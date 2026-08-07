@@ -1,19 +1,24 @@
 <script setup>
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
-import { Dark } from 'quasar'
+import { Dark, useQuasar } from 'quasar'
 import { useRouter } from 'vue-router'
+import { api } from '../boot/axios'
 import { useAuthStore } from '../stores/auth'
 import { useNotificationsStore } from '../stores/notifications'
 import { formatDateTime } from '../utils/date'
 import AppBrand from '../components/AppBrand.vue'
 
 const drawer = ref(true)
+const adminPhotoInput = ref(null)
+const uploadingPhoto = ref(false)
 const router = useRouter()
+const $q = useQuasar()
 const auth = useAuthStore()
 const notifications = useNotificationsStore()
 
 const initials = computed(() => `${auth.user?.nombre?.[0] || ''}${auth.user?.apellido?.[0] || ''}`.toUpperCase())
 const isClient = computed(() => auth.user?.rol === 'cliente')
+const profilePhoto = computed(() => isClient.value ? auth.user?.cliente?.foto_url : auth.user?.foto_url)
 const unreadLabel = computed(() => notifications.unreadCount > 99 ? '99+' : String(notifications.unreadCount || ''))
 
 const menu = computed(() => {
@@ -43,6 +48,28 @@ function toggleDark() {
   localStorage.setItem('viti-theme', Dark.isActive ? 'dark' : 'light')
 }
 
+function chooseAdminPhoto() {
+  if (!isClient.value && !uploadingPhoto.value) adminPhotoInput.value?.click()
+}
+
+async function uploadAdminPhoto(event) {
+  const file = event.target?.files?.[0]
+  if (!file) return
+  uploadingPhoto.value = true
+  try {
+    const payload = new FormData()
+    payload.append('foto', file)
+    const { data } = await api.post('/auth/perfil/foto', payload, { headers: { 'Content-Type': 'multipart/form-data' } })
+    auth.user = data.usuario
+    $q.notify({ type: 'positive', message: 'Fotografía de perfil actualizada.' })
+  } catch (e) {
+    $q.notify({ type: 'negative', message: e.response?.data?.message || 'No se pudo actualizar la fotografía.' })
+  } finally {
+    uploadingPhoto.value = false
+    if (event.target) event.target.value = ''
+  }
+}
+
 async function logout() {
   notifications.clear()
   await auth.logout()
@@ -52,7 +79,6 @@ async function logout() {
 async function handleItem(item) {
   if (item.action === 'request') {
     try {
-      const { api } = await import('../boot/axios')
       const { data } = await api.post('/mi/solicitud')
       window.location.href = data.data.enlace_publico
     } catch {
@@ -222,14 +248,25 @@ onBeforeUnmount(() => {
         <q-separator />
         <q-item class="q-ma-sm q-py-md">
           <q-item-section avatar>
-            <q-avatar color="accent" text-color="white">{{ initials || 'VT' }}</q-avatar>
+            <q-avatar
+              color="accent"
+              text-color="white"
+              :class="{ 'cursor-pointer': !isClient }"
+              @click="chooseAdminPhoto"
+            >
+              <img v-if="profilePhoto" :src="profilePhoto" alt="Foto de perfil" />
+              <span v-else>{{ initials || 'VT' }}</span>
+              <q-tooltip v-if="!isClient">Cambiar fotografía</q-tooltip>
+            </q-avatar>
+            <input ref="adminPhotoInput" type="file" accept="image/jpeg,image/png,image/webp" hidden @change="uploadAdminPhoto" />
           </q-item-section>
           <q-item-section>
             <q-item-label>{{ auth.user?.nombre }} {{ auth.user?.apellido }}</q-item-label>
             <q-item-label caption>{{ isClient ? 'cliente' : 'superadmin' }}</q-item-label>
           </q-item-section>
           <q-item-section side>
-            <q-btn flat round dense icon="logout" @click="logout"><q-tooltip>Cerrar sesión</q-tooltip></q-btn>
+            <q-spinner v-if="uploadingPhoto" size="20px" color="primary" />
+            <q-btn v-else flat round dense icon="logout" @click="logout"><q-tooltip>Cerrar sesión</q-tooltip></q-btn>
           </q-item-section>
         </q-item>
       </div>
