@@ -58,15 +58,10 @@ async function send() {
   }
 }
 
-async function toggleState() {
-  if (!current.value) return
-  const estado = current.value.estado === 'abierta' ? 'cerrada' : 'abierta'
-  try {
-    await api.put(`/buzon/${current.value.id}/estado`, { estado })
-    await load()
-  } catch (e) {
-    $q.notify({ type: 'negative', message: e.response?.data?.message || 'No se pudo actualizar la conversación.' })
-  }
+function startCall(type) {
+  if (!current.value?.id) return
+  if (!navigator.onLine) return $q.notify({ type:'warning', message:'Necesitas Internet para realizar llamadas.' })
+  window.dispatchEvent(new CustomEvent('viti-start-call', { detail: { conversationId: current.value.id, type } }))
 }
 
 onMounted(load)
@@ -76,8 +71,8 @@ onMounted(load)
   <q-page class="viti-page">
     <PageHeader
       eyebrow="Atención al cliente"
-      title="Buzón VITI"
-      subtitle="Responde consultas y conserva cada conversación junto al cliente, solicitud o proyecto."
+      title="Atención VITI"
+      subtitle="Cada cliente tiene un único canal permanente contigo. Mensajes, llamadas y videollamadas en un solo lugar."
     />
 
     <div class="row q-col-gutter-lg">
@@ -100,32 +95,37 @@ onMounted(load)
               </q-item-section>
               <q-item-section>
                 <q-item-label class="text-weight-bold">{{ c.cliente?.nombre }}</q-item-label>
-                <q-item-label>{{ c.asunto }}</q-item-label>
-                <q-item-label caption lines="1">{{ c.mensajes?.[0]?.mensaje || 'Sin mensajes todavía' }}</q-item-label>
-                <q-item-label caption>{{ formatDateTime(c.ultimo_mensaje_at) }}</q-item-label>
+                <q-item-label caption lines="1">{{ c.mensajes?.[0]?.mensaje || 'Canal listo para atención' }}</q-item-label>
+                <q-item-label caption>{{ c.ultimo_mensaje_at ? formatDateTime(c.ultimo_mensaje_at) : 'Sin mensajes todavía' }}</q-item-label>
               </q-item-section>
               <q-item-section side class="items-end q-gutter-xs">
                 <q-badge v-if="c.no_leidos" rounded color="negative" :label="c.no_leidos > 99 ? '99+' : c.no_leidos" />
-                <q-badge outline :color="c.estado === 'abierta' ? 'positive' : 'grey'">{{ c.estado }}</q-badge>
+                <q-badge outline color="positive">Atención</q-badge>
               </q-item-section>
             </q-item>
-            <div v-if="!rows.length && !loading" class="empty-state">No hay conversaciones todavía.</div>
+            <div v-if="!rows.length && !loading" class="empty-state">No hay clientes registrados todavía.</div>
           </q-list>
         </q-card>
       </div>
 
       <div class="col-12 col-md-8">
         <q-card v-if="current" flat class="viti-card">
-          <q-card-section class="row items-center">
+          <q-card-section class="row items-center q-gutter-md">
+            <q-avatar size="52px" color="primary" text-color="white">
+              <img v-if="current.cliente?.foto_path" :src="current.cliente.foto_url || mediaUrl(current.cliente.foto_path)" />
+              <span v-else>{{ current.cliente?.nombre?.[0] || 'C' }}</span>
+            </q-avatar>
             <div>
-              <div class="text-h6 text-weight-bold">{{ current.asunto }}</div>
-              <div class="text-caption text-grey-6">{{ current.cliente?.nombre }} · {{ current.cliente?.telefono }}</div>
+              <div class="text-h6 text-weight-bold">{{ current.cliente?.nombre }}</div>
+              <div class="text-caption text-grey-6">{{ current.cliente?.telefono }} · Canal Atención VITI</div>
             </div>
             <q-space />
-            <q-btn flat color="primary" :label="current.estado === 'abierta' ? 'Cerrar conversación' : 'Reabrir'" no-caps @click="toggleState" />
+            <q-btn round flat color="primary" icon="call" @click="startCall('audio')"><q-tooltip>Llamada de voz</q-tooltip></q-btn>
+            <q-btn round flat color="primary" icon="videocam" @click="startCall('video')"><q-tooltip>Videollamada</q-tooltip></q-btn>
           </q-card-section>
           <q-separator />
           <q-card-section class="messages">
+            <div v-if="!current.mensajes?.length" class="empty-state q-my-xl">Este canal está listo. El cliente puede escribirte directamente sin crear una conversación.</div>
             <div
               v-for="m in current.mensajes"
               :key="m.id"
@@ -140,20 +140,17 @@ onMounted(load)
             </div>
           </q-card-section>
           <q-separator />
-          <q-card-section v-if="current.estado === 'abierta'" class="row q-gutter-sm">
+          <q-card-section class="row q-gutter-sm items-end">
             <q-input v-model="reply" class="col" outlined autogrow label="Responder al cliente" @keyup.ctrl.enter="send" />
-            <q-btn color="primary" unelevated icon="send" @click="send"><q-tooltip>Enviar respuesta</q-tooltip></q-btn>
+            <q-btn color="primary" unelevated round icon="send" @click="send"><q-tooltip>Enviar respuesta</q-tooltip></q-btn>
           </q-card-section>
         </q-card>
-        <div v-else class="empty-state">Selecciona una conversación.</div>
+        <div v-else class="empty-state">Selecciona un cliente para atenderlo.</div>
       </div>
     </div>
   </q-page>
 </template>
 
 <style scoped>
-.messages { display: flex; flex-direction: column; gap: 12px; min-height: 380px; }
-.message { max-width: 82%; padding: 12px 14px; border-radius: 14px; background: var(--viti-surface-soft); }
-.message.client { align-self: flex-start; border-bottom-left-radius: 4px; }
-.message.admin { align-self: flex-end; border-bottom-right-radius: 4px; }
+.messages{display:flex;flex-direction:column;gap:12px;min-height:420px;max-height:62vh;overflow:auto}.message{max-width:82%;padding:12px 14px;border-radius:14px;background:var(--viti-surface-soft)}.message.client{align-self:flex-start;border-bottom-left-radius:4px}.message.admin{align-self:flex-end;border-bottom-right-radius:4px}
 </style>
