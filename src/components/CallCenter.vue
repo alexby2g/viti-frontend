@@ -8,6 +8,7 @@ const $q = useQuasar()
 const auth = useAuthStore()
 const incoming = ref(null)
 const call = ref(null)
+const mediaType = ref('audio')
 const phase = ref('idle')
 const muted = ref(false)
 const cameraOff = ref(false)
@@ -22,7 +23,7 @@ let lastSignalId = 0
 let pendingCandidates = []
 
 const active = computed(() => Boolean(call.value))
-const isVideo = computed(() => (call.value?.tipo || incoming.value?.tipo) === 'video')
+const isVideo = computed(() => (call.value?.tipo || incoming.value?.tipo || mediaType.value) === 'video')
 const otherPerson = computed(() => {
   const c = call.value || incoming.value
   if (!c) return 'Atención VITI'
@@ -42,6 +43,7 @@ function notifyError(message) {
 }
 
 async function openMedia(type) {
+  mediaType.value = type
   if (!navigator.mediaDevices?.getUserMedia) throw new Error('Este dispositivo no permite llamadas desde VITI.')
   localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: type === 'video' })
   remoteStream = new MediaStream()
@@ -81,7 +83,7 @@ function createPeer() {
     else pendingCandidates.push(payload)
   }
   peer.onconnectionstatechange = () => {
-    if (['connected'].includes(peer?.connectionState)) phase.value = 'active'
+    if (peer?.connectionState === 'connected') phase.value = 'active'
     if (['failed','disconnected'].includes(peer?.connectionState) && call.value) phase.value = 'connecting'
   }
 }
@@ -112,6 +114,8 @@ async function startOutgoing(detail) {
       offer_sdp: peer.localDescription.sdp,
     })
     call.value = data.data
+    await nextTick()
+    attachStreams()
     await flushCandidates()
     startSignalPolling()
   } catch (e) {
@@ -125,6 +129,7 @@ async function answerIncoming() {
   if (!item || active.value) return
   try {
     phase.value = 'connecting'
+    mediaType.value = item.tipo
     call.value = item
     incoming.value = null
     await openMedia(item.tipo)
@@ -134,6 +139,8 @@ async function answerIncoming() {
     await peer.setLocalDescription(answer)
     const { data } = await api.post(`/llamadas/${item.id}/contestar`, { answer_sdp: peer.localDescription.sdp })
     call.value = data.data
+    await nextTick()
+    attachStreams()
     await flushCandidates()
     startSignalPolling()
   } catch (e) {
@@ -153,7 +160,10 @@ async function pollIncoming() {
   if (call.value || incoming.value || !navigator.onLine) return
   try {
     const { data } = await api.get('/llamadas/entrante')
-    if (data.data) incoming.value = data.data
+    if (data.data) {
+      mediaType.value = data.data.tipo
+      incoming.value = data.data
+    }
   } catch {}
 }
 
@@ -225,6 +235,7 @@ function cleanup(clearIncoming = true) {
   call.value = null
   if (clearIncoming) incoming.value = null
   phase.value = 'idle'
+  mediaType.value = 'audio'
   muted.value = false
   cameraOff.value = false
   pendingCandidates = []
@@ -273,7 +284,7 @@ onBeforeUnmount(() => {
           <div class="text-caption">{{ statusLabel }} · {{ isVideo ? 'Video' : 'Audio' }}</div>
         </div>
         <q-space />
-        <q-badge color="positive" rounded>VITI</q-badge>
+        <q-badge color="positive" rounded>VITI BETA</q-badge>
       </q-card-section>
 
       <div class="col call-stage">
