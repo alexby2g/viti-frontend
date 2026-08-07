@@ -1,0 +1,22 @@
+{
+  "buildCommand": "npm run build",
+  "outputDirectory": "dist/spa",
+  "rewrites": [
+    {
+      "source": "/api/:path*",
+      "destination": "https://viti-core-api-alexby2g.onrender.com/api/:path*"
+    },
+    {
+      "source": "/sanctum/:path*",
+      "destination": "https://viti-core-api-alexby2g.onrender.com/sanctum/:path*"
+    },
+    {
+      "source": "/storage/:path*",
+      "destination": "https://viti-core-api-alexby2g.onrender.com/storage/:path*"
+    },
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
+  ]
+}

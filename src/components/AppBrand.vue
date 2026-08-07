@@ -1,0 +1,2 @@
+<template><div class="row items-center no-wrap"><img src="/viti-mark.svg" alt="VITI" class="brand-mark"><div class="q-ml-sm"><div class="brand-name">VITI</div><div class="brand-caption">Gestión de soluciones digitales</div></div></div></template>
+<style scoped>.brand-mark{width:44px;height:44px}.brand-name{font-size:24px;font-weight:800;letter-spacing:.18em}.brand-caption{font-size:11px;opacity:.72}</style>
