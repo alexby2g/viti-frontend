@@ -7,6 +7,7 @@ import { useAuthStore } from '../stores/auth'
 import { useNotificationsStore } from '../stores/notifications'
 import { formatDateTime } from '../utils/date'
 import AppBrand from '../components/AppBrand.vue'
+import CallCenter from '../components/CallCenter.vue'
 
 const drawer = ref(true)
 const adminPhotoInput = ref(null)
@@ -143,28 +144,12 @@ onBeforeUnmount(() => {
                   </div>
                 </div>
                 <q-space />
-                <q-btn
-                  v-if="notifications.unreadCount"
-                  flat
-                  dense
-                  no-caps
-                  color="primary"
-                  label="Marcar leído"
-                  @click.stop="markAllRead"
-                />
+                <q-btn v-if="notifications.unreadCount" flat dense no-caps color="primary" label="Marcar leído" @click.stop="markAllRead" />
               </q-card-section>
               <q-separator />
               <q-list v-if="notifications.items.length" separator>
-                <q-item
-                  v-for="item in notifications.items"
-                  :key="item.id"
-                  clickable
-                  v-close-popup
-                  @click="openNotification(item)"
-                >
-                  <q-item-section avatar>
-                    <q-avatar color="primary" text-color="white" icon="chat_bubble" />
-                  </q-item-section>
+                <q-item v-for="item in notifications.items" :key="item.id" clickable v-close-popup @click="openNotification(item)">
+                  <q-item-section avatar><q-avatar color="primary" text-color="white" icon="chat_bubble" /></q-item-section>
                   <q-item-section>
                     <q-item-label class="text-weight-bold">{{ item.titulo }}</q-item-label>
                     <q-item-label caption lines="1">{{ item.asunto }}</q-item-label>
@@ -179,14 +164,7 @@ onBeforeUnmount(() => {
               </div>
               <q-separator />
               <q-card-actions align="right">
-                <q-btn
-                  flat
-                  no-caps
-                  color="primary"
-                  :label="isClient ? 'Abrir mi buzón' : 'Abrir buzón de clientes'"
-                  v-close-popup
-                  @click="router.push(isClient ? '/mi-buzon' : '/buzon')"
-                />
+                <q-btn flat no-caps color="primary" :label="isClient ? 'Abrir mi buzón' : 'Abrir buzón de clientes'" v-close-popup @click="router.push(isClient ? '/mi-buzon' : '/buzon')" />
               </q-card-actions>
             </q-card>
           </q-menu>
@@ -201,44 +179,23 @@ onBeforeUnmount(() => {
           <q-btn unelevated color="primary" icon="add" label="Nueva solicitud" no-caps class="full-width" to="/solicitudes?new=1" />
         </div>
         <div v-else class="q-px-md q-pb-md">
-          <div class="client-badge">
-            <div class="text-caption">Portal de cliente</div>
-            <div class="text-weight-bold">Mi espacio VITI</div>
-          </div>
+          <div class="client-badge"><div class="text-caption">Portal de cliente</div><div class="text-weight-bold">Mi espacio VITI</div></div>
         </div>
 
         <q-scroll-area class="col">
           <q-list padding>
             <template v-for="item in menu" :key="item.label">
-              <q-item
-                v-if="!item.children"
-                clickable
-                v-ripple
-                :to="item.action ? undefined : item.to"
-                exact
-                @click="handleItem(item)"
-              >
+              <q-item v-if="!item.children" clickable v-ripple :to="item.action ? undefined : item.to" exact @click="handleItem(item)">
                 <q-item-section avatar><q-icon :name="item.icon" /></q-item-section>
                 <q-item-section>{{ item.label }}</q-item-section>
-                <q-item-section v-if="item.badge" side>
-                  <q-badge rounded color="negative" :label="item.badge > 99 ? '99+' : item.badge" />
-                </q-item-section>
+                <q-item-section v-if="item.badge" side><q-badge rounded color="negative" :label="item.badge > 99 ? '99+' : item.badge" /></q-item-section>
               </q-item>
 
               <q-expansion-item v-else :icon="item.icon" :label="item.label" group="menu">
-                <q-item
-                  v-for="sub in item.children"
-                  :key="sub.to"
-                  clickable
-                  v-ripple
-                  :to="sub.to"
-                  class="q-ml-sm"
-                >
+                <q-item v-for="sub in item.children" :key="sub.to" clickable v-ripple :to="sub.to" class="q-ml-sm">
                   <q-item-section avatar><q-icon :name="sub.icon" /></q-item-section>
                   <q-item-section>{{ sub.label }}</q-item-section>
-                  <q-item-section v-if="sub.badge" side>
-                    <q-badge rounded color="negative" :label="sub.badge > 99 ? '99+' : sub.badge" />
-                  </q-item-section>
+                  <q-item-section v-if="sub.badge" side><q-badge rounded color="negative" :label="sub.badge > 99 ? '99+' : sub.badge" /></q-item-section>
                 </q-item>
               </q-expansion-item>
             </template>
@@ -248,12 +205,7 @@ onBeforeUnmount(() => {
         <q-separator />
         <q-item class="q-ma-sm q-py-md">
           <q-item-section avatar>
-            <q-avatar
-              color="accent"
-              text-color="white"
-              :class="{ 'cursor-pointer': !isClient }"
-              @click="chooseAdminPhoto"
-            >
+            <q-avatar color="accent" text-color="white" :class="{ 'cursor-pointer': !isClient }" @click="chooseAdminPhoto">
               <img v-if="profilePhoto" :src="profilePhoto" alt="Foto de perfil" />
               <span v-else>{{ initials || 'VT' }}</span>
               <q-tooltip v-if="!isClient">Cambiar fotografía</q-tooltip>
@@ -273,6 +225,7 @@ onBeforeUnmount(() => {
     </q-drawer>
 
     <q-page-container><router-view /></q-page-container>
+    <CallCenter />
   </q-layout>
 </template>
 
