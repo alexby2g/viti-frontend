@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { useQuasar } from 'quasar'
 import { api, initCsrf } from '../boot/axios'
@@ -23,7 +23,12 @@ const visible=(q)=>advanced.value||q.obligatoria||essential.has(q.numero)
 const answered=computed(()=>Object.values(answers).filter(v=>Array.isArray(v)?v.length:String(v??'').trim()).length)
 const totalVisible=computed(()=>sections.value.flatMap(s=>s.preguntas||[]).filter(visible).length)
 const progress=computed(()=>totalVisible.value?Math.min(answered.value/totalVisible.value,1):0)
+const draftKey=computed(()=>`viti-form-draft-${route.params.token}`)
 function errorMessage(e,fallback){const bag=e?.response?.data?.errors;if(bag)return Object.values(bag).flat()[0];return e?.response?.data?.message||fallback}
+function storeDraft(){if(sent.value)return;try{localStorage.setItem(draftKey.value,JSON.stringify({answers:{...answers},otherAnswers:{...otherAnswers},declaration:{...declaration},step:step.value,advanced:advanced.value,updated_at:new Date().toISOString()}))}catch{}}
+function restoreDraft(){if(sent.value)return;try{const d=JSON.parse(localStorage.getItem(draftKey.value)||'null');if(!d)return;Object.assign(answers,d.answers||{});Object.assign(otherAnswers,d.otherAnswers||{});Object.assign(declaration,d.declaration||{});if(Number(d.step)>=1&&Number(d.step)<=7)step.value=Number(d.step);advanced.value=Boolean(d.advanced)}catch{}}
+function clearDraft(){try{localStorage.removeItem(draftKey.value)}catch{}}
+function networkFailure(e){return !navigator.onLine||!e?.response}
 async function load(){loading.value=true;try{item.value=(await api.get(`/publico/solicitudes/${route.params.token}`)).data.data;for(const section of sections.value)for(const q of section.preguntas||[])answers[q.id]=q.tipo==='seleccion_multiple'?[]:'';for(const r of item.value.respuestas||[]){
  const raw=r.respuesta_json??r.respuesta_texto??''
  if(Array.isArray(raw)){
@@ -33,15 +38,18 @@ async function load(){loading.value=true;try{item.value=(await api.get(`/publico
  }else if(typeof raw==='string'&&raw.startsWith('Otro: ')){
   answers[r.pregunta_id]='Otro';otherAnswers[r.pregunta_id]=raw.slice(6)
  }else answers[r.pregunta_id]=raw
-}Object.assign(declaration,{aceptada:Boolean(item.value.declaracion_aceptada),nombre:item.value.declaracion_nombre||item.value.cliente?.nombre||'',fecha:item.value.declaracion_fecha||new Date().toISOString().slice(0,10)});sent.value=['en_revision','aprobada','convertida','cerrada'].includes(item.value.estado)}catch(e){$q.notify({type:'negative',message:errorMessage(e,'El enlace no está disponible.')})}finally{loading.value=false}}
+}Object.assign(declaration,{aceptada:Boolean(item.value.declaracion_aceptada),nombre:item.value.declaracion_nombre||item.value.cliente?.nombre||'',fecha:item.value.declaracion_fecha||new Date().toISOString().slice(0,10)});sent.value=['en_revision','aprobada','convertida','cerrada'].includes(item.value.estado);restoreDraft()}catch(e){$q.notify({type:'negative',message:errorMessage(e,'El enlace no está disponible.')})}finally{loading.value=false}}
 function hasOther(q){return (q.opciones||[]).includes('Otro')}
 function selectedOther(q){const v=answers[q.id];return Array.isArray(v)?v.includes('Otro'):v==='Otro'}
 function normalizedValue(id,value){const custom=String(otherAnswers[id]||'').trim();if(Array.isArray(value))return value.map(x=>x==='Otro'&&custom?`Otro: ${custom}`:x);return value==='Otro'&&custom?`Otro: ${custom}`:value}
 function payload(){return{respuestas:Object.entries(answers).map(([pregunta_id,valor])=>({pregunta_id:Number(pregunta_id),valor:normalizedValue(pregunta_id,valor)})),declaracion_aceptada:declaration.aceptada,declaracion_nombre:declaration.nombre,declaracion_fecha:declaration.fecha}}
-async function save(quiet=false){saving.value=true;try{await initCsrf();await api.put(`/publico/solicitudes/${route.params.token}`,payload());if(!quiet)$q.notify({type:'positive',message:'Tus respuestas fueron guardadas.'});return true}catch(e){$q.notify({type:'negative',message:errorMessage(e,'No se pudo guardar el formulario.')});return false}finally{saving.value=false}}
+async function save(quiet=false){storeDraft();if(!navigator.onLine){if(!quiet)$q.notify({type:'warning',message:'Sin Internet. El borrador quedó guardado en este dispositivo.'});return true}saving.value=true;try{await initCsrf();await api.put(`/publico/solicitudes/${route.params.token}`,payload());clearDraft();if(!quiet)$q.notify({type:'positive',message:'Tus respuestas fueron guardadas.'});return true}catch(e){if(networkFailure(e)){if(!quiet)$q.notify({type:'warning',message:'Se perdió la conexión. El borrador quedó guardado y se sincronizará al volver Internet.'});return true}$q.notify({type:'negative',message:errorMessage(e,'No se pudo guardar el formulario.')});return false}finally{saving.value=false}}
 async function next(){if(await save(true))step.value=Math.min(7,step.value+1)}
-async function submit(){saving.value=true;try{await initCsrf();await api.put(`/publico/solicitudes/${route.params.token}`,payload());await api.post(`/publico/solicitudes/${route.params.token}/enviar`);sent.value=true;$q.notify({type:'positive',message:'Solicitud enviada correctamente. Nuestro equipo la revisará.'})}catch(e){$q.notify({type:'negative',message:errorMessage(e,'Revisa las preguntas obligatorias.')})}finally{saving.value=false}}
-onMounted(load)
+async function submit(){storeDraft();if(!navigator.onLine){$q.notify({type:'warning',message:'El formulario quedó guardado. Conéctate a Internet para enviarlo a revisión.'});return}saving.value=true;try{await initCsrf();await api.put(`/publico/solicitudes/${route.params.token}`,payload());await api.post(`/publico/solicitudes/${route.params.token}/enviar`);sent.value=true;clearDraft();$q.notify({type:'positive',message:'Solicitud enviada correctamente. Nuestro equipo la revisará.'})}catch(e){if(networkFailure(e)){$q.notify({type:'warning',message:'Se guardó el borrador en el dispositivo. Intenta enviarlo cuando vuelva Internet.'});return}$q.notify({type:'negative',message:errorMessage(e,'Revisa las preguntas obligatorias.')})}finally{saving.value=false}}
+async function syncDraft(){if(navigator.onLine&&localStorage.getItem(draftKey.value)&&!sent.value)await save(true)}
+watch(()=>[JSON.stringify(answers),JSON.stringify(otherAnswers),JSON.stringify(declaration),step.value,advanced.value],storeDraft)
+onMounted(async()=>{window.addEventListener('online',syncDraft);await load();await syncDraft()})
+onBeforeUnmount(()=>window.removeEventListener('online',syncDraft))
 </script>
 <template><q-page class="public-page"><q-inner-loading :showing="loading"/><div v-if="item" class="public-shell"><div class="row items-center justify-between q-mb-lg"><AppBrand/><q-badge outline color="primary">{{item.codigo}}</q-badge></div>
 <q-banner v-if="sent" rounded class="bg-green-1 text-green-9 q-mb-lg"><template #avatar><q-icon name="check_circle"/></template>Tu información fue enviada. Nuestro equipo la revisará y se comunicará contigo por teléfono o WhatsApp.</q-banner>
