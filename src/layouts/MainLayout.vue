@@ -10,44 +10,36 @@ import { formatDateTime } from '../utils/date'
 import AppBrand from '../components/AppBrand.vue'
 import CallCenter from '../components/CallCenter.vue'
 
-const adminPhotoInput = ref(null)
-const uploadingPhoto = ref(false)
-const router = useRouter()
-const $q = useQuasar()
-const drawer = ref(false)
-const auth = useAuthStore()
-const notifications = useNotificationsStore()
-const tenant = useTenantStore()
+const adminPhotoInput=ref(null),uploadingPhoto=ref(false),router=useRouter(),$q=useQuasar(),drawer=ref(false)
+const auth=useAuthStore(),notifications=useNotificationsStore(),tenant=useTenantStore()
+const initials=computed(()=>`${auth.user?.nombre?.[0]||''}${auth.user?.apellido?.[0]||''}`.toUpperCase())
+const isClient=computed(()=>auth.user?.rol==='cliente')
+const hasClientProfile=computed(()=>!!auth.user?.cliente_id)
+const isManager=computed(()=>['propietario','administrador'].includes(tenant.role))
+const profilePhoto=computed(()=>isClient.value?auth.user?.cliente?.foto_url:auth.user?.foto_url)
+const unreadLabel=computed(()=>notifications.unreadCount>99?'99+':String(notifications.unreadCount||''))
+const businessOptions=computed(()=>tenant.businesses.map(b=>({label:b.nombre_comercial,value:b.id})))
 
-const initials = computed(() => `${auth.user?.nombre?.[0] || ''}${auth.user?.apellido?.[0] || ''}`.toUpperCase())
-const isClient = computed(() => auth.user?.rol === 'cliente')
-const profilePhoto = computed(() => isClient.value ? auth.user?.cliente?.foto_url : auth.user?.foto_url)
-const unreadLabel = computed(() => notifications.unreadCount > 99 ? '99+' : String(notifications.unreadCount || ''))
-const businessOptions = computed(() => tenant.businesses.map(b => ({ label:b.nombre_comercial, value:b.id })))
-
-const menu = computed(() => {
-  if (isClient.value) {
-    return [
-      { label:'Mi cuenta', icon:'account_circle', to:'/mi-cuenta' },
-      { label:'Mi negocio', icon:'storefront', to:'/mi-negocio' },
-      { label:'Mis aplicaciones', icon:'apps', to:'/mi-aplicaciones' },
-      { label:'Catálogo VITI', icon:'widgets', to:'/catalogo-viti' },
-      { label:'Mi proyecto', icon:'account_tree', to:'/mi-proyecto' },
-      { label:'Mis pagos', icon:'payments', to:'/mi-pagos' },
-      { label:'Nueva solicitud', icon:'assignment_add', action:'request' },
-      { label:'Mi buzón', icon:'forum', to:'/mi-buzon', badge:notifications.unreadCount },
-    ]
+const menu=computed(()=>{
+  if(isClient.value){
+    const items=[]
+    if(hasClientProfile.value)items.push({label:'Mi cuenta',icon:'account_circle',to:'/mi-cuenta'})
+    items.push({label:'Mi negocio',icon:'storefront',to:'/mi-negocio'},{label:'Mis aplicaciones',icon:'apps',to:'/mi-aplicaciones'})
+    if(isManager.value)items.push({label:'Catálogo VITI',icon:'widgets',to:'/catalogo-viti'},{label:'Mi proyecto',icon:'account_tree',to:'/mi-proyecto'},{label:'Mis pagos',icon:'payments',to:'/mi-pagos'})
+    if(hasClientProfile.value&&isManager.value)items.push({label:'Nueva solicitud',icon:'assignment_add',action:'request'})
+    if(hasClientProfile.value)items.push({label:'Mi buzón',icon:'forum',to:'/mi-buzon',badge:notifications.unreadCount})
+    return items
   }
   return [
-    { label:'Inicio', icon:'dashboard', to:'/' },
-    { label:'Plataforma', icon:'hub', children:[{ label:'Centro SaaS VITI', icon:'cloud_circle', to:'/saas' }] },
-    { label:'Clientes y empresas', icon:'groups', to:'/clientes' },
-    { label:'Levantamiento', icon:'assignment', children:[{ label:'Solicitudes de sistema', icon:'fact_check', to:'/solicitudes' }] },
-    { label:'Desarrollo', icon:'terminal', children:[{ label:'Proyectos', icon:'account_tree', to:'/proyectos' },{ label:'Centro de aplicaciones', icon:'apps', to:'/aplicaciones' }] },
-    { label:'Atención', icon:'forum', children:[{ label:'Buzón de clientes', icon:'mark_chat_unread', to:'/buzon', badge:notifications.unreadCount }] },
-    { label:'Soporte', icon:'support_agent', children:[{ label:'Mantenimiento', icon:'build_circle', to:'/mantenimientos' },{ label:'Archivos', icon:'folder', to:'/archivos' }] },
-    { label:'Control', icon:'analytics', children:[{ label:'Pagos y suscripciones', icon:'payments', to:'/pagos' },{ label:'Reportes', icon:'picture_as_pdf', to:'/reportes' }] },
-    { label:'Administración', icon:'admin_panel_settings', children:[{ label:'Auditoría', icon:'history', to:'/auditoria' },{ label:'Almacenamiento', icon:'cloud', to:'/almacenamiento' }] },
+    {label:'Inicio',icon:'dashboard',to:'/'},
+    {label:'Plataforma',icon:'hub',children:[{label:'Centro SaaS VITI',icon:'cloud_circle',to:'/saas'}]},
+    {label:'Clientes y empresas',icon:'groups',to:'/clientes'},
+    {label:'Levantamiento',icon:'assignment',children:[{label:'Solicitudes de sistema',icon:'fact_check',to:'/solicitudes'}]},
+    {label:'Desarrollo',icon:'terminal',children:[{label:'Proyectos',icon:'account_tree',to:'/proyectos'},{label:'Centro de aplicaciones',icon:'apps',to:'/aplicaciones'}]},
+    {label:'Atención',icon:'forum',children:[{label:'Buzón de clientes',icon:'mark_chat_unread',to:'/buzon',badge:notifications.unreadCount}]},
+    {label:'Soporte',icon:'support_agent',children:[{label:'Mantenimiento',icon:'build_circle',to:'/mantenimientos'},{label:'Archivos',icon:'folder',to:'/archivos'}]},
+    {label:'Control',icon:'analytics',children:[{label:'Pagos y suscripciones',icon:'payments',to:'/pagos'},{label:'Reportes',icon:'picture_as_pdf',to:'/reportes'}]},
+    {label:'Administración',icon:'admin_panel_settings',children:[{label:'Auditoría',icon:'history',to:'/auditoria'},{label:'Almacenamiento',icon:'cloud',to:'/almacenamiento'}]},
   ]
 })
 
@@ -61,8 +53,7 @@ async function handleItem(item){closeMobileDrawer();if(item.action==='request'){
 function openNotification(item){if(item.path){router.push(item.path);return}router.push(isClient.value?'/mi-buzon':'/buzon')}
 async function markAllRead(){try{await notifications.markAllRead()}catch{/* conserva estado */}}
 function refreshWhenVisible(){if(document.visibilityState==='visible')notifications.refresh()}
-
-onMounted(async()=>{drawer.value=$q.screen.gt.sm;if(isClient.value){try{await tenant.load()}catch{/* el menú sigue disponible */}}notifications.start();document.addEventListener('visibilitychange',refreshWhenVisible)})
+onMounted(async()=>{drawer.value=$q.screen.gt.sm;if(isClient.value){try{await tenant.load()}catch{/* mantiene acceso básico */}}notifications.start();document.addEventListener('visibilitychange',refreshWhenVisible)})
 onBeforeUnmount(()=>{notifications.stop();document.removeEventListener('visibilitychange',refreshWhenVisible)})
 </script>
 
