@@ -4,14 +4,83 @@ import { useQuasar } from 'quasar'
 import { api } from '../boot/axios'
 import PageHeader from '../components/PageHeader.vue'
 import RowActionsMenu from '../components/RowActionsMenu.vue'
-const $q=useQuasar(),rows=ref([]),companies=ref([]),projects=ref([]),dialog=ref(false),editing=ref(null),loading=ref(false)
-const empty=()=>({empresa_id:null,proyecto_id:null,nombre:'',version:'',tipo:'web',tecnologias:'',entorno:'beta',estado:'en_pruebas',url:'',url_administracion:'',repositorio_url:'',proveedor_hosting:'',notas:'',publicado_at:null});const form=reactive(empty())
-const columns=[{name:'actions',label:'',field:'actions',align:'left'},{name:'nombre',label:'Aplicación',field:'nombre',align:'left'},{name:'empresa',label:'Empresa',field:r=>r.empresa?.nombre_comercial,align:'left'},{name:'version',label:'Versión',field:'version',align:'left'},{name:'entorno',label:'Entorno',field:'entorno',align:'left'},{name:'estado',label:'Estado',field:'estado',align:'left'},{name:'url',label:'URL',field:'url',align:'left'}]
-async function load(){loading.value=true;try{const [a,e,p]=await Promise.all([api.get('/aplicaciones',{params:{per_page:100}}),api.get('/empresas',{params:{per_page:100}}),api.get('/proyectos',{params:{per_page:100}})]);rows.value=a.data.data;companies.value=e.data.data;projects.value=p.data.data}finally{loading.value=false}}
+
+const $q = useQuasar()
+const rows = ref([])
+const companies = ref([])
+const projects = ref([])
+const dialog = ref(false)
+const editing = ref(null)
+const loading = ref(false)
+
+const empty = () => ({ empresa_id:null,proyecto_id:null,nombre:'',version:'',tipo:'web',tecnologias:'',entorno:'beta',estado:'en_pruebas',url:'',url_administracion:'',repositorio_url:'',proveedor_hosting:'',notas:'',publicado_at:null })
+const form = reactive(empty())
+const columns = [
+  {name:'actions',label:'',field:'actions',align:'left'},
+  {name:'nombre',label:'Aplicación',field:'nombre',align:'left'},
+  {name:'empresa',label:'Empresa',field:r=>r.empresa?.nombre_comercial,align:'left'},
+  {name:'version',label:'Versión',field:'version',align:'left'},
+  {name:'entorno',label:'Entorno',field:'entorno',align:'left'},
+  {name:'estado',label:'Estado',field:'estado',align:'left'},
+  {name:'url',label:'URL',field:'url',align:'left'},
+]
+
+async function load(){
+  loading.value=true
+  try{
+    const [a,e,p]=await Promise.all([
+      api.get('/aplicaciones',{params:{per_page:100}}),
+      api.get('/empresas',{params:{per_page:100}}),
+      api.get('/proyectos',{params:{per_page:100}}),
+    ])
+    rows.value=a.data.data
+    companies.value=e.data.data
+    projects.value=p.data.data
+  } finally { loading.value=false }
+}
 function open(row=null){editing.value=row;Object.assign(form,empty(),row||{});dialog.value=true}
 async function save(){try{editing.value?await api.put(`/aplicaciones/${editing.value.id}`,form):await api.post('/aplicaciones',form);$q.notify({type:'positive',message:editing.value?'Aplicación actualizada.':'Aplicación integrada.'});dialog.value=false;load()}catch(e){$q.notify({type:'negative',message:e.response?.data?.message||'No se pudo guardar.'})}}
 function remove(row){$q.dialog({title:'Retirar aplicación',message:`¿Retirar ${row.nombre}?`,cancel:true}).onOk(async()=>{try{await api.delete(`/aplicaciones/${row.id}`);load()}catch(e){$q.notify({type:'negative',message:e.response?.data?.message||'No se puede retirar.'})}})}
 onMounted(load)
 </script>
-<template><q-page class="viti-page"><PageHeader eyebrow="Desarrollo" title="Centro de aplicaciones" subtitle="Registro técnico de páginas, sistemas y aplicaciones entregadas o en beta para supervisión y mantenimiento."><q-btn color="primary" unelevated icon="add_to_queue" label="Integrar aplicación" no-caps @click="open()"/></PageHeader><q-table flat class="viti-table" :rows="rows" :columns="columns" row-key="id" :loading="loading" :pagination="{rowsPerPage:20,sortBy:'id',descending:true}"><template #body-cell-actions="p"><q-td :props="p"><RowActionsMenu @open="open(p.row)" @edit="open(p.row)" @delete="remove(p.row)"/></q-td></template><template #body-cell-url="p"><q-td :props="p"><q-btn v-if="p.value" flat dense icon="open_in_new" color="primary" :href="p.value" target="_blank"/><span v-else>Sin URL</span></q-td></template><template #body-cell-estado="p"><q-td :props="p"><q-badge outline color="primary">{{p.value}}</q-badge></q-td></template><template #no-data><div class="empty-state full-width"><q-icon name="apps" size="52px"/><div class="text-h6 q-mt-sm">Todavía no hay aplicaciones integradas</div><div>Cuando un proyecto llegue a beta o producción, aparecerá aquí.</div></div></template></q-table>
-<q-dialog v-model="dialog"><q-card style="width:760px;max-width:94vw"><q-card-section><div class="section-label">{{editing?'Editar':'Integrar'}} aplicación</div><div class="text-h5 text-weight-bold">Sistema del cliente</div></q-card-section><q-card-section><div class="row q-col-gutter-md"><div class="col-12 col-sm-6"><q-select v-model="form.empresa_id" outlined emit-value map-options :options="companies.map(x=>({label:x.nombre_comercial,value:x.id}))" label="Empresa *"/></div><div class="col-12 col-sm-6"><q-select v-model="form.proyecto_id" outlined emit-value map-options clearable :options="projects.map(x=>({label:`${x.codigo} · ${x.nombre}`,value:x.id}))" label="Proyecto relacionado"/></div><div class="col-12 col-sm-8"><q-input v-model="form.nombre" outlined label="Nombre de la aplicación *"/></div><div class="col-12 col-sm-4"><q-input v-model="form.version" outlined label="Versión"/></div><div class="col-12 col-sm-4"><q-select v-model="form.tipo" outlined :options="['web','movil','escritorio','hibrido','api','otro']" label="Tipo"/></div><div class="col-12 col-sm-8"><q-input v-model="form.tecnologias" outlined label="Tecnologías" placeholder="Ej. Laravel, Quasar, MySQL"/></div><div class="col-12 col-sm-6"><q-select v-model="form.entorno" outlined :options="['desarrollo','beta','produccion']" label="Entorno"/></div><div class="col-12 col-sm-6"><q-select v-model="form.estado" outlined :options="['en_pruebas','activo','pausado','retirado']" label="Estado"/></div><div class="col-12"><q-input v-model="form.url" outlined label="URL pública"/></div><div class="col-12"><q-input v-model="form.url_administracion" outlined label="URL administrativa"/></div><div class="col-12 col-sm-8"><q-input v-model="form.repositorio_url" outlined label="Repositorio del proyecto"/></div><div class="col-12 col-sm-4"><q-input v-model="form.proveedor_hosting" outlined label="Hosting / proveedor" placeholder="Vercel, Render..."/></div><div class="col-12"><q-input v-model="form.notas" outlined type="textarea" label="Notas técnicas"/></div></div></q-card-section><q-card-actions align="right"><q-btn flat label="Cancelar" v-close-popup/><q-btn color="primary" unelevated :label="editing?'Guardar cambios':'Integrar aplicación'" no-caps @click="save"/></q-card-actions></q-card></q-dialog></q-page></template>
+
+<template>
+  <q-page class="viti-page">
+    <PageHeader eyebrow="VITI" title="Centro de aplicaciones" subtitle="Aplicaciones propias de VITI y sistemas administrados desde una sola plataforma.">
+      <q-btn color="primary" unelevated icon="add_to_queue" label="Integrar sistema externo" no-caps @click="open()"/>
+    </PageHeader>
+
+    <div class="text-overline text-primary">VITI Apps</div>
+    <div class="text-h6 text-weight-bold q-mb-sm">Aplicaciones de la plataforma</div>
+    <div class="apps-grid q-mb-xl">
+      <q-card flat class="viti-card native-app-card">
+        <q-card-section class="row items-start no-wrap q-gutter-md">
+          <q-avatar size="56px" color="primary" text-color="white" icon="content_cut"/>
+          <div class="col">
+            <div class="row items-center q-gutter-sm"><div class="text-h6 text-weight-bold">Peluquería</div><q-badge color="positive" label="V1 activa"/></div>
+            <div class="text-body2 text-grey-7 q-mt-xs">Agenda, clientes, servicios, personal, atenciones, pagos e historial para peluquerías, salones y barberías.</div>
+          </div>
+        </q-card-section>
+        <q-separator/>
+        <q-card-actions align="right"><q-btn color="primary" unelevated no-caps icon-right="arrow_forward" label="Abrir aplicación" to="/apps/peluqueria"/></q-card-actions>
+      </q-card>
+    </div>
+
+    <div class="text-overline text-primary">Sistemas administrados</div>
+    <div class="text-h6 text-weight-bold">Aplicaciones de clientes</div>
+    <div class="text-caption text-grey-6 q-mb-md">Proyectos externos entregados, desplegados o mantenidos desde VITI.</div>
+
+    <q-table flat class="viti-table" :rows="rows" :columns="columns" row-key="id" :loading="loading" :pagination="{rowsPerPage:20,sortBy:'id',descending:true}">
+      <template #body-cell-actions="p"><q-td :props="p"><RowActionsMenu @open="open(p.row)" @edit="open(p.row)" @delete="remove(p.row)"/></q-td></template>
+      <template #body-cell-url="p"><q-td :props="p"><q-btn v-if="p.value" flat dense icon="open_in_new" color="primary" :href="p.value" target="_blank"/><span v-else>Sin URL</span></q-td></template>
+      <template #body-cell-estado="p"><q-td :props="p"><q-badge outline color="primary">{{p.value}}</q-badge></q-td></template>
+      <template #no-data><div class="empty-state full-width"><q-icon name="apps" size="52px"/><div class="text-h6 q-mt-sm">Todavía no hay sistemas externos integrados</div><div>Las aplicaciones propias de VITI seguirán disponibles arriba.</div></div></template>
+    </q-table>
+
+    <q-dialog v-model="dialog"><q-card style="width:760px;max-width:94vw"><q-card-section><div class="section-label">{{editing?'Editar':'Integrar'}} aplicación</div><div class="text-h5 text-weight-bold">Sistema del cliente</div></q-card-section><q-card-section><div class="row q-col-gutter-md"><div class="col-12 col-sm-6"><q-select v-model="form.empresa_id" outlined emit-value map-options :options="companies.map(x=>({label:x.nombre_comercial,value:x.id}))" label="Empresa *"/></div><div class="col-12 col-sm-6"><q-select v-model="form.proyecto_id" outlined emit-value map-options clearable :options="projects.map(x=>({label:`${x.codigo} · ${x.nombre}`,value:x.id}))" label="Proyecto relacionado"/></div><div class="col-12 col-sm-8"><q-input v-model="form.nombre" outlined label="Nombre de la aplicación *"/></div><div class="col-12 col-sm-4"><q-input v-model="form.version" outlined label="Versión"/></div><div class="col-12 col-sm-4"><q-select v-model="form.tipo" outlined :options="['web','movil','escritorio','hibrido','api','otro']" label="Tipo"/></div><div class="col-12 col-sm-8"><q-input v-model="form.tecnologias" outlined label="Tecnologías" placeholder="Ej. Laravel, Quasar, MySQL"/></div><div class="col-12 col-sm-6"><q-select v-model="form.entorno" outlined :options="['desarrollo','beta','produccion']" label="Entorno"/></div><div class="col-12 col-sm-6"><q-select v-model="form.estado" outlined :options="['en_pruebas','activo','pausado','retirado']" label="Estado"/></div><div class="col-12"><q-input v-model="form.url" outlined label="URL pública"/></div><div class="col-12"><q-input v-model="form.url_administracion" outlined label="URL administrativa"/></div><div class="col-12 col-sm-8"><q-input v-model="form.repositorio_url" outlined label="Repositorio del proyecto"/></div><div class="col-12 col-sm-4"><q-input v-model="form.proveedor_hosting" outlined label="Hosting / proveedor" placeholder="Vercel, Render..."/></div><div class="col-12"><q-input v-model="form.notas" outlined type="textarea" label="Notas técnicas"/></div></div></q-card-section><q-card-actions align="right"><q-btn flat label="Cancelar" v-close-popup/><q-btn color="primary" unelevated :label="editing?'Guardar cambios':'Integrar aplicación'" no-caps @click="save"/></q-card-actions></q-card></q-dialog>
+  </q-page>
+</template>
+
+<style scoped>
+.apps-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,440px));gap:18px}.native-app-card{overflow:hidden}.empty-state{text-align:center;padding:36px;color:#777}
+</style>
