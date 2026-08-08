@@ -1,6 +1,6 @@
 <script setup>
 import { mediaUrl } from '../utils/media.js'
-import { onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import { useQuasar } from 'quasar'
 import { api } from '../boot/axios'
 import { downloadFile } from '../utils/download'
@@ -14,6 +14,7 @@ const request = ref(null)
 const edit = ref(false)
 const saving = ref(false)
 const photo = ref(null)
+const photoFailed = ref(false)
 const form = reactive({ nombre:'', whatsapp:'', ci:'', ci_expedido:'', ciudad:'', direccion:'' })
 
 const statusLabels = {
@@ -21,8 +22,12 @@ const statusLabels = {
   convertida:'Convertida en proyecto', cerrada:'Cerrada'
 }
 
+const photoSrc = computed(() => {
+  if (photoFailed.value || !profile.value) return ''
+  return profile.value.foto_url || mediaUrl(profile.value.foto_path)
+})
+
 function requestStatus(){ return statusLabels[request.value?.estado] || request.value?.estado || 'Sin solicitud' }
-function photoUrl(path){ return mediaUrl(path) }
 function errorMessage(e, fallback){ const bag=e?.response?.data?.errors; if(bag) return Object.values(bag).flat()[0]; return e?.response?.data?.message||fallback }
 
 async function load(){
@@ -30,6 +35,7 @@ async function load(){
   try{
     profile.value=(await api.get('/mi/perfil')).data.data
     request.value=(await api.get('/mi/solicitud')).data.data
+    photoFailed.value=false
     Object.assign(form,{
       nombre:profile.value.nombre||'', whatsapp:profile.value.whatsapp||'', ci:profile.value.documento||'',
       ci_expedido:profile.value.ci_expedido||'', ciudad:profile.value.ciudad||'', direccion:profile.value.direccion||''
@@ -45,18 +51,33 @@ async function start(){
   finally{starting.value=false}
 }
 
-async function save(){
-  saving.value=true
-  try{profile.value=(await api.put('/mi/perfil',form)).data.data;edit.value=false;$q.notify({type:'positive',message:'Tus datos fueron actualizados.'})}
-  catch(e){$q.notify({type:'negative',message:errorMessage(e,'Revisa los datos ingresados.')})}
-  finally{saving.value=false}
+async function uploadPhoto(){
+  if(!photo.value) return true
+  const fd=new FormData();fd.append('foto',photo.value)
+  try{
+    const { data } = await api.post('/mi/perfil/foto',fd)
+    profile.value = data.data || profile.value
+    photo.value=null
+    photoFailed.value=false
+    return true
+  }catch(e){
+    $q.notify({type:'negative',message:errorMessage(e,'No se pudo subir la fotografía.')})
+    return false
+  }
 }
 
-async function upload(){
-  if(!photo.value)return
-  const fd=new FormData();fd.append('foto',photo.value)
-  try{await api.post('/mi/perfil/foto',fd);photo.value=null;await load();$q.notify({type:'positive',message:'Fotografía actualizada.'})}
-  catch(e){$q.notify({type:'negative',message:errorMessage(e,'No se pudo subir la fotografía.')})}
+async function save(){
+  saving.value=true
+  try{
+    profile.value=(await api.put('/mi/perfil',form)).data.data
+    const photoOk = await uploadPhoto()
+    if (!photoOk) return
+    edit.value=false
+    await load()
+    $q.notify({type:'positive',message:'Tus datos y fotografía fueron actualizados.'})
+  }
+  catch(e){$q.notify({type:'negative',message:errorMessage(e,'Revisa los datos ingresados.')})}
+  finally{saving.value=false}
 }
 
 onMounted(load)
@@ -81,7 +102,7 @@ onMounted(load)
           <q-card-section class="row q-col-gutter-lg items-center">
             <div class="col-auto">
               <q-avatar size="128px" class="id-photo">
-                <img v-if="profile.foto_path" :src="photoUrl(profile.foto_path)" />
+                <img v-if="photoSrc" :src="photoSrc" alt="Fotografía del cliente" @error="photoFailed=true" />
                 <q-icon v-else name="person" size="68px" color="grey-5" />
               </q-avatar>
             </div>
@@ -153,7 +174,10 @@ onMounted(load)
           <div class="col-12 col-sm-2"><q-input v-model="form.ci_expedido" outlined label="Expedido" /></div>
           <div class="col-12 col-sm-6"><q-input v-model="form.ciudad" outlined label="Ciudad o localidad *" /></div>
           <div class="col-12 col-sm-6"><q-input v-model="form.direccion" outlined label="Dirección o zona" /></div>
-          <div class="col-12"><q-file v-model="photo" outlined accept="image/png,image/jpeg,image/webp" label="Cambiar fotografía"><template #append><q-btn v-if="photo" flat round icon="upload" @click.stop="upload" /></template></q-file><div class="text-caption text-grey-6 q-mt-xs">Fotografía reciente, de frente, con el rostro visible.</div></div>
+          <div class="col-12">
+            <q-file v-model="photo" outlined accept="image/png,image/jpeg,image/webp" label="Nueva fotografía (opcional)" clearable />
+            <div class="text-caption text-grey-6 q-mt-xs">Si eliges una foto, se subirá automáticamente cuando pulses “Guardar cambios”. Debe ser reciente, de frente y con el rostro visible.</div>
+          </div>
         </div></q-card-section>
         <q-card-actions align="right"><q-btn flat label="Cancelar" no-caps v-close-popup /><q-btn color="primary" unelevated label="Guardar cambios" no-caps :loading="saving" @click="save" /></q-card-actions>
       </q-card>
