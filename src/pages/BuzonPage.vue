@@ -97,7 +97,7 @@ async function send(){
 }
 
 function startCall(type){ if(!current.value?.id)return; if(!navigator.onLine)return $q.notify({type:'warning',message:'Necesitas Internet para realizar llamadas.'}); if(!callsEnabled.value){openSchedule(type);return} window.dispatchEvent(new CustomEvent('viti-start-call',{detail:{conversationId:current.value.id,type}})) }
-function openSchedule(modality='video',existing=null){ scheduleMode.value=existing?'approve':'new'; scheduleForm.value={modalidad:existing?.modalidad||modality,programada_para:'',duracion_minutos:30,motivo:existing?.motivo||'Sesión de soporte y verificación con Atención VITI.',nota_admin:''}; scheduleDialog.value=true }
+function openSchedule(modality='video',existing=null){ scheduleMode.value=existing?'approve':'new'; scheduleForm.value={modalidad:existing?.modalidad||modality,programada_para:'',duracion_minutos:30,motivo:existing?.motivo||'Atención con el cliente.',nota_admin:''}; scheduleDialog.value=true }
 
 async function saveSchedule(){
   if(!current.value?.id)return
@@ -117,7 +117,7 @@ onMounted(load)
 
 <template>
   <q-page class="viti-page admin-chat-page">
-    <PageHeader v-if="!isMobile || !mobileChatOpen" eyebrow="Atención al cliente" title="Atención VITI" subtitle="Chats, capturas y sesiones de soporte autorizadas." />
+    <PageHeader v-if="!isMobile || !mobileChatOpen" eyebrow="Atención al cliente" title="Atención VITI" subtitle="Conversaciones, archivos y atención en tiempo real." />
 
     <div class="admin-chat-layout" :class="{ 'mobile-mode':isMobile }">
       <div v-show="showContacts" class="contacts-pane">
@@ -126,7 +126,7 @@ onMounted(load)
           <q-list separator>
             <q-item v-for="c in rows" :key="c.id" clickable :active="!isMobile && selected===c.id" active-class="bg-blue-1 text-primary" @click="choose(c.id)">
               <q-item-section avatar><q-avatar color="primary" text-color="white"><img v-if="c.cliente?.foto_url || c.cliente?.foto_path" :src="c.cliente?.foto_url || mediaUrl(c.cliente?.foto_path)"/><span v-else>{{c.cliente?.nombre?.[0]||'C'}}</span></q-avatar></q-item-section>
-              <q-item-section><q-item-label class="text-weight-bold">{{c.cliente?.nombre}}</q-item-label><q-item-label caption lines="1">{{c.mensajes?.[0]?.mensaje||(c.mensajes?.[0]?.archivo_path?'📷 Imagen adjunta':'Canal listo para atención')}}</q-item-label><q-item-label caption>{{c.ultimo_mensaje_at?formatDateTime(c.ultimo_mensaje_at):'Sin mensajes todavía'}}</q-item-label></q-item-section>
+              <q-item-section><q-item-label class="text-weight-bold">{{c.cliente?.nombre}}</q-item-label><q-item-label caption lines="1">{{c.mensajes?.[0]?.mensaje||(c.mensajes?.[0]?.archivo_path?'📷 Imagen adjunta':'Sin mensajes')}}</q-item-label><q-item-label caption>{{c.ultimo_mensaje_at?formatDateTime(c.ultimo_mensaje_at):'Sin mensajes todavía'}}</q-item-label></q-item-section>
               <q-item-section side class="items-end q-gutter-xs"><q-badge v-if="c.no_leidos" rounded color="negative" :label="c.no_leidos>99?'99+':c.no_leidos"/><q-icon v-if="isMobile" name="chevron_right" color="grey-6" size="24px"/></q-item-section>
             </q-item>
             <div v-if="!rows.length&&!loading" class="empty-state">No hay clientes registrados todavía.</div>
@@ -150,7 +150,7 @@ onMounted(load)
 
           <q-separator/>
           <q-card-section ref="messagesBox" class="messages messenger-bg">
-            <div v-if="!current.mensajes?.length" class="empty-state q-my-xl">El canal está listo. Puedes escribir al cliente o esperar su consulta.</div>
+            <div v-if="!current.mensajes?.length" class="empty-state q-my-xl">Aún no hay mensajes en esta conversación.</div>
             <div v-for="m in current.mensajes" :key="m.id" class="message-row" :class="m.usuario?.rol==='cliente'?'client':'admin'">
               <q-avatar v-if="m.usuario?.rol==='cliente'" size="28px" color="primary" text-color="white" class="message-avatar"><img v-if="current.cliente?.foto_url" :src="current.cliente.foto_url"/><span v-else>{{current.cliente?.nombre?.[0]||'C'}}</span></q-avatar>
               <div class="bubble" :class="m.usuario?.rol==='cliente'?'bubble-client':'bubble-admin'"><div v-if="m.archivo_url" class="attachment-wrap"><a :href="m.archivo_url" target="_blank" rel="noopener"><img :src="m.archivo_url" :alt="m.archivo_nombre||'Imagen adjunta'" class="chat-image"/></a></div><div v-if="m.mensaje" class="message-text">{{m.mensaje}}</div><div class="message-meta">{{formatDateTime(m.created_at)}}</div></div>
@@ -165,7 +165,7 @@ onMounted(load)
       </div>
     </div>
 
-    <q-dialog v-model="scheduleDialog"><q-card class="viti-card" style="width:560px;max-width:94vw"><q-card-section><div class="text-overline text-primary">Atención controlada</div><div class="text-h6 text-weight-bold">{{scheduleMode==='approve'?'Aprobar solicitud':'Habilitar atención'}}</div><div class="text-caption text-grey-6">Si dejas la fecha vacía se habilita ahora. Si eliges fecha, VITI notificará la cita al cliente.</div></q-card-section><q-card-section class="q-gutter-md"><q-select v-model="scheduleForm.modalidad" outlined emit-value map-options label="Modalidad" :options="[{label:'Llamada de voz',value:'audio'},{label:'Videollamada',value:'video'},{label:'Asistencia con pantalla',value:'pantalla'}]"/><q-input v-model="scheduleForm.programada_para" outlined type="datetime-local" label="Fecha y hora (opcional)" stack-label/><q-input v-model.number="scheduleForm.duracion_minutos" outlined type="number" min="15" max="180" label="Duración autorizada (minutos)"/><q-input v-model="scheduleForm.motivo" outlined type="textarea" autogrow label="Motivo / objetivo de la sesión"/><q-input v-model="scheduleForm.nota_admin" outlined type="textarea" autogrow label="Nota para el cliente (opcional)"/></q-card-section><q-card-actions align="right"><q-btn flat no-caps label="Cancelar" v-close-popup/><q-btn color="primary" unelevated no-caps :label="scheduleForm.programada_para?'Programar':'Habilitar ahora'" :loading="scheduleLoading" @click="saveSchedule"/></q-card-actions></q-card></q-dialog>
+    <q-dialog v-model="scheduleDialog"><q-card class="viti-card" style="width:560px;max-width:94vw"><q-card-section><div class="text-overline text-primary">Sesión de atención</div><div class="text-h6 text-weight-bold">{{scheduleMode==='approve'?'Aprobar solicitud':'Habilitar atención'}}</div><div class="text-caption text-grey-6">Si dejas la fecha vacía se habilita ahora. Si eliges fecha, VITI notificará la cita al cliente.</div></q-card-section><q-card-section class="q-gutter-md"><q-select v-model="scheduleForm.modalidad" outlined emit-value map-options label="Modalidad" :options="[{label:'Llamada de voz',value:'audio'},{label:'Videollamada',value:'video'},{label:'Asistencia con pantalla',value:'pantalla'}]"/><q-input v-model="scheduleForm.programada_para" outlined type="datetime-local" label="Fecha y hora (opcional)" stack-label/><q-input v-model.number="scheduleForm.duracion_minutos" outlined type="number" min="15" max="180" label="Duración autorizada (minutos)"/><q-input v-model="scheduleForm.motivo" outlined type="textarea" autogrow label="Motivo / objetivo de la sesión"/><q-input v-model="scheduleForm.nota_admin" outlined type="textarea" autogrow label="Nota para el cliente (opcional)"/></q-card-section><q-card-actions align="right"><q-btn flat no-caps label="Cancelar" v-close-popup/><q-btn color="primary" unelevated no-caps :label="scheduleForm.programada_para?'Programar':'Habilitar ahora'" :loading="scheduleLoading" @click="saveSchedule"/></q-card-actions></q-card></q-dialog>
   </q-page>
 </template>
 
