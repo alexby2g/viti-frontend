@@ -22,6 +22,7 @@ const columns = [
   {name:'version',label:'Versión',field:'version',align:'left'},
   {name:'entorno',label:'Entorno',field:'entorno',align:'left'},
   {name:'estado',label:'Estado',field:'estado',align:'left'},
+  {name:'entrega',label:'Acceso cliente',field:'acceso_cliente',align:'left'},
   {name:'url',label:'URL',field:'url',align:'left'},
 ]
 
@@ -41,6 +42,18 @@ async function load(){
 function open(row=null){editing.value=row;Object.assign(form,empty(),row||{});dialog.value=true}
 async function save(){try{editing.value?await api.put(`/aplicaciones/${editing.value.id}`,form):await api.post('/aplicaciones',form);$q.notify({type:'positive',message:editing.value?'Aplicación actualizada.':'Aplicación integrada.'});dialog.value=false;load()}catch(e){$q.notify({type:'negative',message:e.response?.data?.message||'No se pudo guardar.'})}}
 function remove(row){$q.dialog({title:'Retirar aplicación',message:`¿Retirar ${row.nombre}?`,cancel:true}).onOk(async()=>{try{await api.delete(`/aplicaciones/${row.id}`);load()}catch(e){$q.notify({type:'negative',message:e.response?.data?.message||'No se puede retirar.'})}})}
+async function toggleDelivery(row){
+  const delivering=!row.acceso_cliente
+  const title=delivering?'Entregar aplicación':'Revocar acceso'
+  const message=delivering?`¿Habilitar ${row.nombre} para ${row.empresa?.nombre_comercial||'el cliente'}?`:`¿Quitar temporalmente el acceso del cliente a ${row.nombre}?`
+  $q.dialog({title,message,cancel:true,persistent:true}).onOk(async()=>{
+    try{
+      await api.post(`/aplicaciones/${row.id}/${delivering?'entregar':'revocar-acceso'}`)
+      $q.notify({type:'positive',message:delivering?'Aplicación entregada al cliente.':'Acceso revocado.'})
+      await load()
+    }catch(e){$q.notify({type:'negative',message:e.response?.data?.message||'No se pudo cambiar el acceso.'})}
+  })
+}
 onMounted(load)
 </script>
 
@@ -68,12 +81,13 @@ onMounted(load)
 
     <div class="text-overline text-primary">Sistemas administrados</div>
     <div class="text-h6 text-weight-bold">Aplicaciones de clientes</div>
-    <div class="text-caption text-grey-6 q-mb-md">Proyectos externos entregados, desplegados o mantenidos desde VITI.</div>
+    <div class="text-caption text-grey-6 q-mb-md">Aquí decides cuándo una aplicación ya puede ser utilizada por el cliente.</div>
 
     <q-table flat class="viti-table" :rows="rows" :columns="columns" row-key="id" :loading="loading" :pagination="{rowsPerPage:20,sortBy:'id',descending:true}">
-      <template #body-cell-actions="p"><q-td :props="p"><RowActionsMenu @open="open(p.row)" @edit="open(p.row)" @delete="remove(p.row)"/></q-td></template>
+      <template #body-cell-actions="p"><q-td :props="p"><div class="row no-wrap items-center"><RowActionsMenu @open="open(p.row)" @edit="open(p.row)" @delete="remove(p.row)"/><q-btn flat dense round :icon="p.row.acceso_cliente?'lock':'key'" :color="p.row.acceso_cliente?'orange':'positive'" @click="toggleDelivery(p.row)"><q-tooltip>{{p.row.acceso_cliente?'Revocar acceso':'Entregar al cliente'}}</q-tooltip></q-btn></div></q-td></template>
       <template #body-cell-url="p"><q-td :props="p"><q-btn v-if="p.value" flat dense icon="open_in_new" color="primary" :href="p.value" target="_blank"/><span v-else>Sin URL</span></q-td></template>
       <template #body-cell-estado="p"><q-td :props="p"><q-badge outline color="primary">{{p.value}}</q-badge></q-td></template>
+      <template #body-cell-entrega="p"><q-td :props="p"><q-badge :color="p.row.acceso_cliente?'positive':'grey'">{{p.row.acceso_cliente?'Entregada':'Sin acceso'}}</q-badge></q-td></template>
       <template #no-data><div class="empty-state full-width"><q-icon name="apps" size="52px"/><div class="text-h6 q-mt-sm">Todavía no hay sistemas externos integrados</div><div>Las aplicaciones propias de VITI seguirán disponibles arriba.</div></div></template>
     </q-table>
 

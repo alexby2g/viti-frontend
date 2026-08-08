@@ -1,5 +1,8 @@
 import AuthLayout from '../layouts/AuthLayout.vue'
 import MainLayout from '../layouts/MainLayout.vue'
+import PeluqueriaClientLayout from '../layouts/PeluqueriaClientLayout.vue'
+
+const hairPage = () => import('../pages/ClientPeluqueriaWorkspacePage.vue')
 
 export default [
   { path: '/configuracion-inicial', component: AuthLayout, children: [{ path: '', name: 'setup', component: () => import('../pages/SetupPage.vue') }] },
@@ -9,11 +12,27 @@ export default [
   { path: '/solicitar/:token', component: AuthLayout, children: [{ path: '', name: 'public-request', component: () => import('../pages/PublicSolicitudPage.vue') }] },
   { path: '/login', component: AuthLayout, children: [{ path: '', name: 'login', component: () => import('../pages/LoginPage.vue') }] },
   {
+    path: '/mi-apps/peluqueria',
+    component: PeluqueriaClientLayout,
+    meta: { requiresAuth:true, clientOnly:true, appShell:'peluqueria' },
+    children: [
+      { path:'', redirect:'/mi-apps/peluqueria/inicio' },
+      { path:'inicio', name:'hair-client-home', component:hairPage, meta:{requiresAuth:true,clientOnly:true,appShell:'peluqueria',hairSection:'inicio'} },
+      { path:'agenda', name:'hair-client-agenda', component:hairPage, meta:{requiresAuth:true,clientOnly:true,appShell:'peluqueria',hairSection:'agenda'} },
+      { path:'clientes', name:'hair-client-clients', component:hairPage, meta:{requiresAuth:true,clientOnly:true,appShell:'peluqueria',hairSection:'clientes'} },
+      { path:'servicios', name:'hair-client-services', component:hairPage, meta:{requiresAuth:true,clientOnly:true,appShell:'peluqueria',hairSection:'servicios'} },
+      { path:'personal', name:'hair-client-staff', component:hairPage, meta:{requiresAuth:true,clientOnly:true,appShell:'peluqueria',hairSection:'personal'} },
+      { path:'atenciones', name:'hair-client-care', component:hairPage, meta:{requiresAuth:true,clientOnly:true,appShell:'peluqueria',hairSection:'atenciones'} },
+      { path:'caja', name:'hair-client-cash', component:hairPage, meta:{requiresAuth:true,clientOnly:true,appShell:'peluqueria',hairSection:'caja'} },
+      { path:'historial', name:'hair-client-history', component:hairPage, meta:{requiresAuth:true,clientOnly:true,appShell:'peluqueria',hairSection:'historial'} },
+    ],
+  },
+  { path:'/mi-aplicaciones/peluqueria', redirect:'/mi-apps/peluqueria/inicio' },
+  {
     path: '/', component: MainLayout, meta: { requiresAuth: true }, children: [
       { path: '', name: 'dashboard', component: () => import('../pages/DashboardPage.vue'), meta:{adminOnly:true} },
       { path: 'mi-cuenta', name: 'client-portal', component: () => import('../pages/ClientPortalPage.vue'), meta:{clientOnly:true} },
       { path: 'mi-proyecto', name: 'client-project', component: () => import('../pages/ClientProjectPage.vue'), meta:{clientOnly:true} },
-      { path: 'mi-aplicaciones/peluqueria', name: 'client-app-peluqueria', component: () => import('../pages/ClientPeluqueriaPage.vue'), meta:{clientOnly:true} },
       { path: 'mi-buzon', name: 'client-messages', component: () => import('../pages/ClientMessagesPage.vue'), meta:{clientOnly:true} },
       { path: 'clientes', name: 'clientes', component: () => import('../pages/ClientesPage.vue'), meta:{adminOnly:true} },
       { path: 'empresas', redirect: '/clientes' },
