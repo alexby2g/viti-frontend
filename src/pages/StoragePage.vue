@@ -9,6 +9,7 @@ const error = ref('')
 
 const publicStorage = computed(() => data.value?.publico || null)
 const privateStorage = computed(() => data.value?.privado || null)
+const config = computed(() => data.value?.configuracion || {})
 
 async function load() {
   loading.value = true
@@ -56,8 +57,11 @@ onMounted(load)
           <q-card-section>
             <div class="storage-row"><span>Estado</span><q-badge :color="publicStorage?.ok ? 'positive' : 'negative'">{{ publicStorage?.ok ? 'Conectado' : 'Sin conexión' }}</q-badge></div>
             <div class="storage-row"><span>Driver</span><strong>{{ publicStorage?.driver || '—' }}</strong></div>
-            <div class="storage-row"><span>URL pública</span><span class="ellipsis">{{ publicStorage?.url_base || '—' }}</span></div>
+            <div class="storage-row"><span>URL pública</span><span class="ellipsis">{{ publicStorage?.url_base || config.public_url || '—' }}</span></div>
             <div class="text-caption text-grey-6 q-mt-md">{{ publicStorage?.message || 'Pulsa Comprobar para verificar.' }}</div>
+            <q-banner v-if="publicStorage?.diagnostico" dense rounded class="bg-red-1 text-negative q-mt-md">
+              <b>Diagnóstico:</b> {{ publicStorage.diagnostico }}
+            </q-banner>
           </q-card-section>
         </q-card>
       </div>
@@ -77,10 +81,30 @@ onMounted(load)
             <div class="storage-row"><span>Driver</span><strong>{{ privateStorage?.driver || '—' }}</strong></div>
             <div class="storage-row"><span>Acceso público</span><strong>No</strong></div>
             <div class="text-caption text-grey-6 q-mt-md">{{ privateStorage?.message || 'Pulsa Comprobar para verificar.' }}</div>
+            <q-banner v-if="privateStorage?.diagnostico" dense rounded class="bg-red-1 text-negative q-mt-md">
+              <b>Diagnóstico:</b> {{ privateStorage.diagnostico }}
+            </q-banner>
           </q-card-section>
         </q-card>
       </div>
     </div>
+
+    <q-card v-if="data && !data.listo" flat class="viti-card q-mt-lg">
+      <q-card-section>
+        <div class="text-h6 text-weight-bold">Configuración detectada</div>
+        <div class="text-caption text-grey-6">Solo mostramos si existe cada dato. Las claves secretas nunca se exponen.</div>
+      </q-card-section>
+      <q-separator />
+      <q-card-section>
+        <div class="storage-row"><span>Access Key</span><q-badge :color="config.access_key ? 'positive' : 'negative'">{{ config.access_key ? 'Configurada' : 'Falta' }}</q-badge></div>
+        <div class="storage-row"><span>Secret Key</span><q-badge :color="config.secret_key ? 'positive' : 'negative'">{{ config.secret_key ? 'Configurada' : 'Falta' }}</q-badge></div>
+        <div class="storage-row"><span>Endpoint</span><strong>{{ config.endpoint || 'Falta' }}</strong></div>
+        <div class="storage-row"><span>Región</span><strong>{{ config.region || 'Falta' }}</strong></div>
+        <div class="storage-row"><span>Bucket público</span><strong>{{ config.public_bucket || 'Falta' }}</strong></div>
+        <div class="storage-row"><span>Bucket privado</span><strong>{{ config.private_bucket || 'Falta' }}</strong></div>
+        <div class="storage-row"><span>URL pública</span><span class="ellipsis">{{ config.public_url || 'Falta' }}</span></div>
+      </q-card-section>
+    </q-card>
 
     <q-banner v-if="data?.listo" rounded class="bg-green-1 text-positive q-mt-lg">
       <template #avatar><q-icon name="verified" /></template>
