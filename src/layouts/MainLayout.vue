@@ -26,8 +26,9 @@ const menu = computed(() => {
   if (isClient.value) {
     return [
       { label: 'Mi cuenta', icon: 'account_circle', to: '/mi-cuenta' },
-      { label: 'Mi formulario', icon: 'assignment', action: 'request' },
+      { label: 'Mis aplicaciones', icon: 'apps', to: '/mi-aplicaciones' },
       { label: 'Mi proyecto', icon: 'account_tree', to: '/mi-proyecto' },
+      { label: 'Nueva solicitud', icon: 'assignment_add', action: 'request' },
       { label: 'Mi buzón', icon: 'forum', to: '/mi-buzon', badge: notifications.unreadCount },
     ]
   }
@@ -95,18 +96,11 @@ async function handleItem(item) {
 }
 
 function openNotification(item) {
-  router.push({
-    path: isClient.value ? '/mi-buzon' : '/buzon',
-    query: { c: item.conversacion_id },
-  })
+  router.push({ path: isClient.value ? '/mi-buzon' : '/buzon', query: { c: item.conversacion_id } })
 }
 
 async function markAllRead() {
-  try {
-    await notifications.markAllRead()
-  } catch {
-    // El buzón conserva el estado actual si la solicitud falla.
-  }
+  try { await notifications.markAllRead() } catch { /* conserva el estado actual */ }
 }
 
 function refreshWhenVisible() {
@@ -130,23 +124,16 @@ onBeforeUnmount(() => {
     <q-header bordered class="viti-header">
       <q-toolbar class="viti-toolbar">
         <q-btn flat round dense icon="menu" @click="drawer = !drawer" />
-        <div v-if="!isClient && $q.screen.gt.sm" class="toolbar-search q-ml-md">
-          <q-icon name="search" />
-          <q-input borderless dense placeholder="Buscar cliente, empresa o proyecto" />
-        </div>
+        <div class="q-ml-md text-weight-bold gt-xs">{{ isClient ? 'Mi espacio VITI' : 'Panel VITI' }}</div>
         <q-space />
-        <q-btn flat round :icon="$q.dark.isActive ? 'light_mode' : 'dark_mode'" @click="toggleDark" />
-
+        <q-btn flat round :icon="$q.dark.isActive ? 'light_mode' : 'dark_mode'" @click="toggleDark"><q-tooltip>Cambiar tema</q-tooltip></q-btn>
         <q-btn flat round :icon="notifications.unreadCount ? 'notifications_active' : 'notifications_none'">
           <q-badge v-if="notifications.unreadCount" floating rounded color="negative" :label="unreadLabel" />
           <q-tooltip>Notificaciones internas</q-tooltip>
           <q-menu anchor="bottom right" self="top right" class="notifications-menu">
-            <q-card flat style="width: 370px; max-width: 92vw">
+            <q-card flat style="width:370px;max-width:92vw">
               <q-card-section class="row items-center q-pb-sm">
-                <div>
-                  <div class="text-subtitle1 text-weight-bold">Notificaciones</div>
-                  <div class="text-caption text-grey-6">{{ notifications.unreadCount ? `${notifications.unreadCount} mensaje(s) sin leer` : 'Todo está al día' }}</div>
-                </div>
+                <div><div class="text-subtitle1 text-weight-bold">Notificaciones</div><div class="text-caption text-grey-6">{{ notifications.unreadCount ? `${notifications.unreadCount} mensaje(s) sin leer` : 'Todo está al día' }}</div></div>
                 <q-space />
                 <q-btn v-if="notifications.unreadCount" flat dense no-caps color="primary" label="Marcar leído" @click.stop="markAllRead" />
               </q-card-section>
@@ -154,12 +141,7 @@ onBeforeUnmount(() => {
               <q-list v-if="notifications.items.length" separator>
                 <q-item v-for="item in notifications.items" :key="item.id" clickable v-close-popup @click="openNotification(item)">
                   <q-item-section avatar><q-avatar color="primary" text-color="white" icon="chat_bubble" /></q-item-section>
-                  <q-item-section>
-                    <q-item-label class="text-weight-bold">{{ item.titulo }}</q-item-label>
-                    <q-item-label caption lines="1">{{ item.asunto }}</q-item-label>
-                    <q-item-label caption lines="2">{{ item.mensaje }}</q-item-label>
-                    <q-item-label caption>{{ formatDateTime(item.created_at) }}</q-item-label>
-                  </q-item-section>
+                  <q-item-section><q-item-label class="text-weight-bold">{{ item.titulo }}</q-item-label><q-item-label caption lines="1">{{ item.asunto }}</q-item-label><q-item-label caption lines="2">{{ item.mensaje }}</q-item-label><q-item-label caption>{{ formatDateTime(item.created_at) }}</q-item-label></q-item-section>
                 </q-item>
               </q-list>
               <div v-else class="q-pa-lg text-center text-grey-6"><q-icon name="notifications_none" size="32px" class="q-mb-sm" /><div>No tienes mensajes nuevos.</div></div>
@@ -185,7 +167,6 @@ onBeforeUnmount(() => {
                 <q-item-section>{{ item.label }}</q-item-section>
                 <q-item-section v-if="item.badge" side><q-badge rounded color="negative" :label="item.badge > 99 ? '99+' : item.badge" /></q-item-section>
               </q-item>
-
               <q-expansion-item v-else :icon="item.icon" :label="item.label" group="menu">
                 <q-item v-for="sub in item.children" :key="sub.to" clickable v-ripple :to="sub.to" class="q-ml-sm" @click="closeMobileDrawer">
                   <q-item-section avatar><q-icon :name="sub.icon" /></q-item-section>
@@ -219,7 +200,5 @@ onBeforeUnmount(() => {
 </template>
 
 <style scoped>
-.client-badge{padding:14px 16px;border-radius:14px;background:rgba(255,255,255,.08)}
-.viti-toolbar{min-height:64px}
-@media(max-width:600px){.viti-toolbar{min-height:58px;padding-left:10px;padding-right:10px}}
+.client-badge{padding:14px 16px;border-radius:14px;background:rgba(255,255,255,.08)}.viti-toolbar{min-height:64px}@media(max-width:600px){.viti-toolbar{min-height:58px;padding-left:10px;padding-right:10px}}
 </style>
