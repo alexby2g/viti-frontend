@@ -1,6 +1,6 @@
 <script setup>
 import { mediaUrl } from '../utils/media.js'
-import { computed, onMounted, ref } from 'vue'
+import { computed, nextTick, onMounted, ref } from 'vue'
 import { useQuasar } from 'quasar'
 import { useRoute, useRouter } from 'vue-router'
 import { api } from '../boot/axios'
@@ -16,7 +16,40 @@ const rows = ref([])
 const selected = ref(null)
 const reply = ref('')
 const loading = ref(true)
+const sessions = ref([])
+const fileInput = ref(null)
+const attachment = ref(null)
+const attachmentPreview = ref('')
+const messagesBox = ref(null)
+const scheduleDialog = ref(false)
+const scheduleLoading = ref(false)
+const scheduleMode = ref('new')
+const scheduleForm = ref({ modalidad:'video', programada_para:'', duracion_minutos:30, motivo:'', nota_admin:'' })
+
 const current = computed(() => rows.value.find(x => x.id === selected.value) || null)
+const pendingSession = computed(() => sessions.value.find(s => s.estado === 'solicitada') || null)
+const activeSession = computed(() => sessions.value.find(s => {
+  if (s.estado !== 'aprobada' || !s.habilitada_desde || !s.habilitada_hasta) return false
+  const now = Date.now()
+  return new Date(s.habilitada_desde).getTime() <= now && new Date(s.habilitada_hasta).getTime() >= now
+}) || null)
+const upcomingSession = computed(() => sessions.value.find(s => s.estado === 'aprobada' && s.habilitada_desde && new Date(s.habilitada_desde).getTime() > Date.now()) || null)
+const callsEnabled = computed(() => Boolean(activeSession.value))
+
+async function scrollBottom() {
+  await nextTick()
+  const el = messagesBox.value?.$el || messagesBox.value
+  if (el) el.scrollTop = el.scrollHeight
+}
+
+async function loadSessions() {
+  if (!selected.value) { sessions.value = []; return }
+  try {
+    sessions.value = (await api.get('/atencion/sesiones', { params:{ conversacion_id:selected.value } })).data.data || []
+  } catch {
+    sessions.value = []
+  }
+}
 
 async function loadCurrent() {
   if (!selected.value) return
@@ -24,7 +57,8 @@ async function loadCurrent() {
   const detail = data.data
   const index = rows.value.findIndex(x => x.id === selected.value)
   if (index >= 0) rows.value[index] = { ...rows.value[index], ...detail, no_leidos: 0 }
-  await notifications.refresh()
+  await Promise.all([notifications.refresh(), loadSessions()])
+  await scrollBottom()
 }
 
 async function load() {
@@ -47,12 +81,37 @@ async function choose(id) {
   await loadCurrent()
 }
 
+function chooseAttachment() { fileInput.value?.click() }
+
+function onAttachment(event) {
+  const file = event.target?.files?.[0]
+  if (!file) return
+  if (!file.type.startsWith('image/')) return $q.notify({ type:'negative', message:'Selecciona una imagen o captura de pantalla.' })
+  if (file.size > 8 * 1024 * 1024) return $q.notify({ type:'negative', message:'La imagen no puede superar 8 MB.' })
+  clearAttachment()
+  attachment.value = file
+  attachmentPreview.value = URL.createObjectURL(file)
+}
+
+function clearAttachment() {
+  if (attachmentPreview.value) URL.revokeObjectURL(attachmentPreview.value)
+  attachmentPreview.value = ''
+  attachment.value = null
+  if (fileInput.value) fileInput.value.value = ''
+}
+
 async function send() {
-  if (!reply.value.trim() || !current.value) return
+  if (!current.value) return
+  const message = reply.value.trim()
+  if (!message && !attachment.value) return
   try {
-    await api.post(`/buzon/${current.value.id}/mensajes`, { mensaje: reply.value })
+    const payload = new FormData()
+    if (message) payload.append('mensaje', message)
+    if (attachment.value) payload.append('archivo', attachment.value)
+    await api.post(`/buzon/${current.value.id}/mensajes`, payload, { headers:{ 'Content-Type':'multipart/form-data' } })
     reply.value = ''
-    await load()
+    clearAttachment()
+    await loadCurrent()
   } catch (e) {
     $q.notify({ type: 'negative', message: e.response?.data?.message || 'No se pudo enviar la respuesta.' })
   }
@@ -61,23 +120,80 @@ async function send() {
 function startCall(type) {
   if (!current.value?.id) return
   if (!navigator.onLine) return $q.notify({ type:'warning', message:'Necesitas Internet para realizar llamadas.' })
+  if (!callsEnabled.value) {
+    openSchedule(type)
+    return
+  }
   window.dispatchEvent(new CustomEvent('viti-start-call', { detail: { conversationId: current.value.id, type } }))
+}
+
+function openSchedule(modality = 'video', existing = null) {
+  scheduleMode.value = existing ? 'approve' : 'new'
+  scheduleForm.value = {
+    modalidad: existing?.modalidad || modality,
+    programada_para: '',
+    duracion_minutos: 30,
+    motivo: existing?.motivo || 'Sesión de soporte y verificación con Atención VITI.',
+    nota_admin: '',
+  }
+  scheduleDialog.value = true
+}
+
+async function saveSchedule() {
+  if (!current.value?.id) return
+  scheduleLoading.value = true
+  try {
+    const payload = {
+      modalidad: scheduleForm.value.modalidad,
+      duracion_minutos: Number(scheduleForm.value.duracion_minutos || 30),
+      motivo: scheduleForm.value.motivo,
+      nota_admin: scheduleForm.value.nota_admin || undefined,
+      programada_para: scheduleForm.value.programada_para || undefined,
+    }
+    if (scheduleMode.value === 'approve' && pendingSession.value?.id) {
+      await api.post(`/atencion/sesiones/${pendingSession.value.id}/aprobar`, payload)
+    } else {
+      await api.post('/atencion/sesiones', { ...payload, conversacion_id:current.value.id })
+    }
+    scheduleDialog.value = false
+    await loadSessions()
+    $q.notify({ type:'positive', message:scheduleForm.value.programada_para ? 'Atención programada y notificada al cliente.' : 'Atención habilitada por 30 minutos.' })
+  } catch (e) {
+    $q.notify({ type:'negative', message:e.response?.data?.message || 'No se pudo habilitar la sesión.' })
+  } finally {
+    scheduleLoading.value = false
+  }
+}
+
+async function rejectPending() {
+  if (!pendingSession.value?.id) return
+  try {
+    await api.post(`/atencion/sesiones/${pendingSession.value.id}/rechazar`, { nota_admin:'Coordina otra hora por el chat de Atención VITI.' })
+    await loadSessions()
+    $q.notify({ type:'info', message:'Solicitud rechazada. El cliente fue notificado.' })
+  } catch (e) {
+    $q.notify({ type:'negative', message:e.response?.data?.message || 'No se pudo rechazar la solicitud.' })
+  }
+}
+
+function modalityLabel(value) {
+  return value === 'audio' ? 'Llamada de voz' : value === 'pantalla' ? 'Asistencia con pantalla' : 'Videollamada'
 }
 
 onMounted(load)
 </script>
 
 <template>
-  <q-page class="viti-page">
+  <q-page class="viti-page admin-chat-page">
     <PageHeader
       eyebrow="Atención al cliente"
       title="Atención VITI"
-      subtitle="Cada cliente tiene un único canal permanente contigo. Mensajes, llamadas y videollamadas en un solo lugar."
+      subtitle="Chat permanente, capturas y sesiones de soporte autorizadas."
     />
 
     <div class="row q-col-gutter-lg">
       <div class="col-12 col-md-4">
-        <q-card flat class="viti-card">
+        <q-card flat class="viti-card contacts-card">
           <q-list separator>
             <q-item
               v-for="c in rows"
@@ -95,7 +211,7 @@ onMounted(load)
               </q-item-section>
               <q-item-section>
                 <q-item-label class="text-weight-bold">{{ c.cliente?.nombre }}</q-item-label>
-                <q-item-label caption lines="1">{{ c.mensajes?.[0]?.mensaje || 'Canal listo para atención' }}</q-item-label>
+                <q-item-label caption lines="1">{{ c.mensajes?.[0]?.mensaje || (c.mensajes?.[0]?.archivo_path ? '📷 Imagen adjunta' : 'Canal listo para atención') }}</q-item-label>
                 <q-item-label caption>{{ c.ultimo_mensaje_at ? formatDateTime(c.ultimo_mensaje_at) : 'Sin mensajes todavía' }}</q-item-label>
               </q-item-section>
               <q-item-section side class="items-end q-gutter-xs">
@@ -109,48 +225,104 @@ onMounted(load)
       </div>
 
       <div class="col-12 col-md-8">
-        <q-card v-if="current" flat class="viti-card">
-          <q-card-section class="row items-center q-gutter-md">
+        <q-card v-if="current" flat class="viti-card messenger-card">
+          <q-card-section class="row items-center q-gutter-md chat-header">
             <q-avatar size="52px" color="primary" text-color="white">
               <img v-if="current.cliente?.foto_path" :src="current.cliente.foto_url || mediaUrl(current.cliente.foto_path)" />
               <span v-else>{{ current.cliente?.nombre?.[0] || 'C' }}</span>
             </q-avatar>
-            <div>
+            <div class="col">
               <div class="text-h6 text-weight-bold">{{ current.cliente?.nombre }}</div>
-              <div class="text-caption text-grey-6">{{ current.cliente?.telefono }} · Canal Atención VITI</div>
+              <div class="text-caption text-grey-6">{{ current.cliente?.telefono }} · Atención VITI</div>
             </div>
-            <q-space />
-            <q-btn round flat color="primary" icon="call" @click="startCall('audio')"><q-tooltip>Llamada de voz</q-tooltip></q-btn>
-            <q-btn round flat color="primary" icon="videocam" @click="startCall('video')"><q-tooltip>Videollamada</q-tooltip></q-btn>
+            <q-btn round flat color="primary" :icon="callsEnabled ? 'call' : 'event'" @click="startCall('audio')"><q-tooltip>{{ callsEnabled ? 'Llamar' : 'Habilitar o programar llamada' }}</q-tooltip></q-btn>
+            <q-btn round flat color="primary" :icon="callsEnabled ? 'videocam' : 'event'" @click="startCall('video')"><q-tooltip>{{ callsEnabled ? 'Videollamar' : 'Habilitar o programar videollamada' }}</q-tooltip></q-btn>
           </q-card-section>
+
+          <q-banner v-if="pendingSession" class="bg-orange-1 text-orange-10 q-mx-md q-mb-sm" rounded>
+            <template #avatar><q-icon name="support_agent" /></template>
+            <div class="text-weight-bold">El cliente solicita {{ modalityLabel(pendingSession.modalidad) }}</div>
+            <div class="text-caption">{{ pendingSession.motivo }}</div>
+            <template #action>
+              <q-btn flat dense no-caps color="negative" label="Rechazar" @click="rejectPending" />
+              <q-btn flat dense no-caps color="primary" label="Aprobar / agendar" @click="openSchedule(pendingSession.modalidad, pendingSession)" />
+            </template>
+          </q-banner>
+
+          <q-banner v-else-if="activeSession" class="bg-green-1 text-positive q-mx-md q-mb-sm" rounded>
+            <template #avatar><q-icon name="verified" /></template>
+            <strong>{{ modalityLabel(activeSession.modalidad) }} habilitada ahora.</strong>
+            Ventana hasta {{ formatDateTime(activeSession.habilitada_hasta) }}.
+          </q-banner>
+
+          <q-banner v-else-if="upcomingSession" class="bg-purple-1 text-purple-10 q-mx-md q-mb-sm" rounded>
+            <template #avatar><q-icon name="event_available" /></template>
+            <strong>{{ modalityLabel(upcomingSession.modalidad) }} programada:</strong> {{ formatDateTime(upcomingSession.programada_para) }}.
+          </q-banner>
+
           <q-separator />
-          <q-card-section class="messages">
-            <div v-if="!current.mensajes?.length" class="empty-state q-my-xl">Este canal está listo. El cliente puede escribirte directamente sin crear una conversación.</div>
-            <div
-              v-for="m in current.mensajes"
-              :key="m.id"
-              class="message"
-              :class="m.usuario?.rol === 'cliente' ? 'client' : 'admin'"
-            >
-              <div class="text-caption text-weight-bold">
-                {{ m.usuario?.rol === 'cliente' ? (current.cliente?.nombre || 'Cliente') : (m.usuario?.nombre || 'VITI') }}
+          <q-card-section ref="messagesBox" class="messages messenger-bg">
+            <div v-if="!current.mensajes?.length" class="empty-state q-my-xl">El canal está listo. Puedes escribir al cliente o esperar su consulta.</div>
+            <div v-for="m in current.mensajes" :key="m.id" class="message-row" :class="m.usuario?.rol === 'cliente' ? 'client' : 'admin'">
+              <q-avatar v-if="m.usuario?.rol === 'cliente'" size="30px" color="primary" text-color="white" class="message-avatar">
+                <img v-if="current.cliente?.foto_url" :src="current.cliente.foto_url" />
+                <span v-else>{{ current.cliente?.nombre?.[0] || 'C' }}</span>
+              </q-avatar>
+              <div class="bubble" :class="m.usuario?.rol === 'cliente' ? 'bubble-client' : 'bubble-admin'">
+                <div v-if="m.archivo_url" class="attachment-wrap">
+                  <a :href="m.archivo_url" target="_blank" rel="noopener"><img :src="m.archivo_url" :alt="m.archivo_nombre || 'Imagen adjunta'" class="chat-image" /></a>
+                </div>
+                <div v-if="m.mensaje" class="message-text">{{ m.mensaje }}</div>
+                <div class="message-meta">{{ formatDateTime(m.created_at) }}</div>
               </div>
-              <div>{{ m.mensaje }}</div>
-              <div class="text-caption text-grey-6">{{ formatDateTime(m.created_at) }}</div>
             </div>
           </q-card-section>
+
+          <div v-if="attachmentPreview" class="attachment-preview q-px-md q-pt-sm">
+            <img :src="attachmentPreview" alt="Vista previa" />
+            <div class="col"><div class="text-weight-medium">{{ attachment?.name }}</div><div class="text-caption text-grey-6">Imagen privada para este cliente.</div></div>
+            <q-btn flat round icon="close" @click="clearAttachment" />
+          </div>
+
           <q-separator />
-          <q-card-section class="row q-gutter-sm items-end">
-            <q-input v-model="reply" class="col" outlined autogrow label="Responder al cliente" @keyup.ctrl.enter="send" />
-            <q-btn color="primary" unelevated round icon="send" @click="send"><q-tooltip>Enviar respuesta</q-tooltip></q-btn>
+          <q-card-section class="composer row q-gutter-sm items-end">
+            <input ref="fileInput" type="file" accept="image/jpeg,image/png,image/webp" hidden @change="onAttachment" />
+            <q-btn round flat color="primary" icon="add_photo_alternate" @click="chooseAttachment"><q-tooltip>Adjuntar imagen</q-tooltip></q-btn>
+            <q-input v-model="reply" class="col" rounded outlined autogrow placeholder="Responder al cliente..." @keyup.ctrl.enter="send" />
+            <q-btn color="primary" unelevated round icon="send" @click="send"><q-tooltip>Enviar</q-tooltip></q-btn>
           </q-card-section>
         </q-card>
         <div v-else class="empty-state">Selecciona un cliente para atenderlo.</div>
       </div>
     </div>
+
+    <q-dialog v-model="scheduleDialog">
+      <q-card class="viti-card" style="width:560px;max-width:94vw">
+        <q-card-section>
+          <div class="text-overline text-primary">Atención controlada</div>
+          <div class="text-h6 text-weight-bold">{{ scheduleMode === 'approve' ? 'Aprobar solicitud' : 'Habilitar atención' }}</div>
+          <div class="text-caption text-grey-6">Si dejas la fecha vacía se habilita ahora. Si eliges fecha, VITI notificará la cita al cliente.</div>
+        </q-card-section>
+        <q-card-section class="q-gutter-md">
+          <q-select v-model="scheduleForm.modalidad" outlined emit-value map-options label="Modalidad" :options="[
+            {label:'Llamada de voz',value:'audio'},
+            {label:'Videollamada',value:'video'},
+            {label:'Asistencia con pantalla',value:'pantalla'}
+          ]" />
+          <q-input v-model="scheduleForm.programada_para" outlined type="datetime-local" label="Fecha y hora (opcional)" stack-label />
+          <q-input v-model.number="scheduleForm.duracion_minutos" outlined type="number" min="15" max="180" label="Duración autorizada (minutos)" />
+          <q-input v-model="scheduleForm.motivo" outlined type="textarea" autogrow label="Motivo / objetivo de la sesión" />
+          <q-input v-model="scheduleForm.nota_admin" outlined type="textarea" autogrow label="Nota para el cliente (opcional)" />
+        </q-card-section>
+        <q-card-actions align="right">
+          <q-btn flat no-caps label="Cancelar" v-close-popup />
+          <q-btn color="primary" unelevated no-caps :label="scheduleForm.programada_para ? 'Programar' : 'Habilitar ahora'" :loading="scheduleLoading" @click="saveSchedule" />
+        </q-card-actions>
+      </q-card>
+    </q-dialog>
   </q-page>
 </template>
 
 <style scoped>
-.messages{display:flex;flex-direction:column;gap:12px;min-height:420px;max-height:62vh;overflow:auto}.message{max-width:82%;padding:12px 14px;border-radius:14px;background:var(--viti-surface-soft)}.message.client{align-self:flex-start;border-bottom-left-radius:4px}.message.admin{align-self:flex-end;border-bottom-right-radius:4px}
+.admin-chat-page{max-width:1500px}.contacts-card{max-height:74vh;overflow:auto}.messenger-card{overflow:hidden}.chat-header{min-height:78px}.messages{display:flex;flex-direction:column;gap:8px;height:min(58vh,620px);min-height:430px;overflow:auto;padding:18px}.messenger-bg{background:linear-gradient(180deg,rgba(127,127,127,.035),rgba(127,127,127,.015))}.message-row{display:flex;align-items:flex-end;gap:8px}.message-row.client{justify-content:flex-start}.message-row.admin{justify-content:flex-end}.message-avatar{margin-bottom:3px}.bubble{max-width:min(78%,620px);padding:9px 12px;border-radius:18px;box-shadow:0 1px 1px rgba(0,0,0,.06)}.bubble-client{background:var(--viti-surface-soft);border-bottom-left-radius:5px}.bubble-admin{background:#1976d2;color:#fff;border-bottom-right-radius:5px}.message-text{white-space:pre-wrap;overflow-wrap:anywhere}.message-meta{font-size:10.5px;opacity:.7;text-align:right;margin-top:4px}.attachment-wrap{margin:-5px -8px 7px}.chat-image{display:block;max-width:100%;max-height:360px;border-radius:14px;object-fit:cover}.attachment-preview{display:flex;align-items:center;gap:12px}.attachment-preview img{width:64px;height:64px;border-radius:12px;object-fit:cover}.composer{padding:10px 14px}
 </style>
