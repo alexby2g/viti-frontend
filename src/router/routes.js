@@ -31,6 +31,8 @@ export default [
     path: '/', component: MainLayout, meta: { requiresAuth: true }, children: [
       { path: '', name: 'dashboard', component: () => import('../pages/DashboardPage.vue'), meta:{adminOnly:true} },
       { path: 'mi-cuenta', name: 'client-portal', component: () => import('../pages/ClientPortalPage.vue'), meta:{clientOnly:true} },
+      { path: 'mi-negocio', name: 'client-business', component: () => import('../pages/ClientBusinessPage.vue'), meta:{clientOnly:true} },
+      { path: 'catalogo-viti', name: 'client-catalog', component: () => import('../pages/ClientCatalogPage.vue'), meta:{clientOnly:true} },
       { path: 'mi-aplicaciones', name: 'client-apps', component: () => import('../pages/ClientAppsPage.vue'), meta:{clientOnly:true} },
       { path: 'mi-pagos', name: 'client-billing', component: () => import('../pages/ClientBillingPage.vue'), meta:{clientOnly:true} },
       { path: 'mi-proyecto', name: 'client-project', component: () => import('../pages/ClientProjectPage.vue'), meta:{clientOnly:true} },
@@ -42,6 +44,7 @@ export default [
       { path: 'proyectos', name: 'proyectos', component: () => import('../pages/ProyectosPage.vue'), meta:{adminOnly:true} },
       { path: 'proyectos/:id', name: 'proyecto-detalle', component: () => import('../pages/ProyectoDetallePage.vue'), meta:{adminOnly:true} },
       { path: 'aplicaciones', name: 'aplicaciones', component: () => import('../pages/AplicacionesPage.vue'), meta:{adminOnly:true} },
+      { path: 'saas', name: 'saas', component: () => import('../pages/SaasPage.vue'), meta:{adminOnly:true} },
       { path: 'apps/peluqueria', name: 'app-peluqueria', component: () => import('../pages/PeluqueriaPage.vue'), meta:{adminOnly:true} },
       { path: 'pagos', name: 'billing', component: () => import('../pages/BillingPage.vue'), meta:{adminOnly:true} },
       { path: 'mantenimientos', name: 'mantenimientos', component: () => import('../pages/MantenimientosPage.vue'), meta:{adminOnly:true} },
