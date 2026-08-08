@@ -18,9 +18,13 @@ const remoteVideo = ref(null)
 const localVideoReady = ref(false)
 const remoteVideoReady = ref(false)
 const mediaHint = ref('')
+const screenSharing = ref(false)
+const remoteScreenFrame = ref('')
 let peer = null
 let localStream = null
 let remoteStream = null
+let screenStream = null
+let dataChannel = null
 let incomingTimer = null
 let signalTimer = null
 let videoTimer = null
@@ -30,6 +34,8 @@ let pendingRemoteCandidates = []
 
 const active = computed(() => Boolean(call.value))
 const isVideo = computed(() => (call.value?.tipo || incoming.value?.tipo || mediaType.value) === 'video')
+const supportMode = computed(() => (call.value?.sesion_atencion || incoming.value?.sesion_atencion)?.modalidad || null)
+const canShareScreen = computed(() => isVideo.value && supportMode.value === 'pantalla')
 const otherPerson = computed(() => {
   const c = call.value || incoming.value
   if (!c) return 'Atención VITI'
@@ -48,7 +54,7 @@ const otherPhoto = computed(() => {
 const statusLabel = computed(() => {
   if (phase.value === 'calling') return 'Llamando…'
   if (phase.value === 'connecting') return 'Conectando…'
-  if (phase.value === 'active') return 'En llamada'
+  if (phase.value === 'active') return remoteScreenFrame.value ? 'Pantalla compartida' : 'En llamada'
   return 'Preparando…'
 })
 
@@ -75,13 +81,11 @@ async function playElement(element) {
 
 async function attachStreams() {
   await nextTick()
-
-  if (localVideo.value && localStream) {
+  if (localVideo.value && localStream && !screenStream) {
     if (localVideo.value.srcObject !== localStream) localVideo.value.srcObject = localStream
     localVideo.value.muted = true
     await playElement(localVideo.value)
   }
-
   if (remoteVideo.value && remoteStream) {
     if (remoteVideo.value.srcObject !== remoteStream) remoteVideo.value.srcObject = remoteStream
     await playElement(remoteVideo.value)
@@ -104,8 +108,8 @@ function watchRemoteVideo() {
   if (!isVideo.value) return
   videoTimer = window.setTimeout(() => {
     markRemoteState()
-    if (!remoteVideoReady.value && phase.value === 'active') {
-      mediaHint.value = 'La llamada está conectada, pero el otro dispositivo todavía no está enviando video. Revisa Cámara y vuelve a activar el botón de video.'
+    if (!remoteVideoReady.value && phase.value === 'active' && !remoteScreenFrame.value) {
+      mediaHint.value = 'La llamada está conectada, pero el otro dispositivo todavía no está enviando video.'
     }
   }, 7000)
 }
@@ -115,21 +119,16 @@ async function openMedia(type) {
   mediaHint.value = ''
   localVideoReady.value = false
   remoteVideoReady.value = false
-
   if (!navigator.mediaDevices?.getUserMedia) throw new Error('Este dispositivo no permite llamadas desde VITI.')
 
   const constraints = {
     audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
     video: type === 'video' ? {
-      facingMode: 'user',
-      width: { ideal: 1280 },
-      height: { ideal: 720 },
-      frameRate: { ideal: 24, max: 30 },
+      facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 720 }, frameRate: { ideal: 24, max: 30 },
     } : false,
   }
 
   localStream = await navigator.mediaDevices.getUserMedia(constraints)
-
   if (!localStream.getAudioTracks().length) throw new Error('No pudimos activar el micrófono.')
   if (type === 'video' && !localStream.getVideoTracks().length) throw new Error('No pudimos activar la cámara. Revisa el permiso de Cámara en VITI.')
 
@@ -142,12 +141,29 @@ async function openMedia(type) {
       }
     }
   })
-
   markLocalState()
   await attachStreams()
 }
 
-function createPeer() {
+function setupDataChannel(channel) {
+  dataChannel = channel
+  dataChannel.onmessage = event => {
+    try {
+      const payload = JSON.parse(event.data)
+      if (payload.type === 'screen-frame' && payload.data) {
+        remoteScreenFrame.value = payload.data
+        mediaHint.value = ''
+      }
+      if (payload.type === 'screen-stop') remoteScreenFrame.value = ''
+    } catch {}
+  }
+  dataChannel.onclose = () => {
+    remoteScreenFrame.value = ''
+    if (dataChannel === channel) dataChannel = null
+  }
+}
+
+function createPeer(isInitiator = false) {
   peer = new RTCPeerConnection({
     bundlePolicy: 'max-bundle',
     iceServers: [
@@ -157,12 +173,11 @@ function createPeer() {
   })
 
   localStream?.getTracks().forEach(track => peer.addTrack(track, localStream))
+  if (isInitiator) setupDataChannel(peer.createDataChannel('viti-support', { ordered:false, maxRetransmits:0 }))
+  peer.ondatachannel = event => setupDataChannel(event.channel)
 
   peer.ontrack = async event => {
-    // Usamos directamente el MediaStream negociado por WebRTC. Esto evita perder
-    // video en WebView/Chromium al copiar tracks manualmente a otro stream.
     remoteStream = event.streams?.[0] || new MediaStream([event.track])
-
     event.track.onunmute = async () => {
       markRemoteState()
       await attachStreams()
@@ -174,7 +189,6 @@ function createPeer() {
         mediaHint.value = 'La cámara de la otra persona se detuvo.'
       }
     }
-
     await attachStreams()
     markRemoteState()
   }
@@ -208,10 +222,7 @@ async function flushCandidates() {
 
 async function addRemoteCandidate(payload) {
   if (!peer || !payload) return
-  if (!peer.remoteDescription) {
-    pendingRemoteCandidates.push(payload)
-    return
-  }
+  if (!peer.remoteDescription) { pendingRemoteCandidates.push(payload); return }
   try { await peer.addIceCandidate(payload) } catch {}
 }
 
@@ -219,9 +230,7 @@ async function flushRemoteCandidates() {
   if (!peer?.remoteDescription) return
   const items = [...pendingRemoteCandidates]
   pendingRemoteCandidates = []
-  for (const item of items) {
-    try { await peer.addIceCandidate(item) } catch {}
-  }
+  for (const item of items) { try { await peer.addIceCandidate(item) } catch {} }
 }
 
 async function startOutgoing(detail) {
@@ -231,7 +240,7 @@ async function startOutgoing(detail) {
     photoFailed.value = false
     phase.value = 'calling'
     await openMedia(detail.type)
-    createPeer()
+    createPeer(true)
     const offer = await peer.createOffer({ offerToReceiveAudio: true, offerToReceiveVideo: detail.type === 'video' })
     await peer.setLocalDescription(offer)
     const { data } = await api.post('/llamadas', {
@@ -259,13 +268,11 @@ async function answerIncoming() {
     call.value = item
     incoming.value = null
     await openMedia(item.tipo)
-    createPeer()
-
+    createPeer(false)
     const offerSdp = normalizeSdp(item.offer_sdp)
     if (!offerSdp?.startsWith('v=')) throw new Error('La invitación de llamada llegó dañada. Vuelve a intentar la llamada.')
     await peer.setRemoteDescription({ type: 'offer', sdp: offerSdp })
     await flushRemoteCandidates()
-
     const answer = await peer.createAnswer()
     await peer.setLocalDescription(answer)
     const { data } = await api.post(`/llamadas/${item.id}/contestar`, { answer_sdp: normalizeSdp(peer.localDescription.sdp) })
@@ -304,7 +311,6 @@ async function pollSignals() {
     const { data } = await api.get(`/llamadas/${call.value.id}/senales`, { params: { since: lastSignalId } })
     const serverCall = data.data.llamada
     call.value = { ...call.value, ...serverCall }
-
     if (serverCall.answer_sdp && !peer.currentRemoteDescription && Number(serverCall.iniciada_por_usuario_id) === Number(auth.user?.id)) {
       const answerSdp = normalizeSdp(serverCall.answer_sdp)
       if (!answerSdp?.startsWith('v=')) throw new Error('La respuesta de la llamada llegó dañada.')
@@ -312,12 +318,10 @@ async function pollSignals() {
       await flushRemoteCandidates()
       phase.value = 'connecting'
     }
-
     for (const signal of data.data.senales || []) {
       lastSignalId = Math.max(lastSignalId, Number(signal.id || 0))
       if (signal.tipo === 'ice' && signal.payload) await addRemoteCandidate(signal.payload)
     }
-
     if (['finalizada','rechazada','cancelada','perdida'].includes(serverCall.estado)) {
       const endedByOther = serverCall.estado !== 'finalizada'
       cleanup(false)
@@ -337,17 +341,12 @@ function startSignalPolling() {
   signalTimer = window.setInterval(pollSignals, 1000)
   pollSignals()
 }
-
-function stopSignalPolling() {
-  if (signalTimer) window.clearInterval(signalTimer)
-  signalTimer = null
-}
+function stopSignalPolling() { if (signalTimer) window.clearInterval(signalTimer); signalTimer = null }
 
 function toggleMute() {
   muted.value = !muted.value
   localStream?.getAudioTracks().forEach(track => { track.enabled = !muted.value })
 }
-
 async function toggleCamera() {
   cameraOff.value = !cameraOff.value
   localStream?.getVideoTracks().forEach(track => { track.enabled = !cameraOff.value })
@@ -355,11 +354,60 @@ async function toggleCamera() {
   if (!cameraOff.value) await attachStreams()
 }
 
+function sendScreenPayload(payload) {
+  if (dataChannel?.readyState !== 'open') return false
+  try { dataChannel.send(JSON.stringify(payload)); return true } catch { return false }
+}
+
+async function startScreenShare() {
+  if (!canShareScreen.value || screenSharing.value) return
+  if (window.Android?.startVitiScreenShare) {
+    window.Android.startVitiScreenShare()
+    screenSharing.value = true
+    $q.notify({ type:'info', message:'VITI pedirá autorización para compartir únicamente la pantalla de la aplicación.' })
+    return
+  }
+  if (!navigator.mediaDevices?.getDisplayMedia) {
+    return notifyError('Este dispositivo necesita la versión Android de VITI con asistencia de pantalla.')
+  }
+  try {
+    screenStream = await navigator.mediaDevices.getDisplayMedia({ video:true, audio:false })
+    const track = screenStream.getVideoTracks()[0]
+    const sender = peer?.getSenders?.().find(item => item.track?.kind === 'video')
+    if (!sender || !track) throw new Error('No se pudo preparar la pantalla compartida.')
+    await sender.replaceTrack(track)
+    screenSharing.value = true
+    if (localVideo.value) { localVideo.value.srcObject = screenStream; await playElement(localVideo.value) }
+    track.onended = stopScreenShare
+  } catch (e) {
+    notifyError(e.message || 'No se pudo compartir la pantalla.')
+  }
+}
+
+async function stopScreenShare() {
+  if (!screenSharing.value) return
+  if (window.Android?.stopVitiScreenShare) window.Android.stopVitiScreenShare()
+  if (screenStream) {
+    screenStream.getTracks().forEach(track => track.stop())
+    const cameraTrack = localStream?.getVideoTracks?.()[0]
+    const sender = peer?.getSenders?.().find(item => item.track?.kind === 'video')
+    if (sender && cameraTrack) { try { await sender.replaceTrack(cameraTrack) } catch {} }
+    screenStream = null
+    await attachStreams()
+  }
+  sendScreenPayload({ type:'screen-stop' })
+  screenSharing.value = false
+}
+
+function handleAndroidScreenFrame(event) {
+  if (!screenSharing.value || !event?.detail?.data) return
+  sendScreenPayload({ type:'screen-frame', data:event.detail.data })
+}
+
 async function finish(state = 'finalizada', notifyServer = true) {
   const id = call.value?.id
-  if (notifyServer && id) {
-    try { await api.post(`/llamadas/${id}/finalizar`, { estado: state }) } catch {}
-  }
+  await stopScreenShare()
+  if (notifyServer && id) { try { await api.post(`/llamadas/${id}/finalizar`, { estado: state }) } catch {} }
   cleanup(false)
 }
 
@@ -367,6 +415,13 @@ function cleanup(clearIncoming = true) {
   stopSignalPolling()
   if (videoTimer) window.clearTimeout(videoTimer)
   videoTimer = null
+  if (window.Android?.stopVitiScreenShare) { try { window.Android.stopVitiScreenShare() } catch {} }
+  screenStream?.getTracks().forEach(track => track.stop())
+  screenStream = null
+  screenSharing.value = false
+  remoteScreenFrame.value = ''
+  dataChannel?.close?.()
+  dataChannel = null
   peer?.close?.()
   peer = null
   localStream?.getTracks().forEach(track => track.stop())
@@ -396,12 +451,14 @@ function handleStart(event) {
 
 onMounted(() => {
   window.addEventListener('viti-start-call', handleStart)
+  window.addEventListener('viti-screen-frame', handleAndroidScreenFrame)
   incomingTimer = window.setInterval(pollIncoming, 3500)
   pollIncoming()
 })
 
 onBeforeUnmount(() => {
   window.removeEventListener('viti-start-call', handleStart)
+  window.removeEventListener('viti-screen-frame', handleAndroidScreenFrame)
   if (incomingTimer) window.clearInterval(incomingTimer)
   cleanup()
 })
@@ -416,7 +473,7 @@ onBeforeUnmount(() => {
           <q-icon v-else name="support_agent" size="42px" />
         </q-avatar>
         <div class="text-h5 text-weight-bold q-mt-md">{{ otherPerson }}</div>
-        <div class="text-grey-6 q-mt-xs">{{ incoming?.tipo === 'video' ? 'Videollamada entrante' : 'Llamada de voz entrante' }}</div>
+        <div class="text-grey-6 q-mt-xs">{{ incoming?.tipo === 'video' ? (supportMode === 'pantalla' ? 'Asistencia con pantalla entrante' : 'Videollamada entrante') : 'Llamada de voz entrante' }}</div>
       </q-card-section>
       <q-card-actions align="center" class="q-pb-xl q-gutter-lg">
         <q-btn round size="lg" color="negative" icon="call_end" @click="rejectIncoming"><q-tooltip>Rechazar</q-tooltip></q-btn>
@@ -434,27 +491,25 @@ onBeforeUnmount(() => {
         </q-avatar>
         <div>
           <div class="text-h6 text-weight-bold">{{ otherPerson }}</div>
-          <div class="text-caption">{{ statusLabel }} · {{ isVideo ? 'Video' : 'Audio' }}</div>
+          <div class="text-caption">{{ statusLabel }} · {{ supportMode === 'pantalla' ? 'Soporte de pantalla' : (isVideo ? 'Video' : 'Audio') }}</div>
         </div>
         <q-space />
         <q-badge color="positive" rounded>VITI BETA</q-badge>
       </q-card-section>
 
       <div class="col call-stage">
-        <video v-if="isVideo" ref="remoteVideo" autoplay playsinline class="remote-video" @loadedmetadata="playElement(remoteVideo)" />
+        <img v-if="remoteScreenFrame" :src="remoteScreenFrame" class="remote-screen" alt="Pantalla compartida" />
+        <video v-if="isVideo" ref="remoteVideo" autoplay playsinline class="remote-video" :class="{ 'video-small': remoteScreenFrame }" @loadedmetadata="playElement(remoteVideo)" />
         <audio v-else ref="remoteVideo" autoplay @loadedmetadata="playElement(remoteVideo)" />
 
-        <div v-if="isVideo && !remoteVideoReady" class="video-waiting">
+        <div v-if="isVideo && !remoteVideoReady && !remoteScreenFrame" class="video-waiting">
           <q-icon name="videocam_off" size="74px" />
           <div class="text-h6 q-mt-md">Esperando video de {{ otherPerson }}</div>
           <div class="text-caption q-mt-sm">{{ mediaHint || 'La llamada está conectando la cámara…' }}</div>
         </div>
 
         <div v-if="!isVideo" class="audio-avatar">
-          <q-avatar size="124px" color="primary" text-color="white">
-            <img v-if="otherPhoto" :src="otherPhoto" alt="Foto de perfil" @error="photoFailed = true" />
-            <q-icon v-else name="person" size="64px" />
-          </q-avatar>
+          <q-avatar size="124px" color="primary" text-color="white"><img v-if="otherPhoto" :src="otherPhoto" alt="Foto de perfil" @error="photoFailed = true" /><q-icon v-else name="person" size="64px" /></q-avatar>
           <div class="text-h5 text-weight-bold q-mt-md">{{ otherPerson }}</div>
           <div class="text-grey-5 q-mt-sm">{{ statusLabel }}</div>
         </div>
@@ -470,6 +525,7 @@ onBeforeUnmount(() => {
       <q-card-section class="call-controls row justify-center q-gutter-md">
         <q-btn round size="lg" :color="muted ? 'negative' : 'grey-8'" :icon="muted ? 'mic_off' : 'mic'" @click="toggleMute" />
         <q-btn v-if="isVideo" round size="lg" :color="cameraOff ? 'negative' : 'grey-8'" :icon="cameraOff ? 'videocam_off' : 'videocam'" @click="toggleCamera" />
+        <q-btn v-if="canShareScreen" round size="lg" :color="screenSharing ? 'primary' : 'grey-8'" :icon="screenSharing ? 'stop_screen_share' : 'screen_share'" @click="screenSharing ? stopScreenShare() : startScreenShare()"><q-tooltip>{{ screenSharing ? 'Dejar de compartir' : 'Compartir pantalla de VITI' }}</q-tooltip></q-btn>
         <q-btn round size="lg" color="negative" icon="call_end" @click="finish('finalizada')" />
       </q-card-section>
     </q-card>
@@ -477,16 +533,5 @@ onBeforeUnmount(() => {
 </template>
 
 <style scoped>
-.call-incoming-card{width:380px;max-width:92vw;border-radius:24px}
-.call-screen{background:#050b13;color:#fff}
-.call-header{background:#0b2447}
-.call-stage{position:relative;display:flex;align-items:center;justify-content:center;overflow:hidden;min-height:0;background:#000}
-.remote-video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;background:#000}
-.local-video-wrap{position:absolute;right:18px;top:18px;width:min(28vw,210px);height:min(38vw,280px);border-radius:18px;border:2px solid rgba(255,255,255,.5);background:#111;overflow:hidden;z-index:3}
-.local-video{width:100%;height:100%;object-fit:cover;background:#111}
-.local-video-fallback{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:#111;color:#fff}
-.video-waiting{position:relative;z-index:2;text-align:center;color:#fff;padding:24px;max-width:520px}
-.audio-avatar{text-align:center}
-.media-hint{background:#14233a;color:#dce7f7;padding:10px 18px;text-align:center;font-size:13px}
-.call-controls{background:#0b2447;padding-bottom:max(20px,env(safe-area-inset-bottom));z-index:4}
+.call-incoming-card{width:380px;max-width:92vw;border-radius:24px}.call-screen{background:#050b13;color:#fff}.call-header{background:#0b2447}.call-stage{position:relative;display:flex;align-items:center;justify-content:center;overflow:hidden;min-height:0;background:#000}.remote-video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;background:#000}.remote-video.video-small{left:auto;right:18px;bottom:18px;top:auto;width:min(24vw,190px);height:min(32vw,250px);border-radius:16px;border:2px solid rgba(255,255,255,.55);z-index:4}.remote-screen{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;background:#050505;z-index:2}.local-video-wrap{position:absolute;right:18px;top:18px;width:min(28vw,210px);height:min(38vw,280px);border-radius:18px;border:2px solid rgba(255,255,255,.5);background:#111;overflow:hidden;z-index:5}.local-video{width:100%;height:100%;object-fit:cover;background:#111}.local-video-fallback{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:#111;color:#fff}.video-waiting{position:relative;z-index:2;text-align:center;color:#fff;padding:24px;max-width:520px}.audio-avatar{text-align:center}.media-hint{background:#14233a;color:#dce7f7;padding:10px 18px;text-align:center;font-size:13px}.call-controls{background:#0b2447;padding-bottom:max(20px,env(safe-area-inset-bottom));z-index:6}
 </style>
