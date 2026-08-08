@@ -9,7 +9,7 @@ import RowActionsMenu from '../components/RowActionsMenu.vue'
 
 const $q=useQuasar(), route=useRoute(), router=useRouter()
 const rows=ref([]), clients=ref([]), loading=ref(false), dialog=ref(false)
-const inviteDialog=ref(false), inviteLoading=ref(false), inviteLink=ref(''), inviteDays=ref(7)
+const linkDialog=ref(false), publicLink=ref('')
 const form=reactive({empresa_id:null,cliente_id:null,titulo:'',resumen:'',prioridad:'normal',fecha_limite_deseada:null,presupuesto_estimado:null})
 const columns=[
  {name:'actions',label:'',field:'actions',align:'left'},
@@ -44,20 +44,16 @@ async function save(){
    await router.push(`/solicitudes/${created.id}`)
  }catch(e){$q.notify({type:'negative',message:e.response?.data?.message||e.message||'No se pudo crear la solicitud.'})}
 }
-async function createInvitation(){
- inviteLoading.value=true
- try{
-   const {data}=await api.post('/invitaciones-clientes',{dias_vigencia:Number(inviteDays.value||7)})
-   inviteLink.value=`${window.location.origin}${data.data.ruta}`
-   inviteDialog.value=true
- }catch(e){$q.notify({type:'negative',message:e.response?.data?.message||'No se pudo generar el enlace de registro.'})}
- finally{inviteLoading.value=false}
+function showPublicLink(){
+ publicLink.value=`${window.location.origin}/solicitud`
+ linkDialog.value=true
 }
-async function copyInvite(){
- if(!inviteLink.value)return
- try{await navigator.clipboard.writeText(inviteLink.value);$q.notify({type:'positive',message:'Enlace copiado. Ya puedes enviarlo por WhatsApp.'})}
+async function copyPublicLink(){
+ if(!publicLink.value)return
+ try{await navigator.clipboard.writeText(publicLink.value);$q.notify({type:'positive',message:'Enlace copiado. Ya puedes enviarlo por WhatsApp.'})}
  catch{$q.notify({type:'info',message:'Mantén pulsado el enlace para copiarlo.'})}
 }
+function openPublicForm(){window.open(publicLink.value||`${window.location.origin}/solicitud`,'_blank','noopener,noreferrer')}
 function remove(row){$q.dialog({title:'Eliminar solicitud',message:`¿Eliminar ${row.codigo}?`,cancel:true}).onOk(async()=>{try{await api.delete(`/solicitudes/${row.id}`);load()}catch(e){$q.notify({type:'negative',message:e.response?.data?.message||'No se puede eliminar.'})}})}
 function stateLabel(value){return String(value||'').replaceAll('_',' ')}
 onMounted(async()=>{await load();if(route.query.new)openNew()})
@@ -67,7 +63,7 @@ onMounted(async()=>{await load();if(route.query.new)openNew()})
 <q-page class="viti-page solicitudes-page">
   <PageHeader eyebrow="Levantamiento" title="Solicitudes de sistema" subtitle="Cada solicitud contiene el cuestionario institucional y puede convertirse en un proyecto.">
     <div class="header-actions">
-      <q-btn outline color="primary" icon="link" label="Enlace para nuevo cliente" no-caps :loading="inviteLoading" @click="createInvitation"/>
+      <q-btn outline color="primary" icon="language" label="Formulario público" no-caps @click="showPublicLink"/>
       <q-btn color="primary" unelevated icon="add" label="Nueva solicitud" no-caps @click="openNew"/>
     </div>
   </PageHeader>
@@ -76,7 +72,7 @@ onMounted(async()=>{await load();if(route.query.new)openNew()})
     <template #body-cell-actions="p"><q-td :props="p"><RowActionsMenu @open="router.push(`/solicitudes/${p.row.id}`)" @edit="router.push({path:`/solicitudes/${p.row.id}`,query:{editar:'1'}})" @delete="remove(p.row)"/></q-td></template>
     <template #body-cell-estado="p"><q-td :props="p"><q-badge outline color="primary">{{stateLabel(p.value)}}</q-badge></q-td></template>
     <template #body-cell-created_at="p"><q-td :props="p">{{formatDateTime(p.value)}}</q-td></template>
-    <template #no-data><div class="empty-state full-width"><q-icon name="assignment" size="52px"/><div class="text-h6 q-mt-sm">No hay solicitudes</div><div>Genera un enlace para un nuevo cliente o registra la solicitud manualmente.</div></div></template>
+    <template #no-data><div class="empty-state full-width"><q-icon name="assignment" size="52px"/><div class="text-h6 q-mt-sm">No hay solicitudes</div><div>Comparte el formulario público o registra la solicitud manualmente.</div></div></template>
   </q-table>
 
   <div v-else class="mobile-request-list">
@@ -96,29 +92,29 @@ onMounted(async()=>{await load();if(route.query.new)openNew()})
         <div @click.stop><RowActionsMenu @open="router.push(`/solicitudes/${row.id}`)" @edit="router.push({path:`/solicitudes/${row.id}`,query:{editar:'1'}})" @delete="remove(row)"/></div>
       </q-card-section>
     </q-card>
-    <div v-if="!rows.length && !loading" class="empty-state"><q-icon name="assignment" size="48px"/><div class="text-h6 q-mt-sm">No hay solicitudes</div><div>Genera un enlace y deja que el cliente complete el registro desde su navegador.</div></div>
+    <div v-if="!rows.length && !loading" class="empty-state"><q-icon name="assignment" size="48px"/><div class="text-h6 q-mt-sm">No hay solicitudes</div><div>Comparte el formulario público y deja que el cliente complete todo desde su navegador.</div></div>
   </div>
 
-  <q-dialog v-model="inviteDialog">
+  <q-dialog v-model="linkDialog">
     <q-card class="viti-card invite-card">
       <q-card-section>
         <div class="section-label">Registro sin instalar la app</div>
-        <div class="text-h5 text-weight-bold">Enlace para nuevo cliente</div>
-        <div class="text-caption text-grey-6 q-mt-xs">El enlace es de un solo uso. El cliente creará su cuenta, negocio y solicitud antes de pasar al cuestionario.</div>
+        <div class="text-h5 text-weight-bold">Formulario público</div>
+        <div class="text-caption text-grey-6 q-mt-xs">Este enlace es reutilizable. Puedes enviarlo a cualquier cliente por WhatsApp, redes sociales o correo.</div>
       </q-card-section>
       <q-card-section class="q-gutter-md">
-        <q-input v-model.number="inviteDays" outlined type="number" min="1" max="30" label="Vigencia del enlace (días)" />
-        <q-input :model-value="inviteLink" outlined readonly label="Enlace listo para enviar">
-          <template #append><q-btn flat round icon="content_copy" @click="copyInvite" /></template>
+        <q-input :model-value="publicLink" outlined readonly label="Enlace listo para compartir">
+          <template #append><q-btn flat round icon="content_copy" @click="copyPublicLink" /></template>
         </q-input>
         <q-banner rounded class="bg-blue-1 text-primary">
           <template #avatar><q-icon name="phone_android" /></template>
-          El cliente puede abrirlo desde Chrome, Safari o cualquier navegador. No necesita descargar VITI para completar el formulario.
+          El cliente registra sus datos y negocio, completa el cuestionario y la solicitud aparece automáticamente en este panel. No necesita descargar VITI ni crear contraseña.
         </q-banner>
       </q-card-section>
       <q-card-actions align="right">
         <q-btn flat no-caps label="Cerrar" v-close-popup />
-        <q-btn color="primary" unelevated no-caps icon="content_copy" label="Copiar enlace" @click="copyInvite" />
+        <q-btn outline color="primary" no-caps icon="open_in_new" label="Probar formulario" @click="openPublicForm" />
+        <q-btn color="primary" unelevated no-caps icon="content_copy" label="Copiar enlace" @click="copyPublicLink" />
       </q-card-actions>
     </q-card>
   </q-dialog>
