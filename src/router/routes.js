@@ -13,6 +13,7 @@ export default [
       { path: '', name: 'dashboard', component: () => import('../pages/DashboardPage.vue'), meta:{adminOnly:true} },
       { path: 'mi-cuenta', name: 'client-portal', component: () => import('../pages/ClientPortalPage.vue'), meta:{clientOnly:true} },
       { path: 'mi-proyecto', name: 'client-project', component: () => import('../pages/ClientProjectPage.vue'), meta:{clientOnly:true} },
+      { path: 'mi-aplicaciones/peluqueria', name: 'client-app-peluqueria', component: () => import('../pages/ClientPeluqueriaPage.vue'), meta:{clientOnly:true} },
       { path: 'mi-buzon', name: 'client-messages', component: () => import('../pages/ClientMessagesPage.vue'), meta:{clientOnly:true} },
       { path: 'clientes', name: 'clientes', component: () => import('../pages/ClientesPage.vue'), meta:{adminOnly:true} },
       { path: 'empresas', redirect: '/clientes' },
