@@ -12,6 +12,7 @@ const mediaType = ref('audio')
 const phase = ref('idle')
 const muted = ref(false)
 const cameraOff = ref(false)
+const photoFailed = ref(false)
 const localVideo = ref(null)
 const remoteVideo = ref(null)
 let peer = null
@@ -21,6 +22,7 @@ let incomingTimer = null
 let signalTimer = null
 let lastSignalId = 0
 let pendingCandidates = []
+let pendingRemoteCandidates = []
 
 const active = computed(() => Boolean(call.value))
 const isVideo = computed(() => (call.value?.tipo || incoming.value?.tipo || mediaType.value) === 'video')
@@ -31,6 +33,16 @@ const otherPerson = computed(() => {
   if (Number(c.iniciada_por_usuario_id) === me) return c.receptor?.nombre || c.cliente?.nombre || 'Atención VITI'
   return c.iniciador?.nombre || c.cliente?.nombre || 'Atención VITI'
 })
+const otherPhoto = computed(() => {
+  if (photoFailed.value) return null
+  const c = call.value || incoming.value
+  if (!c) return null
+  const me = Number(auth.user?.id || 0)
+  if (Number(c.iniciada_por_usuario_id) === me) {
+    return c.receptor?.foto_url || c.cliente?.foto_url || null
+  }
+  return c.iniciador?.foto_url || c.cliente?.foto_url || null
+})
 const statusLabel = computed(() => {
   if (phase.value === 'calling') return 'Llamando…'
   if (phase.value === 'connecting') return 'Conectando…'
@@ -40,6 +52,21 @@ const statusLabel = computed(() => {
 
 function notifyError(message) {
   $q.notify({ type: 'negative', message })
+}
+
+function normalizeSdp(raw) {
+  if (!raw) return raw
+  let sdp = String(raw)
+
+  // Compatibilidad con respuestas que hayan conservado saltos escapados como texto.
+  if (!/[\r\n]/.test(sdp) && /\\[rn]/.test(sdp)) {
+    sdp = sdp.replace(/\\r\\n/g, '\n').replace(/\\n/g, '\n').replace(/\\r/g, '\n')
+  }
+
+  sdp = sdp.replace(/\r\n/g, '\n').replace(/\r/g, '\n')
+  const lines = sdp.split('\n').map(line => line.replace(/[ \t]+$/, ''))
+  while (lines.length && lines[lines.length - 1] === '') lines.pop()
+  return `${lines.join('\r\n')}\r\n`
 }
 
 async function openMedia(type) {
@@ -73,7 +100,9 @@ function createPeer() {
 
   localStream?.getTracks().forEach(track => peer.addTrack(track, localStream))
   peer.ontrack = event => {
-    for (const track of event.streams?.[0]?.getTracks?.() || [event.track]) remoteStream.addTrack(track)
+    for (const track of event.streams?.[0]?.getTracks?.() || [event.track]) {
+      if (!remoteStream.getTracks().some(existing => existing.id === track.id)) remoteStream.addTrack(track)
+    }
     nextTick(attachStreams)
   }
   peer.onicecandidate = event => {
@@ -99,10 +128,29 @@ async function flushCandidates() {
   for (const item of items) await sendCandidate(item)
 }
 
+async function addRemoteCandidate(payload) {
+  if (!peer || !payload) return
+  if (!peer.remoteDescription) {
+    pendingRemoteCandidates.push(payload)
+    return
+  }
+  try { await peer.addIceCandidate(payload) } catch {}
+}
+
+async function flushRemoteCandidates() {
+  if (!peer?.remoteDescription) return
+  const items = [...pendingRemoteCandidates]
+  pendingRemoteCandidates = []
+  for (const item of items) {
+    try { await peer.addIceCandidate(item) } catch {}
+  }
+}
+
 async function startOutgoing(detail) {
   if (active.value || incoming.value) return
   if (!navigator.onLine) return notifyError('Necesitas conexión a Internet para realizar una llamada.')
   try {
+    photoFailed.value = false
     phase.value = 'calling'
     await openMedia(detail.type)
     createPeer()
@@ -111,7 +159,7 @@ async function startOutgoing(detail) {
     const { data } = await api.post('/llamadas', {
       conversacion_id: detail.conversationId,
       tipo: detail.type,
-      offer_sdp: peer.localDescription.sdp,
+      offer_sdp: normalizeSdp(peer.localDescription.sdp),
     })
     call.value = data.data
     await nextTick()
@@ -128,16 +176,20 @@ async function answerIncoming() {
   const item = incoming.value
   if (!item || active.value) return
   try {
+    photoFailed.value = false
     phase.value = 'connecting'
     mediaType.value = item.tipo
     call.value = item
     incoming.value = null
     await openMedia(item.tipo)
     createPeer()
-    await peer.setRemoteDescription({ type: 'offer', sdp: item.offer_sdp })
+    const offerSdp = normalizeSdp(item.offer_sdp)
+    if (!offerSdp?.startsWith('v=')) throw new Error('La invitación de llamada llegó dañada. Vuelve a intentar la llamada.')
+    await peer.setRemoteDescription({ type: 'offer', sdp: offerSdp })
+    await flushRemoteCandidates()
     const answer = await peer.createAnswer()
     await peer.setLocalDescription(answer)
-    const { data } = await api.post(`/llamadas/${item.id}/contestar`, { answer_sdp: peer.localDescription.sdp })
+    const { data } = await api.post(`/llamadas/${item.id}/contestar`, { answer_sdp: normalizeSdp(peer.localDescription.sdp) })
     call.value = data.data
     await nextTick()
     attachStreams()
@@ -161,6 +213,7 @@ async function pollIncoming() {
   try {
     const { data } = await api.get('/llamadas/entrante')
     if (data.data) {
+      photoFailed.value = false
       mediaType.value = data.data.tipo
       incoming.value = data.data
     }
@@ -175,15 +228,16 @@ async function pollSignals() {
     call.value = { ...call.value, ...serverCall }
 
     if (serverCall.answer_sdp && !peer.currentRemoteDescription && Number(serverCall.iniciada_por_usuario_id) === Number(auth.user?.id)) {
-      await peer.setRemoteDescription({ type: 'answer', sdp: serverCall.answer_sdp })
+      const answerSdp = normalizeSdp(serverCall.answer_sdp)
+      if (!answerSdp?.startsWith('v=')) throw new Error('La respuesta de la llamada llegó dañada.')
+      await peer.setRemoteDescription({ type: 'answer', sdp: answerSdp })
+      await flushRemoteCandidates()
       phase.value = 'connecting'
     }
 
     for (const signal of data.data.senales || []) {
       lastSignalId = Math.max(lastSignalId, Number(signal.id || 0))
-      if (signal.tipo === 'ice' && signal.payload) {
-        try { await peer.addIceCandidate(signal.payload) } catch {}
-      }
+      if (signal.tipo === 'ice' && signal.payload) await addRemoteCandidate(signal.payload)
     }
 
     if (['finalizada','rechazada','cancelada','perdida'].includes(serverCall.estado)) {
@@ -191,7 +245,12 @@ async function pollSignals() {
       cleanup(false)
       $q.notify({ type: 'info', message: endedByOther ? 'La llamada terminó o fue rechazada.' : 'Llamada finalizada.' })
     }
-  } catch {}
+  } catch (e) {
+    if (e?.name === 'InvalidAccessError' || /SDP|SessionDescription/i.test(e?.message || '')) {
+      notifyError('No pudimos establecer la llamada. Actualiza VITI en ambos dispositivos e inténtalo nuevamente.')
+      await finish('cancelada')
+    }
+  }
 }
 
 function startSignalPolling() {
@@ -238,7 +297,9 @@ function cleanup(clearIncoming = true) {
   mediaType.value = 'audio'
   muted.value = false
   cameraOff.value = false
+  photoFailed.value = false
   pendingCandidates = []
+  pendingRemoteCandidates = []
   lastSignalId = 0
 }
 
@@ -265,7 +326,10 @@ onBeforeUnmount(() => {
   <q-dialog :model-value="Boolean(incoming)" persistent>
     <q-card class="call-incoming-card">
       <q-card-section class="text-center q-pa-xl">
-        <q-avatar size="82px" color="primary" text-color="white" icon="support_agent" />
+        <q-avatar size="82px" color="primary" text-color="white">
+          <img v-if="otherPhoto" :src="otherPhoto" alt="Foto de perfil" @error="photoFailed = true" />
+          <q-icon v-else name="support_agent" size="42px" />
+        </q-avatar>
         <div class="text-h5 text-weight-bold q-mt-md">{{ otherPerson }}</div>
         <div class="text-grey-6 q-mt-xs">{{ incoming?.tipo === 'video' ? 'Videollamada entrante' : 'Llamada de voz entrante' }}</div>
       </q-card-section>
@@ -279,6 +343,10 @@ onBeforeUnmount(() => {
   <q-dialog :model-value="active" persistent maximized transition-show="slide-up" transition-hide="slide-down">
     <q-card class="call-screen column no-wrap">
       <q-card-section class="row items-center call-header">
+        <q-avatar size="46px" color="primary" text-color="white" class="q-mr-md">
+          <img v-if="otherPhoto" :src="otherPhoto" alt="Foto de perfil" @error="photoFailed = true" />
+          <q-icon v-else name="person" />
+        </q-avatar>
         <div>
           <div class="text-h6 text-weight-bold">{{ otherPerson }}</div>
           <div class="text-caption">{{ statusLabel }} · {{ isVideo ? 'Video' : 'Audio' }}</div>
@@ -291,7 +359,10 @@ onBeforeUnmount(() => {
         <video v-if="isVideo" ref="remoteVideo" autoplay playsinline class="remote-video"></video>
         <audio v-else ref="remoteVideo" autoplay></audio>
         <div v-if="!isVideo" class="audio-avatar">
-          <q-avatar size="124px" color="primary" text-color="white" icon="person" />
+          <q-avatar size="124px" color="primary" text-color="white">
+            <img v-if="otherPhoto" :src="otherPhoto" alt="Foto de perfil" @error="photoFailed = true" />
+            <q-icon v-else name="person" size="64px" />
+          </q-avatar>
           <div class="text-h5 text-weight-bold q-mt-md">{{ otherPerson }}</div>
           <div class="text-grey-5 q-mt-sm">{{ statusLabel }}</div>
         </div>
