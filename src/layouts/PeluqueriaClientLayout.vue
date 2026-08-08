@@ -1,6 +1,6 @@
 <script setup>
-import { computed, onMounted, ref } from 'vue'
-import { useQuasar } from 'quasar'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { Dark, useQuasar } from 'quasar'
 import { useRouter } from 'vue-router'
 import { api } from '../boot/axios'
 import { useAuthStore } from '../stores/auth'
@@ -11,6 +11,7 @@ const auth = useAuthStore()
 const drawer = ref(false)
 const loading = ref(true)
 const appInfo = ref(null)
+const previousDark = ref(false)
 
 const businessName = computed(() => appInfo.value?.empresa?.nombre_comercial || 'Mi peluquería')
 const menu = [
@@ -43,8 +44,14 @@ async function loadState() {
 }
 
 onMounted(() => {
+  previousDark.value = Dark.isActive
+  Dark.set(false)
   drawer.value = $q.screen.gt.sm
   loadState()
+})
+
+onBeforeUnmount(() => {
+  Dark.set(previousDark.value)
 })
 </script>
 
@@ -92,5 +99,28 @@ onMounted(() => {
 </template>
 
 <style scoped>
-.hair-app-shell{background:#f6f7fb;min-height:100vh}.hair-header{background:rgba(255,255,255,.96);border-bottom:1px solid #e7e9ef;backdrop-filter:blur(12px)}.hair-drawer{background:#fff}.hair-active{background:#eef3ff;color:var(--q-primary);font-weight:700}.rounded-borders{border-radius:10px}
+.hair-app-shell{
+  --viti-bg:#f6f7fb;
+  --viti-card:#ffffff;
+  --viti-text:#172033;
+  --viti-muted:#667085;
+  --viti-border:#e4e7ec;
+  background:var(--viti-bg);
+  color:var(--viti-text);
+  min-height:100vh;
+}
+.hair-app-shell :deep(.q-page-container),
+.hair-app-shell :deep(.q-page){background:var(--viti-bg);color:var(--viti-text)}
+.hair-app-shell :deep(.q-card),
+.hair-app-shell :deep(.q-table),
+.hair-app-shell :deep(.viti-card),
+.hair-app-shell :deep(.viti-table){background:var(--viti-card);color:var(--viti-text);border-color:var(--viti-border)}
+.hair-app-shell :deep(.text-grey-6),
+.hair-app-shell :deep(.text-grey-7){color:var(--viti-muted)!important}
+.hair-header{background:rgba(255,255,255,.96);color:#172033!important;border-bottom:1px solid #e7e9ef;backdrop-filter:blur(12px)}
+.hair-drawer{background:#08264a;color:#fff}
+.hair-drawer :deep(.q-separator){background:rgba(255,255,255,.18)}
+.hair-drawer :deep(.text-grey-6){color:#afbdd0!important}
+.hair-active{background:#eef3ff!important;color:#1565c0!important;font-weight:700}
+.rounded-borders{border-radius:10px}
 </style>
