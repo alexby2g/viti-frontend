@@ -1,33 +1,41 @@
 <script setup>
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
 import { useQuasar } from 'quasar'
 import { api } from '../boot/axios'
 import PageHeader from '../components/PageHeader.vue'
-import { paymentQrData } from '../assets/paymentQr'
 
 const $q = useQuasar()
 const loading = ref(true)
 const tab = ref('proyectos')
-const data = ref({resumen:{},configuracion:null,proyectos:[],suscripciones:[]})
+const data = ref({ resumen:{}, configuracion:null, proyectos:[], suscripciones:[] })
 const dialog = ref(false)
 const kind = ref('')
 const current = ref(null)
+const qrFile = ref(null)
+const qrPreview = ref('')
+const uploadingQr = ref(false)
+const qrFailed = ref(false)
 
-const agreement = reactive({precio_acordado:1700,anticipo_monto:850,observaciones:''})
-const projectPayment = reactive({tipo:'anticipo',monto:0,metodo:'qr',fecha_pago:'',referencia:'',observaciones:''})
-const subscription = reactive({plan:'VITI Soporte',monto:70,frecuencia:'mensual',fecha_inicio:'',fecha_vencimiento:'',dias_gracia:7,estado:'activa'})
-const subscriptionPayment = reactive({monto:70,metodo:'qr',fecha_pago:'',referencia:'',observaciones:''})
-const configForm = reactive({banco:'',titular:'',observaciones:''})
+const agreement = reactive({ precio_acordado:1700, anticipo_monto:850, observaciones:'' })
+const projectPayment = reactive({ tipo:'anticipo', monto:0, metodo:'qr', fecha_pago:'', referencia:'', observaciones:'' })
+const subscription = reactive({ plan:'VITI Soporte', monto:70, frecuencia:'mensual', fecha_inicio:'', fecha_vencimiento:'', dias_gracia:7, estado:'activa' })
+const subscriptionPayment = reactive({ monto:70, metodo:'qr', fecha_pago:'', referencia:'', observaciones:'' })
+const configForm = reactive({ banco:'', titular:'', observaciones:'' })
 
 const money = value => `${Number(value || 0).toFixed(2)} Bs`
 const pretty = value => String(value || '').replaceAll('_',' ').replace(/\b\w/g,c=>c.toUpperCase())
 const today = () => new Date().toISOString().slice(0,10)
-const statusColor = value => ({pagado:'positive',pendiente_saldo:'orange',pendiente_anticipo:'negative',activa:'positive',gracia:'orange',suspendida:'negative',cancelada:'grey'}[value] || 'grey')
+const statusColor = value => ({ pagado:'positive', pendiente_saldo:'orange', pendiente_anticipo:'negative', activa:'positive', gracia:'orange', suspendida:'negative', cancelada:'grey' }[value] || 'grey')
+const qrSrc = computed(() => {
+  if (qrPreview.value) return qrPreview.value
+  if (data.value.configuracion?.qr_url && !qrFailed.value) return data.value.configuracion.qr_url
+  return '/viti-payment-qr.png'
+})
 
 const projectColumns = [
   {name:'proyecto',label:'Proyecto',field:'nombre',align:'left'},
   {name:'cliente',label:'Cliente / empresa',field:r=>r.empresa?.nombre_comercial||r.cliente?.nombre,align:'left'},
-  {name:'total',label:'Acordado',field:r=>r.precio_acordado,align:'right'},
+  {name:'total',label:'Acordado',field:'precio_acordado',align:'right'},
   {name:'pagado',label:'Pagado',field:'pagado',align:'right'},
   {name:'pendiente',label:'Pendiente',field:'pendiente',align:'right'},
   {name:'estado',label:'Estado',field:'estado_pago',align:'left'},
@@ -52,8 +60,10 @@ async function load(){
       titular:data.value.configuracion?.titular||'',
       observaciones:data.value.configuracion?.observaciones||'',
     })
-  }catch(e){$q.notify({type:'negative',message:e.response?.data?.message||'No se pudieron cargar los pagos.'})}
-  finally{loading.value=false}
+    qrFailed.value=false
+  }catch(e){
+    $q.notify({type:'negative',message:e.response?.data?.message||'No se pudieron cargar los pagos.'})
+  }finally{loading.value=false}
 }
 
 function openAgreement(row){
@@ -102,19 +112,49 @@ async function saveDialog(){
     dialog.value=false
     $q.notify({type:'positive',message:'Registro actualizado.'})
     await load()
-  }catch(e){$q.notify({type:'negative',message:e.response?.data?.message||Object.values(e.response?.data?.errors||{}).flat()[0]||'No se pudo guardar.'})}
+  }catch(e){
+    $q.notify({type:'negative',message:e.response?.data?.message||Object.values(e.response?.data?.errors||{}).flat()[0]||'No se pudo guardar.'})
+  }
 }
+
 async function saveConfig(){
-  try{await api.put('/pagos/configuracion',configForm);$q.notify({type:'positive',message:'Datos de cobro actualizados.'});await load()}
-  catch(e){$q.notify({type:'negative',message:e.response?.data?.message||'No se pudo actualizar.'})}
+  try{
+    const response=await api.put('/pagos/configuracion',configForm)
+    data.value.configuracion=response.data.data
+    $q.notify({type:'positive',message:'Datos de cobro actualizados.'})
+  }catch(e){$q.notify({type:'negative',message:e.response?.data?.message||'No se pudo actualizar.'})}
+}
+
+function onQrSelected(file){
+  if(qrPreview.value) URL.revokeObjectURL(qrPreview.value)
+  qrPreview.value=file?URL.createObjectURL(file):''
+}
+
+async function uploadQr(){
+  if(!qrFile.value){$q.notify({type:'warning',message:'Selecciona una imagen de QR.'});return}
+  uploadingQr.value=true
+  try{
+    const payload=new FormData()
+    payload.append('qr',qrFile.value)
+    const response=await api.post('/pagos/configuracion/qr',payload,{headers:{'Content-Type':'multipart/form-data'}})
+    data.value.configuracion=response.data.data
+    qrFile.value=null
+    if(qrPreview.value) URL.revokeObjectURL(qrPreview.value)
+    qrPreview.value=''
+    qrFailed.value=false
+    $q.notify({type:'positive',message:'QR de cobro actualizado.'})
+  }catch(e){
+    $q.notify({type:'negative',message:e.response?.data?.message||Object.values(e.response?.data?.errors||{}).flat()[0]||'No se pudo subir el QR.'})
+  }finally{uploadingQr.value=false}
 }
 
 onMounted(load)
+onBeforeUnmount(()=>{if(qrPreview.value)URL.revokeObjectURL(qrPreview.value)})
 </script>
 
 <template>
 <q-page class="viti-page">
-  <PageHeader eyebrow="Control" title="Pagos y suscripciones" subtitle="Controla el acuerdo del proyecto, la entrega y el mantenimiento recurrente desde un solo lugar." />
+  <PageHeader eyebrow="Control" title="Pagos y suscripciones" subtitle="Controla acuerdos, cobros, suscripciones y el QR principal de VITI desde un solo lugar." />
   <q-inner-loading :showing="loading" />
 
   <div class="row q-col-gutter-md q-mb-lg">
@@ -125,7 +165,9 @@ onMounted(load)
   </div>
 
   <q-tabs v-model="tab" align="left" no-caps active-color="primary" indicator-color="primary" class="q-mb-md">
-    <q-tab name="proyectos" icon="account_tree" label="Proyectos"/><q-tab name="suscripciones" icon="autorenew" label="Suscripciones"/><q-tab name="cobro" icon="qr_code_2" label="Datos de cobro"/>
+    <q-tab name="proyectos" icon="account_tree" label="Proyectos"/>
+    <q-tab name="suscripciones" icon="autorenew" label="Suscripciones"/>
+    <q-tab name="cobro" icon="qr_code_2" label="Datos de cobro"/>
   </q-tabs>
 
   <q-tab-panels v-model="tab" animated class="transparent">
@@ -136,7 +178,7 @@ onMounted(load)
         <template #body-cell-pagado="p"><q-td :props="p" class="text-right">{{money(p.row.pagado)}}</q-td></template>
         <template #body-cell-pendiente="p"><q-td :props="p" class="text-right">{{money(p.row.pendiente)}}</q-td></template>
         <template #body-cell-estado="p"><q-td :props="p"><q-badge :color="statusColor(p.row.estado_pago)">{{pretty(p.row.estado_pago)}}</q-badge></q-td></template>
-        <template #body-cell-acciones="p"><q-td :props="p"><q-btn flat round dense icon="more_vert"><q-menu><q-list style="min-width:210px"><q-item clickable v-close-popup @click="openAgreement(p.row)"><q-item-section avatar><q-icon name="handshake"/></q-item-section><q-item-section>{{p.row.precio_acordado===null?'Registrar acuerdo':'Editar acuerdo'}}</q-item-section></q-item><q-item clickable v-close-popup :disable="p.row.precio_acordado===null" @click="openProjectPayment(p.row)"><q-item-section avatar><q-icon name="payments"/></q-item-section><q-item-section>Registrar pago</q-item-section></q-item><q-item clickable v-close-popup :disable="!p.row.aplicacion" @click="openSubscription(p.row)"><q-item-section avatar><q-icon name="autorenew"/></q-item-section><q-item-section>Configurar suscripción</q-item-section></q-item></q-list></q-menu></q-btn></q-td></template>
+        <template #body-cell-acciones="p"><q-td :props="p"><q-btn flat round dense icon="more_vert"><q-menu><q-list style="min-width:220px"><q-item clickable v-close-popup @click="openAgreement(p.row)"><q-item-section avatar><q-icon name="handshake"/></q-item-section><q-item-section>{{p.row.precio_acordado===null?'Registrar acuerdo':'Editar acuerdo'}}</q-item-section></q-item><q-item clickable v-close-popup :disable="p.row.precio_acordado===null" @click="openProjectPayment(p.row)"><q-item-section avatar><q-icon name="payments"/></q-item-section><q-item-section>Registrar pago</q-item-section></q-item><q-item clickable v-close-popup :disable="!p.row.aplicacion" @click="openSubscription(p.row)"><q-item-section avatar><q-icon name="autorenew"/></q-item-section><q-item-section>Configurar suscripción</q-item-section></q-item></q-list></q-menu></q-btn></q-td></template>
       </q-table>
     </q-tab-panel>
 
@@ -144,23 +186,57 @@ onMounted(load)
       <q-table flat class="viti-table" :rows="data.suscripciones||[]" :columns="subscriptionColumns" row-key="id" :pagination="{rowsPerPage:15}">
         <template #body-cell-monto="p"><q-td :props="p" class="text-right">{{money(p.row.monto)}} / {{p.row.frecuencia==='anual'?'año':'mes'}}</q-td></template>
         <template #body-cell-estado="p"><q-td :props="p"><q-badge :color="statusColor(p.row.estado)">{{pretty(p.row.estado)}}</q-badge></q-td></template>
-        <template #body-cell-acciones="p"><q-td :props="p"><q-btn flat round dense icon="more_vert"><q-menu><q-list style="min-width:190px"><q-item clickable v-close-popup @click="openSubscriptionPayment(p.row)"><q-item-section avatar><q-icon name="payments"/></q-item-section><q-item-section>Registrar pago</q-item-section></q-item><q-item clickable v-close-popup @click="editSubscription(p.row)"><q-item-section avatar><q-icon name="edit"/></q-item-section><q-item-section>Editar suscripción</q-item-section></q-item></q-list></q-menu></q-btn></q-td></template>
+        <template #body-cell-acciones="p"><q-td :props="p"><q-btn flat round dense icon="more_vert"><q-menu><q-list style="min-width:200px"><q-item clickable v-close-popup @click="openSubscriptionPayment(p.row)"><q-item-section avatar><q-icon name="payments"/></q-item-section><q-item-section>Registrar pago</q-item-section></q-item><q-item clickable v-close-popup @click="editSubscription(p.row)"><q-item-section avatar><q-icon name="edit"/></q-item-section><q-item-section>Editar suscripción</q-item-section></q-item></q-list></q-menu></q-btn></q-td></template>
         <template #no-data><div class="empty-state full-width">Todavía no hay suscripciones configuradas.</div></template>
       </q-table>
     </q-tab-panel>
 
     <q-tab-panel name="cobro" class="q-pa-none">
-      <div class="row q-col-gutter-lg"><div class="col-12 col-md-5"><q-card flat class="viti-card q-pa-lg text-center"><div class="text-h6 text-weight-bold">QR principal VITI</div><img :src="paymentQrData" alt="QR de pago VITI" class="qr-img q-mt-md"/><div class="text-caption text-grey-6 q-mt-md">QR recortado del comprobante original. El monto se ingresa al pagar.</div></q-card></div><div class="col-12 col-md-7"><q-card flat class="viti-card"><q-card-section><div class="text-h6 text-weight-bold">Datos de cobro</div><div class="text-caption text-grey-6">Estos datos los verá el cliente junto al QR.</div></q-card-section><q-separator/><q-card-section><q-input v-model="configForm.banco" outlined label="Banco" class="q-mb-md"/><q-input v-model="configForm.titular" outlined label="Titular" class="q-mb-md"/><q-input v-model="configForm.observaciones" outlined type="textarea" label="Indicaciones opcionales"/></q-card-section><q-card-actions align="right"><q-btn color="primary" unelevated no-caps label="Guardar datos" @click="saveConfig"/></q-card-actions></q-card></div></div>
+      <div class="row q-col-gutter-lg">
+        <div class="col-12 col-md-5">
+          <q-card flat class="viti-card qr-card">
+            <q-card-section>
+              <div class="text-h6 text-weight-bold">QR principal VITI</div>
+              <div class="text-caption text-grey-6">Puedes reemplazarlo cuando cambies de cuenta o banco.</div>
+            </q-card-section>
+            <q-card-section class="text-center q-pt-none">
+              <div class="qr-stage"><img :src="qrSrc" alt="QR de pago VITI" class="qr-img" @error="qrFailed=true"/></div>
+              <q-file v-model="qrFile" outlined accept="image/png,image/jpeg,image/webp" label="Seleccionar nuevo QR" class="q-mt-md" clearable @update:model-value="onQrSelected">
+                <template #prepend><q-icon name="upload_file"/></template>
+              </q-file>
+              <div class="text-caption text-grey-6 q-mt-sm">PNG, JPG o WEBP. Máximo 5 MB. Conviene subir solo el código QR con un pequeño margen blanco.</div>
+            </q-card-section>
+            <q-card-actions align="right" class="q-px-md q-pb-md"><q-btn color="primary" unelevated no-caps icon="cloud_upload" label="Subir / reemplazar QR" :disable="!qrFile" :loading="uploadingQr" @click="uploadQr"/></q-card-actions>
+          </q-card>
+        </div>
+        <div class="col-12 col-md-7">
+          <q-card flat class="viti-card">
+            <q-card-section><div class="text-h6 text-weight-bold">Datos de cobro</div><div class="text-caption text-grey-6">Estos datos los verá el cliente junto al QR.</div></q-card-section>
+            <q-separator/>
+            <q-card-section><q-input v-model="configForm.banco" outlined label="Banco" class="q-mb-md"/><q-input v-model="configForm.titular" outlined label="Titular" class="q-mb-md"/><q-input v-model="configForm.observaciones" outlined type="textarea" label="Indicaciones opcionales"/></q-card-section>
+            <q-card-actions align="right"><q-btn color="primary" unelevated no-caps label="Guardar datos" @click="saveConfig"/></q-card-actions>
+          </q-card>
+        </div>
+      </div>
     </q-tab-panel>
   </q-tab-panels>
 
-  <q-dialog v-model="dialog"><q-card style="width:620px;max-width:94vw"><q-card-section><div class="section-label">Pagos VITI</div><div class="text-h5 text-weight-bold">{{kind==='agreement'?'Acuerdo económico':kind==='project-payment'?'Registrar pago del proyecto':kind==='subscription'?'Suscripción de la aplicación':'Registrar pago de suscripción'}}</div></q-card-section><q-separator/><q-card-section>
-    <div v-if="kind==='agreement'" class="row q-col-gutter-md"><div class="col-12 col-sm-6"><q-input v-model.number="agreement.precio_acordado" outlined type="number" label="Precio acordado (Bs)"/></div><div class="col-12 col-sm-6"><q-input v-model.number="agreement.anticipo_monto" outlined type="number" label="Anticipo (Bs)"/></div><div class="col-12"><q-input v-model="agreement.observaciones" outlined type="textarea" label="Observaciones opcionales"/></div></div>
-    <div v-else-if="kind==='project-payment'" class="row q-col-gutter-md"><div class="col-12 col-sm-6"><q-select v-model="projectPayment.tipo" outlined :options="[{label:'Anticipo',value:'anticipo'},{label:'Saldo final',value:'saldo_final'},{label:'Otro',value:'otro'}]" emit-value map-options label="Tipo"/></div><div class="col-12 col-sm-6"><q-input v-model.number="projectPayment.monto" outlined type="number" label="Monto (Bs)"/></div><div class="col-12 col-sm-6"><q-select v-model="projectPayment.metodo" outlined :options="['qr','transferencia','efectivo','otro']" label="Método"/></div><div class="col-12 col-sm-6"><q-input v-model="projectPayment.fecha_pago" outlined type="date" label="Fecha" stack-label/></div><div class="col-12"><q-input v-model="projectPayment.referencia" outlined label="Referencia / comprobante"/></div></div>
-    <div v-else-if="kind==='subscription'" class="row q-col-gutter-md"><div class="col-12 col-sm-6"><q-input v-model="subscription.plan" outlined label="Plan"/></div><div class="col-12 col-sm-6"><q-input v-model.number="subscription.monto" outlined type="number" label="Monto (Bs)"/></div><div class="col-12 col-sm-6"><q-select v-model="subscription.frecuencia" outlined :options="['mensual','anual']" label="Frecuencia"/></div><div class="col-12 col-sm-6"><q-input v-model.number="subscription.dias_gracia" outlined type="number" label="Días de gracia"/></div><div class="col-12 col-sm-6"><q-input v-model="subscription.fecha_inicio" outlined type="date" label="Inicio" stack-label/></div><div class="col-12 col-sm-6"><q-input v-model="subscription.fecha_vencimiento" outlined type="date" label="Vencimiento (opcional)" stack-label clearable/></div><div class="col-12"><q-select v-model="subscription.estado" outlined :options="['activa','suspendida','cancelada']" label="Estado manual"/></div></div>
-    <div v-else class="row q-col-gutter-md"><div class="col-12 col-sm-6"><q-input v-model.number="subscriptionPayment.monto" outlined type="number" label="Monto (Bs)"/></div><div class="col-12 col-sm-6"><q-select v-model="subscriptionPayment.metodo" outlined :options="['qr','transferencia','efectivo','otro']" label="Método"/></div><div class="col-12 col-sm-6"><q-input v-model="subscriptionPayment.fecha_pago" outlined type="date" label="Fecha" stack-label/></div><div class="col-12 col-sm-6"><q-input v-model="subscriptionPayment.referencia" outlined label="Referencia"/></div></div>
-  </q-card-section><q-card-actions align="right"><q-btn flat no-caps label="Cancelar" v-close-popup/><q-btn color="primary" unelevated no-caps label="Guardar" @click="saveDialog"/></q-card-actions></q-card></q-dialog>
+  <q-dialog v-model="dialog">
+    <q-card style="width:620px;max-width:94vw">
+      <q-card-section><div class="section-label">Pagos VITI</div><div class="text-h5 text-weight-bold">{{kind==='agreement'?'Acuerdo económico':kind==='project-payment'?'Registrar pago del proyecto':kind==='subscription'?'Suscripción de la aplicación':'Registrar pago de suscripción'}}</div></q-card-section>
+      <q-separator/>
+      <q-card-section>
+        <div v-if="kind==='agreement'" class="row q-col-gutter-md"><div class="col-12 col-sm-6"><q-input v-model.number="agreement.precio_acordado" outlined type="number" label="Precio acordado (Bs)"/></div><div class="col-12 col-sm-6"><q-input v-model.number="agreement.anticipo_monto" outlined type="number" label="Anticipo (Bs)"/></div><div class="col-12"><q-input v-model="agreement.observaciones" outlined type="textarea" label="Observaciones opcionales"/></div></div>
+        <div v-else-if="kind==='project-payment'" class="row q-col-gutter-md"><div class="col-12 col-sm-6"><q-select v-model="projectPayment.tipo" outlined :options="[{label:'Anticipo',value:'anticipo'},{label:'Saldo final',value:'saldo_final'},{label:'Otro',value:'otro'}]" emit-value map-options label="Tipo"/></div><div class="col-12 col-sm-6"><q-input v-model.number="projectPayment.monto" outlined type="number" label="Monto (Bs)"/></div><div class="col-12 col-sm-6"><q-select v-model="projectPayment.metodo" outlined :options="['qr','transferencia','efectivo','otro']" label="Método"/></div><div class="col-12 col-sm-6"><q-input v-model="projectPayment.fecha_pago" outlined type="date" label="Fecha" stack-label/></div><div class="col-12"><q-input v-model="projectPayment.referencia" outlined label="Referencia opcional"/></div><div class="col-12"><q-input v-model="projectPayment.observaciones" outlined type="textarea" label="Observaciones"/></div></div>
+        <div v-else-if="kind==='subscription'" class="row q-col-gutter-md"><div class="col-12 col-sm-7"><q-input v-model="subscription.plan" outlined label="Plan"/></div><div class="col-12 col-sm-5"><q-input v-model.number="subscription.monto" outlined type="number" label="Monto (Bs)"/></div><div class="col-12 col-sm-6"><q-select v-model="subscription.frecuencia" outlined :options="['mensual','anual']" label="Frecuencia"/></div><div class="col-12 col-sm-6"><q-input v-model.number="subscription.dias_gracia" outlined type="number" label="Días de gracia"/></div><div class="col-12 col-sm-6"><q-input v-model="subscription.fecha_inicio" outlined type="date" label="Inicio" stack-label/></div><div class="col-12 col-sm-6"><q-input v-model="subscription.fecha_vencimiento" outlined type="date" label="Vencimiento opcional" stack-label/></div><div class="col-12"><q-select v-model="subscription.estado" outlined :options="['activa','gracia','suspendida','cancelada']" label="Estado"/></div></div>
+        <div v-else class="row q-col-gutter-md"><div class="col-12 col-sm-6"><q-input v-model.number="subscriptionPayment.monto" outlined type="number" label="Monto (Bs)"/></div><div class="col-12 col-sm-6"><q-select v-model="subscriptionPayment.metodo" outlined :options="['qr','transferencia','efectivo','otro']" label="Método"/></div><div class="col-12 col-sm-6"><q-input v-model="subscriptionPayment.fecha_pago" outlined type="date" label="Fecha" stack-label/></div><div class="col-12 col-sm-6"><q-input v-model="subscriptionPayment.referencia" outlined label="Referencia"/></div><div class="col-12"><q-input v-model="subscriptionPayment.observaciones" outlined type="textarea" label="Observaciones"/></div></div>
+      </q-card-section>
+      <q-card-actions align="right"><q-btn flat no-caps label="Cancelar" v-close-popup/><q-btn color="primary" unelevated no-caps label="Guardar" @click="saveDialog"/></q-card-actions>
+    </q-card>
+  </q-dialog>
 </q-page>
 </template>
 
-<style scoped>.qr-img{width:min(100%,340px);aspect-ratio:1/1;object-fit:contain;background:#fff;border-radius:16px;padding:12px;border:1px solid var(--viti-border)}.empty-state{text-align:center;padding:38px;color:var(--viti-muted)}</style>
+<style scoped>
+.qr-card{overflow:hidden}.qr-stage{display:flex;align-items:center;justify-content:center;min-height:320px;padding:18px;border:1px dashed var(--viti-border);border-radius:16px;background:#fff}.qr-img{display:block;width:min(100%,390px);height:auto;max-height:420px;object-fit:contain;background:#fff}.empty-state{text-align:center;padding:36px;color:var(--viti-muted)}
+</style>
