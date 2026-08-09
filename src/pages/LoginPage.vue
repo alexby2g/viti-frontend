@@ -4,7 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { useQuasar } from 'quasar'
 import { useAuthStore } from '../stores/auth'
 import AppBrand from '../components/AppBrand.vue'
-const auth=useAuthStore(),router=useRouter(),route=useRoute(),$q=useQuasar(),show=ref(false),showSecret=ref(false),mode=ref('admin')
+const auth=useAuthStore(),router=useRouter(),route=useRoute(),$q=useQuasar(),show=ref(false),showSecret=ref(false),mode=ref(route.query.tipo==='cliente'?'cliente':'admin')
 const form=reactive({acceso:'',password:'',codigo_secreto:''})
 function errorMessage(e){const bag=e?.response?.data?.errors;if(bag)return Object.values(bag).flat()[0];return e?.response?.data?.message||'No se pudo iniciar sesión.'}
 async function submit(){try{await auth.login({...form,codigo_secreto:mode.value==='admin'?form.codigo_secreto:null});const target=auth.user?.rol==='cliente'?'/mi-cuenta':(route.query.redirect||'/');router.replace(target)}catch(e){$q.notify({type:'negative',message:errorMessage(e)})}}

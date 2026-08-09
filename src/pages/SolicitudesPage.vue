@@ -9,7 +9,7 @@ import RowActionsMenu from '../components/RowActionsMenu.vue'
 
 const $q=useQuasar(), route=useRoute(), router=useRouter()
 const rows=ref([]), clients=ref([]), loading=ref(false), dialog=ref(false)
-const linkDialog=ref(false), publicLink=ref('')
+const linkDialog=ref(false), linkLoading=ref(false), publicLink=ref(''), linkExpiresAt=ref(null)
 const form=reactive({empresa_id:null,cliente_id:null,titulo:'',resumen:'',prioridad:'normal',fecha_limite_deseada:null,presupuesto_estimado:null})
 const columns=[
  {name:'actions',label:'',field:'actions',align:'left'},
@@ -44,16 +44,26 @@ async function save(){
    await router.push(`/solicitudes/${created.id}`)
  }catch(e){$q.notify({type:'negative',message:e.response?.data?.message||e.message||'No se pudo crear la solicitud.'})}
 }
-function showPublicLink(){
- publicLink.value=`${window.location.origin}/solicitud`
+async function createRegistrationLink(){
  linkDialog.value=true
+ linkLoading.value=true
+ publicLink.value=''
+ linkExpiresAt.value=null
+ try{
+   const {data}=await api.post('/invitaciones-clientes',{dias_vigencia:7})
+   publicLink.value=`${window.location.origin}${data.data.ruta}`
+   linkExpiresAt.value=data.data.expira_at
+ }catch(e){
+   linkDialog.value=false
+   $q.notify({type:'negative',message:e.response?.data?.message||'No se pudo crear el enlace de registro.'})
+ }finally{linkLoading.value=false}
 }
 async function copyPublicLink(){
  if(!publicLink.value)return
  try{await navigator.clipboard.writeText(publicLink.value);$q.notify({type:'positive',message:'Enlace copiado. Ya puedes enviarlo por WhatsApp.'})}
  catch{$q.notify({type:'info',message:'Mantén pulsado el enlace para copiarlo.'})}
 }
-function openPublicForm(){window.open(publicLink.value||`${window.location.origin}/solicitud`,'_blank','noopener,noreferrer')}
+function openPublicForm(){if(publicLink.value)window.open(publicLink.value,'_blank','noopener,noreferrer')}
 function remove(row){$q.dialog({title:'Eliminar solicitud',message:`¿Eliminar ${row.codigo}?`,cancel:true}).onOk(async()=>{try{await api.delete(`/solicitudes/${row.id}`);load()}catch(e){$q.notify({type:'negative',message:e.response?.data?.message||'No se puede eliminar.'})}})}
 function stateLabel(value){return String(value||'').replaceAll('_',' ')}
 onMounted(async()=>{await load();if(route.query.new)openNew()})
@@ -63,7 +73,7 @@ onMounted(async()=>{await load();if(route.query.new)openNew()})
 <q-page class="viti-page solicitudes-page">
   <PageHeader eyebrow="Levantamiento" title="Solicitudes de sistema" subtitle="Cada solicitud contiene el cuestionario institucional y puede convertirse en un proyecto.">
     <div class="header-actions">
-      <q-btn outline color="primary" icon="language" label="Formulario público" no-caps @click="showPublicLink"/>
+      <q-btn outline color="primary" icon="person_add" label="Crear enlace de registro" no-caps @click="createRegistrationLink"/>
       <q-btn color="primary" unelevated icon="add" label="Nueva solicitud" no-caps @click="openNew"/>
     </div>
   </PageHeader>
@@ -98,23 +108,25 @@ onMounted(async()=>{await load();if(route.query.new)openNew()})
   <q-dialog v-model="linkDialog">
     <q-card class="viti-card invite-card">
       <q-card-section>
-        <div class="section-label">Registro sin instalar la app</div>
-        <div class="text-h5 text-weight-bold">Formulario público</div>
-        <div class="text-caption text-grey-6 q-mt-xs">Este enlace es reutilizable. Puedes enviarlo a cualquier cliente por WhatsApp, redes sociales o correo.</div>
+        <div class="section-label">Registro seguro del cliente</div>
+        <div class="text-h5 text-weight-bold">Enlace personal de registro</div>
+        <div class="text-caption text-grey-6 q-mt-xs">Envíalo únicamente al cliente que se registrará. El enlace funciona una sola vez y vence en 7 días.</div>
       </q-card-section>
       <q-card-section class="q-gutter-md">
-        <q-input :model-value="publicLink" outlined readonly label="Enlace listo para compartir">
+        <q-skeleton v-if="linkLoading" type="QInput" />
+        <q-input v-else :model-value="publicLink" outlined readonly label="Enlace listo para compartir">
           <template #append><q-btn flat round icon="content_copy" @click="copyPublicLink" /></template>
         </q-input>
         <q-banner rounded class="bg-blue-1 text-primary">
           <template #avatar><q-icon name="phone_android" /></template>
-          El cliente registra sus datos y negocio, completa el cuestionario y la solicitud aparece automáticamente en este panel. No necesita descargar VITI ni crear contraseña.
+          El cliente creará su nombre de usuario y contraseña, registrará sus datos y negocio, y después completará el cuestionario. Su cuenta siempre quedará con rol Cliente.
         </q-banner>
+        <div v-if="linkExpiresAt" class="text-caption text-grey-6"><q-icon name="schedule" class="q-mr-xs" />Vence: {{formatDateTime(linkExpiresAt)}}</div>
       </q-card-section>
       <q-card-actions align="right">
         <q-btn flat no-caps label="Cerrar" v-close-popup />
-        <q-btn outline color="primary" no-caps icon="open_in_new" label="Probar formulario" @click="openPublicForm" />
-        <q-btn color="primary" unelevated no-caps icon="content_copy" label="Copiar enlace" @click="copyPublicLink" />
+        <q-btn outline color="primary" no-caps icon="open_in_new" label="Probar registro" :disable="linkLoading||!publicLink" @click="openPublicForm" />
+        <q-btn color="primary" unelevated no-caps icon="content_copy" label="Copiar enlace" :loading="linkLoading" :disable="!publicLink" @click="copyPublicLink" />
       </q-card-actions>
     </q-card>
   </q-dialog>
