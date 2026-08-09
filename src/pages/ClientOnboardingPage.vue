@@ -18,13 +18,13 @@ const photoPreview = ref('')
 const showPassword = ref(false)
 
 const form = reactive({
-  nombre:'', telefono:'', whatsapp:'', ci:'', ci_expedido:'', ciudad:'', direccion:'',
+  nombre:'', usuario:'', telefono:'', whatsapp:'', ci:'', ci_expedido:'', ciudad:'', direccion:'',
   password:'', password_confirmation:'',
   empresa_nombre:'', empresa_actividad:'', empresa_telefono:'', empresa_whatsapp:'', empresa_ciudad:'', empresa_direccion:'',
   titulo_sistema:'', resumen:'',
 })
 
-const canContinue1 = computed(() => form.nombre.trim().length >= 3 && /^\d{7,15}$/.test(form.telefono) && form.ci.trim() && form.ciudad.trim() && form.password.length >= 10 && form.password === form.password_confirmation)
+const canContinue1 = computed(() => form.nombre.trim().length >= 3 && /^(?=.*[a-z])[a-z0-9_-]{4,40}$/.test(form.usuario) && /^\d{7,15}$/.test(form.telefono) && form.ci.trim() && form.ciudad.trim() && form.password.length >= 10 && form.password === form.password_confirmation)
 const canContinue2 = computed(() => form.empresa_nombre.trim().length >= 2 && form.titulo_sistema.trim().length >= 3)
 
 function errorMessage(e, fallback) {
@@ -107,6 +107,7 @@ onMounted(load)
           <div class="row q-col-gutter-md">
             <div class="col-12 col-sm-8"><q-input v-model="form.nombre" outlined label="Nombre completo *" autocomplete="name" /></div>
             <div class="col-12 col-sm-4"><q-input v-model="form.telefono" outlined label="Teléfono *" inputmode="numeric" maxlength="15" /></div>
+            <div class="col-12"><q-input v-model="form.usuario" outlined label="Nombre de usuario *" autocomplete="username" maxlength="40" hint="Lo usarás junto con tu contraseña para ingresar a VITI." @update:model-value="v => form.usuario = String(v ?? '').toLowerCase().replace(/\s+/g,'')"><template #prepend><q-icon name="alternate_email" /></template></q-input></div>
             <div class="col-12 col-sm-6"><q-input v-model="form.whatsapp" outlined label="WhatsApp" inputmode="numeric" maxlength="15" hint="Si lo dejas vacío usaremos tu teléfono." /></div>
             <div class="col-12 col-sm-6"><q-input v-model="form.ci" outlined label="Cédula de identidad *" /></div>
             <div class="col-12 col-sm-4"><q-input v-model="form.ci_expedido" outlined label="Expedido" placeholder="Ej.: BEN" /></div>
@@ -143,7 +144,7 @@ onMounted(load)
           <div class="text-h6 text-weight-bold q-mb-sm">Todo listo para comenzar</div>
           <div class="text-body2 text-grey-7 q-mb-lg">Al continuar crearemos tu cuenta, tu ficha de cliente, tu negocio y una solicitud en VITI. Después pasarás al cuestionario de requerimientos.</div>
           <q-list bordered separator class="rounded-borders">
-            <q-item><q-item-section avatar><q-icon name="person" color="primary"/></q-item-section><q-item-section><q-item-label>{{form.nombre}}</q-item-label><q-item-label caption>{{form.telefono}} · {{form.ciudad}}</q-item-label></q-item-section></q-item>
+            <q-item><q-item-section avatar><q-icon name="person" color="primary"/></q-item-section><q-item-section><q-item-label>{{form.nombre}}</q-item-label><q-item-label caption>@{{form.usuario}} · {{form.telefono}} · {{form.ciudad}}</q-item-label></q-item-section></q-item>
             <q-item><q-item-section avatar><q-icon name="business" color="primary"/></q-item-section><q-item-section><q-item-label>{{form.empresa_nombre}}</q-item-label><q-item-label caption>{{form.empresa_actividad||'Actividad por completar'}}</q-item-label></q-item-section></q-item>
             <q-item><q-item-section avatar><q-icon name="devices" color="primary"/></q-item-section><q-item-section><q-item-label>{{form.titulo_sistema}}</q-item-label><q-item-label caption>Se abrirá el cuestionario inmediatamente después del registro.</q-item-label></q-item-section></q-item>
           </q-list>
