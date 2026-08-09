@@ -1,5 +1,5 @@
 <script setup>
-import { onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import { useQuasar } from 'quasar'
 import { api } from '../boot/axios'
 import { formatDateTime } from '../utils/date'
@@ -12,12 +12,31 @@ const editing = ref(null)
 const loading = ref(false)
 const empty = () => ({ nombre:'', apellido:'', usuario:'', telefono:'', correo:'', rol:'administrador', estado:'activo', password:'', password_confirmation:'' })
 const form = reactive(empty())
+const isClientAccount = row => Boolean(row?.cliente_id) || row?.rol === 'cliente'
+const isPrimaryAccount = row => row?.rol === 'superadmin'
+const roleLocked = computed(() => isClientAccount(editing.value) || isPrimaryAccount(editing.value))
+const stateLocked = computed(() => isPrimaryAccount(editing.value))
+const roleOptions = computed(() => {
+  if (isClientAccount(editing.value)) return [{ label:'Cliente', value:'cliente' }]
+  if (isPrimaryAccount(editing.value)) return [{ label:'Superadministrador principal', value:'superadmin' }]
+  return [
+    { label:'Equipo AGR Studio', value:'administrador' },
+    { label:'Soporte interno', value:'soporte' },
+  ]
+})
+const roleLabel = row => {
+  if (isClientAccount(row)) return 'Cliente'
+  if (row?.rol === 'superadmin') return 'Superadministrador principal'
+  if (row?.rol === 'administrador') return 'Equipo AGR Studio'
+  if (row?.rol === 'soporte') return 'Soporte interno'
+  return row?.rol || 'Sin rol'
+}
 const columns = [
   { name:'actions', label:'', field:'actions', align:'left' },
   { name:'nombre', label:'Persona', field:r=>`${r.nombre} ${r.apellido||''}`, align:'left' },
   { name:'usuario', label:'Usuario', field:'usuario', align:'left' },
   { name:'telefono', label:'Teléfono', field:'telefono', align:'left' },
-  { name:'rol', label:'Rol', field:'rol', align:'left' },
+  { name:'rol', label:'Tipo de cuenta', field:roleLabel, align:'left' },
   { name:'estado', label:'Estado', field:'estado', align:'left' },
   { name:'ultimo_acceso', label:'Último acceso', field:'ultimo_acceso', align:'left' },
 ]
@@ -31,12 +50,22 @@ async function load() {
 function open(row = null) {
   editing.value = row
   Object.assign(form, empty(), row || {}, { password:'', password_confirmation:'' })
+  if (isClientAccount(row)) form.rol = 'cliente'
+  if (isPrimaryAccount(row)) {
+    form.rol = 'superadmin'
+    form.estado = 'activo'
+  }
   dialog.value = true
 }
 
 async function save() {
   try {
     form.usuario = String(form.usuario || '').toLowerCase().trim()
+    if (isClientAccount(editing.value)) form.rol = 'cliente'
+    if (isPrimaryAccount(editing.value)) {
+      form.rol = 'superadmin'
+      form.estado = 'activo'
+    }
     if (editing.value) await api.put(`/usuarios/${editing.value.id}`, form)
     else await api.post('/usuarios', form)
     $q.notify({ type:'positive', message:'Usuario guardado correctamente.' })
@@ -49,6 +78,10 @@ async function save() {
 }
 
 function remove(row) {
+  if (isPrimaryAccount(row)) {
+    $q.notify({ type:'warning', message:'La cuenta principal del superadministrador está protegida.' })
+    return
+  }
   const ownsAccount = Boolean(row.cliente_id)
   const message = ownsAccount
     ? `Se eliminará la cuenta @${row.usuario}, su cliente, empresas, solicitudes, proyectos, aplicaciones y pagos relacionados. Esta acción no se puede deshacer.`
@@ -76,12 +109,17 @@ onMounted(load)
 
 <template>
   <q-page class="viti-page users-page">
-    <PageHeader eyebrow="Administración" title="Usuarios de VITI" subtitle="Administra cuentas internas y accesos de clientes desde un solo lugar.">
-      <q-btn class="responsive-primary-action" color="primary" unelevated icon="person_add" label="Nuevo usuario" no-caps @click="open()" />
+    <PageHeader eyebrow="Administración" title="Cuentas y accesos" subtitle="Consulta clientes y administra únicamente los accesos internos de AGR Studio.">
+      <q-btn class="responsive-primary-action" color="primary" unelevated icon="person_add" label="Nuevo usuario interno" no-caps @click="open()" />
     </PageHeader>
 
+    <q-banner rounded class="bg-blue-1 text-primary q-mb-lg">
+      <template #avatar><q-icon name="verified_user" /></template>
+      Las cuentas creadas desde un enlace siempre conservan el rol <strong>Cliente</strong>. No pueden convertirse en administrador ni en superadministrador.
+    </q-banner>
+
     <q-table v-if="$q.screen.gt.sm" flat class="viti-table" :rows="rows" :columns="columns" row-key="id" :loading="loading" :pagination="{rowsPerPage:20,sortBy:'id',descending:true}">
-      <template #body-cell-actions="p"><q-td :props="p"><q-btn flat round dense icon="more_vert"><q-menu><q-list style="min-width:190px"><q-item clickable v-close-popup @click="open(p.row)"><q-item-section avatar><q-icon name="edit" /></q-item-section><q-item-section>Editar</q-item-section></q-item><q-item clickable v-close-popup class="text-negative" @click="remove(p.row)"><q-item-section avatar><q-icon name="delete_forever" /></q-item-section><q-item-section>Eliminar</q-item-section></q-item></q-list></q-menu></q-btn></q-td></template>
+      <template #body-cell-actions="p"><q-td :props="p"><q-btn flat round dense icon="more_vert"><q-menu><q-list style="min-width:190px"><q-item clickable v-close-popup @click="open(p.row)"><q-item-section avatar><q-icon name="edit" /></q-item-section><q-item-section>Editar datos</q-item-section></q-item><q-item v-if="!isPrimaryAccount(p.row)" clickable v-close-popup class="text-negative" @click="remove(p.row)"><q-item-section avatar><q-icon name="delete_forever" /></q-item-section><q-item-section>Eliminar</q-item-section></q-item></q-list></q-menu></q-btn></q-td></template>
       <template #body-cell-estado="p"><q-td :props="p"><q-badge outline :color="p.value==='activo'?'positive':'grey'">{{p.value}}</q-badge></q-td></template>
       <template #body-cell-ultimo_acceso="p"><q-td :props="p">{{formatDateTime(p.value)}}</q-td></template>
     </q-table>
@@ -94,10 +132,10 @@ onMounted(load)
           <div class="col q-ml-md min-width-0">
             <div class="text-subtitle1 text-weight-bold ellipsis">{{row.nombre}} {{row.apellido}}</div>
             <div class="text-primary text-weight-medium">@{{row.usuario}}</div>
-            <div class="text-caption text-grey-6 q-mt-xs">{{row.telefono || 'Sin teléfono'}} · {{row.rol}}</div>
+            <div class="text-caption text-grey-6 q-mt-xs">{{row.telefono || 'Sin teléfono'}} · {{roleLabel(row)}}</div>
             <q-badge class="q-mt-sm" outline :color="row.estado==='activo'?'positive':'grey'">{{row.estado}}</q-badge>
           </div>
-          <q-btn flat round dense icon="more_vert"><q-menu><q-list><q-item clickable v-close-popup @click="open(row)"><q-item-section avatar><q-icon name="edit" /></q-item-section><q-item-section>Editar</q-item-section></q-item><q-item clickable v-close-popup class="text-negative" @click="remove(row)"><q-item-section avatar><q-icon name="delete_forever" /></q-item-section><q-item-section>Eliminar</q-item-section></q-item></q-list></q-menu></q-btn>
+          <q-btn flat round dense icon="more_vert"><q-menu><q-list><q-item clickable v-close-popup @click="open(row)"><q-item-section avatar><q-icon name="edit" /></q-item-section><q-item-section>Editar datos</q-item-section></q-item><q-item v-if="!isPrimaryAccount(row)" clickable v-close-popup class="text-negative" @click="remove(row)"><q-item-section avatar><q-icon name="delete_forever" /></q-item-section><q-item-section>Eliminar</q-item-section></q-item></q-list></q-menu></q-btn>
         </q-card-section>
       </q-card>
       <div v-if="!rows.length && !loading" class="empty-state">No hay usuarios registrados.</div>
@@ -105,16 +143,21 @@ onMounted(load)
 
     <q-dialog v-model="dialog">
       <q-card class="responsive-dialog-card">
-        <q-card-section><div class="section-label">Usuario</div><div class="text-h5 text-weight-bold">{{editing?'Editar acceso':'Crear acceso'}}</div></q-card-section>
+        <q-card-section><div class="section-label">{{isClientAccount(editing)?'Cuenta de cliente':'Usuario interno'}}</div><div class="text-h5 text-weight-bold">{{editing?'Editar datos de acceso':'Crear acceso interno'}}</div></q-card-section>
         <q-separator />
-        <q-card-section><div class="row q-col-gutter-md">
+        <q-card-section>
+          <q-banner v-if="roleLocked" dense rounded class="bg-blue-1 text-primary q-mb-md">
+            <template #avatar><q-icon name="lock" /></template>
+            {{isClientAccount(editing)?'Esta cuenta pertenece a un cliente. Su tipo de acceso está bloqueado como Cliente.':'Esta es la única cuenta principal y debe conservar el rol Superadministrador.'}}
+          </q-banner>
+          <div class="row q-col-gutter-md">
           <div class="col-12 col-sm-6"><q-input v-model="form.nombre" outlined label="Nombre *" /></div>
           <div class="col-12 col-sm-6"><q-input v-model="form.apellido" outlined label="Apellido" /></div>
           <div class="col-12 col-sm-6"><q-input v-model="form.usuario" outlined label="Usuario *" autocomplete="username" @update:model-value="v=>form.usuario=String(v||'').toLowerCase().replace(/\s+/g,'')" /></div>
           <div class="col-12 col-sm-6"><q-input v-model="form.telefono" outlined label="Teléfono" inputmode="numeric" /></div>
           <div class="col-12"><q-input v-model="form.correo" outlined label="Correo opcional" type="email" /></div>
-          <div class="col-12 col-sm-6"><q-select v-model="form.rol" outlined :options="['superadmin','administrador','soporte']" label="Rol" /></div>
-          <div class="col-12 col-sm-6"><q-select v-model="form.estado" outlined :options="['activo','inactivo']" label="Estado" /></div>
+          <div class="col-12 col-sm-6"><q-select v-model="form.rol" outlined emit-value map-options :options="roleOptions" label="Tipo de cuenta" :disable="roleLocked" /></div>
+          <div class="col-12 col-sm-6"><q-select v-model="form.estado" outlined :options="['activo','inactivo']" label="Estado" :disable="stateLocked" /></div>
           <div class="col-12 col-sm-6"><q-input v-model="form.password" outlined type="password" :label="editing?'Nueva contraseña (opcional)':'Contraseña *'" autocomplete="new-password" /></div>
           <div class="col-12 col-sm-6"><q-input v-model="form.password_confirmation" outlined type="password" label="Confirmar contraseña" autocomplete="new-password" /></div>
         </div></q-card-section>
