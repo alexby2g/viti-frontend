@@ -39,7 +39,7 @@ const menu=computed(()=>{
     {label:'Atención',icon:'forum',children:[{label:'Buzón de clientes',icon:'mark_chat_unread',to:'/buzon',badge:notifications.unreadCount}]},
     {label:'Soporte',icon:'support_agent',children:[{label:'Mantenimiento',icon:'build_circle',to:'/mantenimientos'},{label:'Archivos',icon:'folder',to:'/archivos'}]},
     {label:'Control',icon:'analytics',children:[{label:'Pagos y suscripciones',icon:'payments',to:'/pagos'},{label:'Reportes',icon:'picture_as_pdf',to:'/reportes'}]},
-    {label:'Administración',icon:'admin_panel_settings',children:[{label:'Auditoría',icon:'history',to:'/auditoria'},{label:'Almacenamiento',icon:'cloud',to:'/almacenamiento'}]},
+    {label:'Administración',icon:'admin_panel_settings',children:[{label:'Usuarios',icon:'manage_accounts',to:'/usuarios'},{label:'Auditoría',icon:'history',to:'/auditoria'},{label:'Almacenamiento',icon:'cloud',to:'/almacenamiento'}]},
   ]
 })
 
