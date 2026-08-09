@@ -52,6 +52,7 @@ export default [
       { path: 'reportes', name: 'reportes', component: () => import('../pages/ReportesPage.vue'), meta:{adminOnly:true} },
       { path: 'buzon', name: 'buzon', component: () => import('../pages/BuzonPage.vue'), meta:{adminOnly:true} },
       { path: 'auditoria', name: 'auditoria', component: () => import('../pages/AuditoriaPage.vue'), meta:{adminOnly:true} },
+      { path: 'usuarios', name: 'usuarios', component: () => import('../pages/UsuariosPage.vue'), meta:{adminOnly:true} },
       { path: 'almacenamiento', name: 'almacenamiento', component: () => import('../pages/StoragePage.vue'), meta:{adminOnly:true} },
     ],
   },
