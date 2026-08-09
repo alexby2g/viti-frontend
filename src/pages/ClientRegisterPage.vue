@@ -17,6 +17,7 @@ const photoPreview = ref('')
 
 const form = reactive({
   nombre: '',
+  usuario: '',
   telefono: '',
   whatsapp: '',
   ci: '',
@@ -32,6 +33,7 @@ const passwordOk = computed(() =>
   form.password.length >= 10 && /[A-Za-z]/.test(form.password) && /\d/.test(form.password) && form.password === form.password_confirmation
 )
 const required = v => Boolean(String(v ?? '').trim()) || 'Este campo es obligatorio.'
+const username = v => /^(?=.*[a-z])[a-z0-9_-]{4,40}$/.test(String(v ?? '')) || 'Usa 4 a 40 caracteres, incluye una letra y no uses espacios.'
 const phone = v => /^\d{7,15}$/.test(String(v ?? '')) || 'Ingresa entre 7 y 15 dígitos.'
 const photoRequired = () => Boolean(photo.value) || 'Sube una fotografía donde se vea claramente tu rostro.'
 
@@ -106,6 +108,7 @@ async function submit() {
           <div class="col-12 col-md-8">
             <div class="row q-col-gutter-md">
               <div class="col-12"><q-input v-model="form.nombre" outlined label="Nombre completo *" :rules="[required]" /></div>
+              <div class="col-12 col-sm-6"><q-input v-model="form.usuario" outlined label="Nombre de usuario *" autocomplete="username" maxlength="40" hint="Lo usarás para iniciar sesión. Ej.: alexander_rivera" :rules="[required, username]" @update:model-value="v => form.usuario = String(v ?? '').toLowerCase().replace(/\s+/g,'')"><template #prepend><q-icon name="alternate_email" /></template></q-input></div>
               <div class="col-12 col-sm-6"><q-input v-model="form.telefono" outlined label="Teléfono *" inputmode="numeric" maxlength="15" :rules="[required, phone]" @update:model-value="v => form.telefono = String(v ?? '').replace(/\D/g,'')" /></div>
               <div class="col-12 col-sm-6"><q-input v-model="form.whatsapp" outlined label="WhatsApp" inputmode="numeric" maxlength="15" @update:model-value="v => form.whatsapp = String(v ?? '').replace(/\D/g,'')" /></div>
               <div class="col-12 col-sm-8"><q-input v-model="form.ci" outlined label="Cédula de identidad (CI) *" :rules="[required]" hint="Se utilizará para identificar tu ficha dentro de VITI." /></div>
@@ -129,5 +132,5 @@ async function submit() {
 </template>
 
 <style scoped>
-.auth-page{min-height:100vh;background:linear-gradient(135deg,#eef5ff,#fff 55%,#e9f7ef);padding:24px}.auth-shell{width:min(920px,96vw);background:#fff;padding:42px;border-radius:22px;box-shadow:0 22px 65px rgba(18,45,78,.14)}.photo-panel{text-align:center;padding:20px;border:1px solid var(--viti-border);border-radius:18px;background:var(--viti-surface-soft)}.profile-photo-preview{border:4px solid #fff;box-shadow:0 8px 26px rgba(0,0,0,.14);background:#eef3f8}.profile-photo-preview img{width:100%;height:100%;object-fit:cover;object-position:center}.body--dark .auth-page{background:#06162b}.body--dark .auth-shell{background:#0c294c}@media(max-width:600px){.auth-shell{padding:28px 20px}}
+.auth-page{min-height:100vh;background:linear-gradient(135deg,#eef5ff,#fff 55%,#e9f7ef);padding:24px}.auth-shell{width:min(920px,96vw);background:#fff;padding:42px;border-radius:22px;box-shadow:0 22px 65px rgba(18,45,78,.14)}.photo-panel{text-align:center;padding:20px;border:1px solid var(--viti-border);border-radius:18px;background:var(--viti-surface-soft)}.profile-photo-preview{border:4px solid #fff;box-shadow:0 8px 26px rgba(0,0,0,.14);background:#eef3f8}.profile-photo-preview img{width:100%;height:100%;object-fit:cover;object-position:center}.body--dark .auth-page{background:#06162b}.body--dark .auth-shell{background:#0c294c}@media(max-width:600px){.auth-page{padding:0}.auth-shell{width:100%;min-height:100vh;padding:24px 16px;border-radius:0;box-shadow:none}.photo-panel{padding:16px}.profile-photo-preview{width:112px!important;height:112px!important;font-size:112px!important}}
 </style>
