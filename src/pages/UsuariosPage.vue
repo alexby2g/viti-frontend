@@ -10,7 +10,7 @@ const rows = ref([])
 const dialog = ref(false)
 const editing = ref(null)
 const loading = ref(false)
-const empty = () => ({ nombre:'', apellido:'', usuario:'', telefono:'', correo:'', rol:'administrador', estado:'activo', password:'', password_confirmation:'' })
+const empty = () => ({ nombre:'', apellido:'', usuario:'', documento:'', telefono:'', correo:'', rol:'administrador', estado:'activo', password:'', password_confirmation:'', codigo_secreto:'' })
 const form = reactive(empty())
 const isClientAccount = row => Boolean(row?.cliente_id) || row?.rol === 'cliente'
 const isPrimaryAccount = row => row?.rol === 'superadmin'
@@ -20,14 +20,14 @@ const roleOptions = computed(() => {
   if (isClientAccount(editing.value)) return [{ label:'Cliente', value:'cliente' }]
   if (isPrimaryAccount(editing.value)) return [{ label:'Superadministrador principal', value:'superadmin' }]
   return [
-    { label:'Equipo AGR Studio', value:'administrador' },
+    { label:'Administrador', value:'administrador' },
     { label:'Soporte interno', value:'soporte' },
   ]
 })
 const roleLabel = row => {
   if (isClientAccount(row)) return 'Cliente'
   if (row?.rol === 'superadmin') return 'Superadministrador principal'
-  if (row?.rol === 'administrador') return 'Equipo AGR Studio'
+  if (row?.rol === 'administrador') return 'Administrador'
   if (row?.rol === 'soporte') return 'Soporte interno'
   return row?.rol || 'Sin rol'
 }
@@ -35,6 +35,7 @@ const columns = [
   { name:'actions', label:'', field:'actions', align:'left' },
   { name:'nombre', label:'Persona', field:r=>`${r.nombre} ${r.apellido||''}`, align:'left' },
   { name:'usuario', label:'Usuario', field:'usuario', align:'left' },
+  { name:'documento', label:'CI', field:'documento', align:'left' },
   { name:'telefono', label:'Teléfono', field:'telefono', align:'left' },
   { name:'rol', label:'Tipo de cuenta', field:roleLabel, align:'left' },
   { name:'estado', label:'Estado', field:'estado', align:'left' },
@@ -61,6 +62,7 @@ function open(row = null) {
 async function save() {
   try {
     form.usuario = String(form.usuario || '').toLowerCase().trim()
+    form.documento = String(form.documento || '').replace(/\D/g,'')
     if (isClientAccount(editing.value)) form.rol = 'cliente'
     if (isPrimaryAccount(editing.value)) {
       form.rol = 'superadmin'
@@ -109,8 +111,8 @@ onMounted(load)
 
 <template>
   <q-page class="viti-page users-page">
-    <PageHeader eyebrow="Administración" title="Cuentas y accesos" subtitle="Consulta clientes y administra únicamente los accesos internos de AGR Studio.">
-      <q-btn class="responsive-primary-action" color="primary" unelevated icon="person_add" label="Nuevo usuario interno" no-caps @click="open()" />
+    <PageHeader eyebrow="Administración" title="Cuentas y accesos" subtitle="Consulta clientes y crea administradores internos sin compartir tu cuenta de superadministrador.">
+      <q-btn class="responsive-primary-action" color="primary" unelevated icon="admin_panel_settings" label="Crear administrador" no-caps @click="open()" />
     </PageHeader>
 
     <q-banner rounded class="bg-blue-1 text-primary q-mb-lg">
@@ -132,7 +134,8 @@ onMounted(load)
           <div class="col q-ml-md min-width-0">
             <div class="text-subtitle1 text-weight-bold ellipsis">{{row.nombre}} {{row.apellido}}</div>
             <div class="text-primary text-weight-medium">@{{row.usuario}}</div>
-            <div class="text-caption text-grey-6 q-mt-xs">{{row.telefono || 'Sin teléfono'}} · {{roleLabel(row)}}</div>
+            <div class="text-caption text-grey-6 q-mt-xs">CI {{row.documento || 'sin registrar'}} · {{row.telefono || 'Sin teléfono'}}</div>
+            <div class="text-caption text-grey-6">{{roleLabel(row)}}</div>
             <q-badge class="q-mt-sm" outline :color="row.estado==='activo'?'positive':'grey'">{{row.estado}}</q-badge>
           </div>
           <q-btn flat round dense icon="more_vert"><q-menu><q-list><q-item clickable v-close-popup @click="open(row)"><q-item-section avatar><q-icon name="edit" /></q-item-section><q-item-section>Editar datos</q-item-section></q-item><q-item v-if="!isPrimaryAccount(row)" clickable v-close-popup class="text-negative" @click="remove(row)"><q-item-section avatar><q-icon name="delete_forever" /></q-item-section><q-item-section>Eliminar</q-item-section></q-item></q-list></q-menu></q-btn>
@@ -154,12 +157,14 @@ onMounted(load)
           <div class="col-12 col-sm-6"><q-input v-model="form.nombre" outlined label="Nombre *" /></div>
           <div class="col-12 col-sm-6"><q-input v-model="form.apellido" outlined label="Apellido" /></div>
           <div class="col-12 col-sm-6"><q-input v-model="form.usuario" outlined label="Usuario *" autocomplete="username" @update:model-value="v=>form.usuario=String(v||'').toLowerCase().replace(/\s+/g,'')" /></div>
-          <div class="col-12 col-sm-6"><q-input v-model="form.telefono" outlined label="Teléfono" inputmode="numeric" /></div>
+          <div class="col-12 col-sm-6"><q-input v-model="form.documento" outlined :label="editing?'CI':'CI *'" inputmode="numeric" maxlength="15" hint="También sirve para iniciar sesión." @update:model-value="v=>form.documento=String(v||'').replace(/\D/g,'')" /></div>
+          <div class="col-12 col-sm-6"><q-input v-model="form.telefono" outlined label="Teléfono" inputmode="numeric" @update:model-value="v=>form.telefono=String(v||'').replace(/\D/g,'')" /></div>
           <div class="col-12"><q-input v-model="form.correo" outlined label="Correo opcional" type="email" /></div>
           <div class="col-12 col-sm-6"><q-select v-model="form.rol" outlined emit-value map-options :options="roleOptions" label="Tipo de cuenta" :disable="roleLocked" /></div>
           <div class="col-12 col-sm-6"><q-select v-model="form.estado" outlined :options="['activo','inactivo']" label="Estado" :disable="stateLocked" /></div>
           <div class="col-12 col-sm-6"><q-input v-model="form.password" outlined type="password" :label="editing?'Nueva contraseña (opcional)':'Contraseña *'" autocomplete="new-password" /></div>
           <div class="col-12 col-sm-6"><q-input v-model="form.password_confirmation" outlined type="password" label="Confirmar contraseña" autocomplete="new-password" /></div>
+          <div v-if="!editing" class="col-12"><q-input v-model="form.codigo_secreto" outlined type="password" label="Código secreto del superadministrador *" hint="Se valida una sola vez y no se guarda en la cuenta creada."><template #prepend><q-icon name="key" /></template></q-input></div>
         </div></q-card-section>
         <q-card-actions align="right"><q-btn flat label="Cancelar" v-close-popup /><q-btn color="primary" unelevated label="Guardar" no-caps @click="save" /></q-card-actions>
       </q-card>

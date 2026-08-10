@@ -35,6 +35,7 @@ const passwordOk = computed(() =>
 const required = v => Boolean(String(v ?? '').trim()) || 'Este campo es obligatorio.'
 const username = v => /^(?=.*[a-z])[a-z0-9_-]{4,40}$/.test(String(v ?? '')) || 'Usa 4 a 40 caracteres, incluye una letra y no uses espacios.'
 const phone = v => /^\d{7,15}$/.test(String(v ?? '')) || 'Ingresa entre 7 y 15 dígitos.'
+const ci = v => /^\d{5,15}$/.test(String(v ?? '')) || 'Ingresa entre 5 y 15 dígitos.'
 const photoRequired = () => Boolean(photo.value) || 'Sube una fotografía donde se vea claramente tu rostro.'
 
 function serverErrors(e) {
@@ -57,6 +58,7 @@ async function submit() {
     if (value !== null && value !== undefined && value !== '') fd.append(key, value)
   })
   fd.set('telefono', String(form.telefono).replace(/\D/g, ''))
+  fd.set('ci', String(form.ci).replace(/\D/g, ''))
   if (form.whatsapp) fd.set('whatsapp', String(form.whatsapp).replace(/\D/g, ''))
   fd.append('foto', photo.value)
 
@@ -111,7 +113,7 @@ async function submit() {
               <div class="col-12 col-sm-6"><q-input v-model="form.usuario" outlined label="Nombre de usuario *" autocomplete="username" maxlength="40" hint="Lo usarás para iniciar sesión. Ej.: alexander_rivera" :rules="[required, username]" @update:model-value="v => form.usuario = String(v ?? '').toLowerCase().replace(/\s+/g,'')"><template #prepend><q-icon name="alternate_email" /></template></q-input></div>
               <div class="col-12 col-sm-6"><q-input v-model="form.telefono" outlined label="Teléfono *" inputmode="numeric" maxlength="15" :rules="[required, phone]" @update:model-value="v => form.telefono = String(v ?? '').replace(/\D/g,'')" /></div>
               <div class="col-12 col-sm-6"><q-input v-model="form.whatsapp" outlined label="WhatsApp" inputmode="numeric" maxlength="15" @update:model-value="v => form.whatsapp = String(v ?? '').replace(/\D/g,'')" /></div>
-              <div class="col-12 col-sm-8"><q-input v-model="form.ci" outlined label="Cédula de identidad (CI) *" :rules="[required]" hint="Se utilizará para identificar tu ficha dentro de VITI." /></div>
+              <div class="col-12 col-sm-8"><q-input v-model="form.ci" outlined label="Cédula de identidad (CI) *" inputmode="numeric" maxlength="15" :rules="[required,ci]" hint="También podrás usar estos dígitos para iniciar sesión." @update:model-value="v=>form.ci=String(v??'').replace(/\D/g,'')" /></div>
               <div class="col-12 col-sm-4"><q-input v-model="form.ci_expedido" outlined label="Expedido" placeholder="Ej. SC, BEN" /></div>
               <div class="col-12 col-sm-6"><q-input v-model="form.ciudad" outlined label="Ciudad o localidad *" :rules="[required]" /></div>
               <div class="col-12 col-sm-6"><q-input v-model="form.direccion" outlined label="Dirección o zona" /></div>

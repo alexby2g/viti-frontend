@@ -35,9 +35,9 @@ export async function flushClientQueue(api) {
   for (const item of items) {
     try {
       if (item.type === 'start-message') {
-        await api.post('/mi/buzon', item.payload)
+        await api.post(item.base || '/mi/buzon', item.payload)
       } else if (item.type === 'reply-message') {
-        await api.post(`/mi/buzon/${item.conversation_id}/mensajes`, { mensaje: item.mensaje })
+        await api.post(`${item.base || '/mi/buzon'}/${item.conversation_id}/mensajes`, { mensaje: item.mensaje, client_request_id:item.client_request_id })
       } else {
         continue
       }

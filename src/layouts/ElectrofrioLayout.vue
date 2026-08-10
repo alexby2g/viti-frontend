@@ -21,8 +21,9 @@ const clientMode = computed(() => route.path.startsWith('/mi-apps/electrofrio'))
 const appBase = computed(() => clientMode.value ? '/mi-apps/electrofrio' : '/apps/electrofrio')
 const apiBase = computed(() => clientMode.value ? '/mi/apps/electrofrio' : '/apps/electrofrio')
 const homePath = computed(() => clientMode.value ? '/mi-aplicaciones' : '/aplicaciones')
-const roleLabel = computed(() => clientMode.value ? 'Propietario de Electrofrío' : 'Superadministración VITI')
-const unread = computed(() => notifications.unreadCount > 99 ? '99+' : String(notifications.unreadCount || ''))
+const roleLabel = computed(() => clientMode.value ? 'Propietario de Electrofrío' : (auth.user?.rol==='superadmin'?'Superadministración VITI':'Administración VITI'))
+const electroUnreadCount = computed(() => notifications.items.filter(item => item.contexto === 'electrofrio').length)
+const unread = computed(() => electroUnreadCount.value > 99 ? '99+' : String(electroUnreadCount.value || ''))
 const menu = computed(() => [
   { label:'Inicio', icon:'dashboard', to:`${appBase.value}/inicio` },
   { label:'Agenda', icon:'event', to:`${appBase.value}/agenda` },
@@ -34,7 +35,7 @@ const menu = computed(() => [
   { label:'Pagos', icon:'payments', to:`${appBase.value}/pagos` },
   { label:'Garantías', icon:'verified', to:`${appBase.value}/garantias` },
   { label:'Historial', icon:'history', to:`${appBase.value}/historial` },
-  { label:'Buzón VITI', icon:'forum', to:`${appBase.value}/buzon`, badge:true },
+  { label:'Mensajes Electrofrío', icon:'forum', to:`${appBase.value}/buzon`, badge:true },
 ])
 
 function leaveTo(path){
@@ -76,10 +77,10 @@ onBeforeUnmount(()=>{
         </div>
         <q-space/>
         <q-btn flat round icon="notifications_none" class="lt-sm" @click="leaveTo(`${appBase}/buzon`)">
-          <q-badge v-if="notifications.unreadCount" floating rounded color="negative" :label="unread"/>
+          <q-badge v-if="electroUnreadCount" floating rounded color="negative" :label="unread"/>
         </q-btn>
-        <q-btn flat no-caps icon="forum" label="Buzón VITI" class="gt-xs" @click="leaveTo(`${appBase}/buzon`)">
-          <q-badge v-if="notifications.unreadCount" rounded color="negative" :label="unread" class="q-ml-sm"/>
+        <q-btn flat no-caps icon="forum" label="Mensajes" class="gt-xs" @click="leaveTo(`${appBase}/buzon`)">
+          <q-badge v-if="electroUnreadCount" rounded color="negative" :label="unread" class="q-ml-sm"/>
         </q-btn>
         <q-btn outline color="primary" no-caps icon="apps" label="Volver a VITI" class="q-ml-sm" @click="leaveTo(homePath)"/>
       </q-toolbar>
@@ -97,7 +98,7 @@ onBeforeUnmount(()=>{
           <q-item v-for="item in menu" :key="item.to" clickable v-ripple :to="item.to" active-class="electro-active" class="q-mx-sm rounded-borders">
             <q-item-section avatar><q-icon :name="item.icon"/></q-item-section>
             <q-item-section>{{item.label}}</q-item-section>
-            <q-item-section v-if="item.badge&&notifications.unreadCount" side><q-badge rounded color="negative" :label="unread"/></q-item-section>
+            <q-item-section v-if="item.badge&&electroUnreadCount" side><q-badge rounded color="negative" :label="unread"/></q-item-section>
           </q-item>
         </q-list>
       </q-scroll-area>
