@@ -1,5 +1,5 @@
 <script setup>
-import SoporteVitalWorkspace80Page from './SoporteVitalWorkspace80Page.vue'
+import SoporteVitalWorkspaceV1Page from './SoporteVitalWorkspaceV1Page.vue'
 </script>
 
-<template><SoporteVitalWorkspace80Page/></template>
+<template><SoporteVitalWorkspaceV1Page/></template>
