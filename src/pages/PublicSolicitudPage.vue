@@ -10,7 +10,6 @@ const answers=reactive({}),otherAnswers=reactive({}),declaration=reactive({acept
 const commercial=reactive({plan_viti_id:null,forma_pago_preferida:null,acuerdo_comercial_aceptado:false,acuerdo_comercial_nombre:'',acuerdo_comercial_fecha:new Date().toISOString().slice(0,10)})
 
 const essential=new Set([7,9,12,13,17,18,19,20,22,31,32,41,43,50,51,52,60,61,67,68])
-const duplicatedFromRegistration=new Set([1,2,3,4])
 const groups=[
  {id:1,label:'Qué necesitas',sections:[2,3,4]},
  {id:2,label:'Cómo funcionará',sections:[5,6,7,8,9]},
@@ -33,7 +32,8 @@ const requestedModuleMap={
 
 const sections=computed(()=>item.value?.cuestionario?.secciones||[])
 const currentSections=computed(()=>sections.value.filter(s=>groups.find(g=>g.id===step.value)?.sections.includes(s.numero)))
-const visible=q=>!duplicatedFromRegistration.has(q.numero)&&(advanced.value||q.obligatoria||essential.has(q.numero))
+const registrationDuplicate=q=>[2,3].includes(Number(q.numero))||([1,4].includes(Number(q.numero))&&Boolean(item.value?.empresa))
+const visible=q=>!registrationDuplicate(q)&&(advanced.value||q.obligatoria||essential.has(q.numero))
 const visibleQuestions=computed(()=>sections.value.flatMap(s=>s.preguntas||[]).filter(visible))
 const hasValue=value=>Array.isArray(value)?value.length>0:String(value??'').trim().length>0
 const answered=computed(()=>visibleQuestions.value.filter(q=>hasValue(answers[q.id])).length)
@@ -42,7 +42,6 @@ const progress=computed(()=>totalVisible.value?Math.min(answered.value/totalVisi
 const draftKey=computed(()=>`viti-form-draft-${route.params.token}`)
 const plans=computed(()=>item.value?.planes_disponibles||[])
 const selectedPlan=computed(()=>plans.value.find(plan=>Number(plan.id)===Number(commercial.plan_viti_id))||item.value?.plan_viti||null)
-const selectedPayment=computed(()=>paymentOptions.find(option=>option.value===commercial.forma_pago_preferida)||null)
 const questionByNumber=number=>sections.value.flatMap(s=>s.preguntas||[]).find(q=>Number(q.numero)===Number(number))
 const requestedModules=computed(()=>{
  const q=questionByNumber(17),value=q?answers[q.id]:[]
@@ -82,7 +81,6 @@ async function load(){
     answers[r.pregunta_id]='Otro';otherAnswers[r.pregunta_id]=raw.slice(6)
    }else answers[r.pregunta_id]=raw
   }
-  autoFillRegistrationAnswers()
   Object.assign(declaration,{aceptada:Boolean(item.value.declaracion_aceptada),nombre:item.value.declaracion_nombre||item.value.cliente?.nombre||'',fecha:item.value.declaracion_fecha||new Date().toISOString().slice(0,10)})
   Object.assign(commercial,{
    plan_viti_id:item.value.plan_viti_id||null,
@@ -93,6 +91,7 @@ async function load(){
   })
   sent.value=['en_revision','aprobada','convertida','cerrada'].includes(item.value.estado)
   restoreDraft()
+  autoFillRegistrationAnswers()
  }catch(e){$q.notify({type:'negative',message:errorMessage(e,'El enlace no está disponible.')})}
  finally{loading.value=false}
 }
@@ -128,9 +127,9 @@ onBeforeUnmount(()=>window.removeEventListener('online',syncDraft))
 <template><q-page class="public-page"><q-inner-loading :showing="loading"/><div v-if="item" class="public-shell">
 <div class="row items-center justify-between q-mb-lg"><AppBrand/><q-badge outline color="primary">{{item.codigo}}</q-badge></div>
 <q-banner v-if="sent" rounded class="bg-green-1 text-green-9 q-mb-lg"><template #avatar><q-icon name="check_circle"/></template>Tu información fue enviada. Nuestro equipo la revisará y se comunicará contigo por teléfono o WhatsApp.<template #action><q-btn flat no-caps color="green-9" icon="login" label="Ingresar a mi cuenta" to="/login?tipo=cliente"/></template></q-banner>
-<div class="section-label">Solicitud de proyecto</div><h1 class="page-title">Cuéntanos lo esencial de tu sistema</h1><div class="page-subtitle">{{item.empresa?.nombre_comercial}} · {{item.cliente?.nombre}}</div>
+<div class="section-label">Solicitud de proyecto</div><h1 class="page-title">Cuéntanos lo esencial de tu sistema</h1><div class="page-subtitle">{{item.empresa?.nombre_comercial||'Tu nueva empresa o proyecto'}} · {{item.cliente?.nombre}}</div>
 
-<q-card flat class="viti-card q-mt-lg"><q-card-section><div class="row items-center justify-between q-gutter-md"><div><div class="text-weight-bold">Formulario simplificado</div><div class="text-caption text-grey-6">Respondidas {{answered}} de {{totalVisible}} preguntas {{advanced?'visibles':'principales'}}. Tus datos de registro ya están cargados y no se vuelven a pedir.</div></div><q-toggle v-model="advanced" label="Ver preguntas opcionales" color="primary" :disable="sent"/></div><q-linear-progress rounded size="10px" :value="progress" color="primary" class="q-mt-md"/></q-card-section></q-card>
+<q-card flat class="viti-card q-mt-lg"><q-card-section><div class="row items-center justify-between q-gutter-md"><div><div class="text-weight-bold">Formulario simplificado</div><div class="text-caption text-grey-6">Respondidas {{answered}} de {{totalVisible}} preguntas {{advanced?'visibles':'principales'}}. Los datos que VITI ya conoce no se vuelven a pedir.</div></div><q-toggle v-model="advanced" label="Ver preguntas opcionales" color="primary" :disable="sent"/></div><q-linear-progress rounded size="10px" :value="progress" color="primary" class="q-mt-md"/></q-card-section></q-card>
 
 <q-stepper v-model="step" flat animated color="primary" class="viti-card q-mt-lg" header-nav>
 <q-step v-for="g in groups" :key="g.id" :name="g.id" :title="g.label" :done="step>g.id">
