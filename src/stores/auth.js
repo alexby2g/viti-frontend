@@ -51,6 +51,17 @@ export const useAuthStore = defineStore('auth', {
         return data
       } finally { this.loading = false }
     },
+    async loginElectrofrioCustomer(payload) {
+      this.loading = true
+      try {
+        await initCsrf()
+        const { data } = await api.post('/auth/electrofrio/login', payload)
+        this.user = data.usuario
+        this.initialized = true
+        registerNativePushDevice(api).catch(() => {})
+        return data
+      } finally { this.loading = false }
+    },
     async logout() {
       try {
         await unregisterNativePushDevice(api)

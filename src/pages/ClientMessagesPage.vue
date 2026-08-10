@@ -35,8 +35,9 @@ let lastTypingAt = 0
 
 const context = computed(() => route.meta.chatContext === 'electrofrio' ? 'electrofrio' : 'viti')
 const isElectrofrio = computed(() => context.value === 'electrofrio')
-const apiBase = computed(() => isElectrofrio.value ? '/mi/apps/electrofrio/buzon' : '/mi/buzon')
-const attentionBase = computed(() => isElectrofrio.value ? '/mi/apps/electrofrio/atencion' : '/mi/atencion')
+const customerPortal = computed(() => route.meta.customerPortal === true)
+const apiBase = computed(() => customerPortal.value ? '/portal/electrofrio/buzon' : '/mi/buzon')
+const attentionBase = computed(() => customerPortal.value ? '/portal/electrofrio/atencion' : '/mi/atencion')
 const cacheKey = computed(() => `viti-client-buzon-${context.value}-v4`)
 const current = computed(() => rows.value[0] || null)
 const isMobile = computed(() => $q.screen.lt.md)
@@ -191,13 +192,13 @@ onBeforeUnmount(()=>{window.removeEventListener('online',flushPending);window.re
         <q-separator/>
         <q-card-section ref="messagesBox" class="messages messenger-bg">
           <div v-if="!current.mensajes?.length" class="empty-state q-my-xl">Aún no hay mensajes. Escribe para iniciar la conversación.</div>
-          <div v-for="message in current.mensajes" :key="message.id" class="message-row" :class="message.usuario?.rol==='cliente'?'mine':'team'">
-            <q-avatar v-if="message.usuario?.rol!=='cliente'" size="28px" color="primary" text-color="white" class="message-avatar"><img v-if="current.responsable?.foto_url" :src="current.responsable.foto_url"/><q-icon v-else name="support_agent" size="17px"/></q-avatar>
-            <div class="bubble" :class="[{pending:message.pendiente},message.usuario?.rol==='cliente'?'bubble-mine':'bubble-team']">
+          <div v-for="message in current.mensajes" :key="message.id" class="message-row" :class="message.es_mio||message.pendiente?'mine':'team'">
+            <q-avatar v-if="!message.es_mio&&!message.pendiente" size="28px" color="primary" text-color="white" class="message-avatar"><img v-if="current.responsable?.foto_url" :src="current.responsable.foto_url"/><q-icon v-else name="support_agent" size="17px"/></q-avatar>
+            <div class="bubble" :class="[{pending:message.pendiente},message.es_mio||message.pendiente?'bubble-mine':'bubble-team']">
               <q-btn v-if="message.puede_editar||message.puede_eliminar" flat round dense size="sm" icon="more_vert" class="message-actions"><q-menu><q-list dense style="min-width:150px"><q-item v-if="message.puede_editar" clickable v-close-popup @click="openEdit(message)"><q-item-section avatar><q-icon name="edit"/></q-item-section><q-item-section>Editar</q-item-section></q-item><q-item v-if="message.puede_eliminar" clickable v-close-popup class="text-negative" @click="removeMessage(message)"><q-item-section avatar><q-icon name="delete"/></q-item-section><q-item-section>Eliminar</q-item-section></q-item></q-list></q-menu></q-btn>
               <div v-if="message.eliminado" class="deleted-message"><q-icon name="block"/> Mensaje eliminado</div>
               <template v-else><div v-if="message.archivo_url" class="attachment-wrap"><a :href="message.archivo_url" target="_blank" rel="noopener"><img :src="message.archivo_url" :alt="message.archivo_nombre||'Imagen adjunta'" class="chat-image"/></a></div><div v-if="message.mensaje" class="message-text">{{message.mensaje}}</div></template>
-              <div class="message-meta"><span v-if="message.editado_at">editado · </span>{{message.pendiente?'Pendiente':formatDateTime(message.created_at)}}<q-icon v-if="message.usuario?.rol==='cliente'&&!message.pendiente&&!message.eliminado" :name="statusIcon(message)" size="15px" :color="statusColor(message)" class="q-ml-xs"><q-tooltip>{{message.estado_envio}}</q-tooltip></q-icon></div>
+              <div class="message-meta"><span v-if="message.editado_at">editado · </span>{{message.pendiente?'Pendiente':formatDateTime(message.created_at)}}<q-icon v-if="message.es_mio&&!message.pendiente&&!message.eliminado" :name="statusIcon(message)" size="15px" :color="statusColor(message)" class="q-ml-xs"><q-tooltip>{{message.estado_envio}}</q-tooltip></q-icon></div>
             </div>
           </div>
           <div v-if="presence.escribiendo" class="typing-bubble">Escribiendo<span>.</span><span>.</span><span>.</span></div>

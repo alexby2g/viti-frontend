@@ -22,7 +22,7 @@ const clientMode = computed(() => route.path.startsWith('/mi-apps/electrofrio'))
 const appBase = computed(() => clientMode.value ? '/mi-apps/electrofrio' : '/apps/electrofrio')
 const apiBase = computed(() => clientMode.value ? '/mi/apps/electrofrio' : '/apps/electrofrio')
 const homePath = computed(() => clientMode.value ? '/mi-aplicaciones' : '/aplicaciones')
-const roleLabel = computed(() => clientMode.value ? 'Propietario de Electrofrío' : (auth.user?.rol==='superadmin'?'Superadministración VITI':'Administración VITI'))
+const roleLabel = computed(() => clientMode.value ? ({propietario:'Propietario',administrador:'Administrador',empleado:'Técnico / empleado'}[appInfo.value?.rol]||'Equipo de Electrofrío') : (auth.user?.rol==='superadmin'?'Superadministración VITI':'Administración VITI'))
 const electroUnreadCount = computed(() => notifications.items.filter(item => item.contexto === 'electrofrio').length)
 const unread = computed(() => electroUnreadCount.value > 99 ? '99+' : String(electroUnreadCount.value || ''))
 const themeIcon = computed(() => theme.value === 'dark' ? 'light_mode' : 'dark_mode')
@@ -33,7 +33,9 @@ const enabledModules = computed(() => {
 const planName = computed(() => appInfo.value?.plan?.nombre || 'Plan personalizado')
 const planPrice = computed(() => Number(appInfo.value?.plan?.precio_proyecto || 0))
 const hasModule = module => enabledModules.value.includes(module)
+const canManage = computed(() => !clientMode.value || ['propietario','administrador'].includes(appInfo.value?.rol))
 provide('electrofrioModules', enabledModules)
+provide('electrofrioCanManage', canManage)
 const menuGroups = computed(() => [
   {
     title: 'Gestión diaria',
@@ -46,8 +48,7 @@ const menuGroups = computed(() => [
   {
     title: 'Personas y recursos',
     items: [
-      { module:'clientes', label:'Clientes', icon:'groups', to:`${appBase.value}/clientes` },
-      { module:'equipos', label:'Equipos', icon:'ac_unit', to:`${appBase.value}/equipos` },
+      { module:'clientes', label:'Clientes y equipos', icon:'groups', to:`${appBase.value}/clientes` },
       { module:'tecnicos', label:'Técnicos', icon:'engineering', to:`${appBase.value}/tecnicos` },
       { module:'inventario', label:'Inventario', icon:'inventory_2', to:`${appBase.value}/inventario` },
     ],
