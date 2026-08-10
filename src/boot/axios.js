@@ -36,6 +36,13 @@ api.interceptors.request.use(config => {
   const empresaId = localStorage.getItem('viti-empresa-id')
   if (empresaId) config.headers['X-VITI-Empresa'] = empresaId
 
+  // La administración de Peluquería no debe reutilizar el padrón completo de empresas VITI.
+  // Su selector solo recibe negocios que realmente tienen una instancia Peluquería provisionada.
+  if (typeof window !== 'undefined' && window.location.pathname.startsWith('/apps/peluqueria') && config.url === '/empresas') {
+    config.url = '/apps/peluqueria/empresas'
+    config.params = undefined
+  }
+
   // Cuando enviamos FormData (mensajes con texto/fotos, logos, etc.), el navegador
   // debe construir el Content-Type con su boundary. Si una vista fija manualmente
   // multipart/form-data, lo retiramos aquí para evitar peticiones que Laravel no
