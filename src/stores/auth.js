@@ -6,11 +6,21 @@ export const useAuthStore = defineStore('auth', {
   state: () => ({ user: null, initialized: false, loading: false, setupRequired: null }),
   getters: { isAuthenticated: s => Boolean(s.user) },
   actions: {
-    async checkSetup() { const { data } = await api.get('/setup/status'); this.setupRequired = data.requiere_configuracion; return this.setupRequired },
+    async checkSetup() {
+      try {
+        const { data } = await api.get('/setup/status', { timeout: 5000 })
+        this.setupRequired = Boolean(data.requiere_configuracion)
+      } catch {
+        // La disponibilidad del backend no debe impedir que Vue renderice la app.
+        // En una instalación ya configurada, continuar hacia login es el fallback seguro.
+        this.setupRequired = false
+      }
+      return this.setupRequired
+    },
     async initialize(force = false) {
       if (this.initialized && !force) return this.isAuthenticated
       try {
-        const { data } = await api.get('/auth/status')
+        const { data } = await api.get('/auth/status', { timeout: 5000 })
         this.user = data.usuario || null
         if (this.user) registerNativePushDevice(api).catch(() => {})
       } catch { this.user = null }
