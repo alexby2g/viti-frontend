@@ -11,11 +11,42 @@ function errorMessage(e){if(e?.userMessage)return e.userMessage;const bag=e?.res
 async function submit(){try{await auth.login({...form,codigo_secreto:mode.value==='admin'&&form.codigo_secreto?form.codigo_secreto:null});const requested=typeof route.query.redirect==='string'?route.query.redirect:'';const safeClientTarget=requested.startsWith('/mi-')?requested:'/mi-aplicaciones';const target=auth.user?.rol==='cliente'?safeClientTarget:(requested||'/');await router.replace(target)}catch(e){$q.notify({type:'negative',message:errorMessage(e)})}}
 onMounted(()=>{warmBackend().catch(()=>{})})
 </script>
-<template><q-page class="auth-page flex flex-center"><div class="login-card"><AppBrand/><div class="q-mt-xl section-label">Acceso a VITI</div><h1 class="page-title">Bienvenido</h1><p class="page-subtitle">Ingresa según el tipo de cuenta que utilizas.</p>
-<q-btn-toggle v-model="mode" spread no-caps unelevated toggle-color="primary" color="grey-2" text-color="dark" class="q-mt-lg" :options="[{label:'Administrador',value:'admin',icon:'admin_panel_settings'},{label:'Cliente',value:'cliente',icon:'person'}]"/>
-<q-form class="q-mt-lg" @submit="submit"><q-input v-model="form.acceso" outlined label="Usuario, teléfono o CI" hint="Puedes ingresar con cualquiera de estos tres datos." :rules="[v=>!!v||'Este campo es obligatorio.']"><template #prepend><q-icon name="badge"/></template></q-input><q-input v-model="form.password" outlined class="q-mt-sm" :type="show?'text':'password'" label="Contraseña" :rules="[v=>!!v||'Este campo es obligatorio.']"><template #append><q-icon :name="show?'visibility_off':'visibility'" class="cursor-pointer" @click="show=!show"/></template></q-input>
-<q-input v-if="mode==='admin'" v-model="form.codigo_secreto" outlined class="q-mt-sm" :type="showSecret?'text':'password'" label="Código secreto (solo superadministrador)" hint="Los administradores dejan este campo vacío." clearable><template #prepend><q-icon name="key"/></template><template #append><q-icon :name="showSecret?'visibility_off':'visibility'" class="cursor-pointer" @click="showSecret=!showSecret"/></template></q-input>
-<q-btn type="submit" color="primary" unelevated label="Iniciar sesión" no-caps class="full-width q-mt-md" size="lg" :loading="auth.loading"><template #loading><q-spinner size="22px" class="q-mr-sm"/><span>{{ auth.loginStage || 'Conectando...' }}</span></template></q-btn></q-form>
-<div v-if="mode==='cliente'" class="text-center q-mt-lg">¿Es tu primera vez? <router-link to="/registro">Crear cuenta de cliente</router-link></div>
-<div v-else class="text-caption text-grey-6 q-mt-md text-center">El código secreto pertenece únicamente al superadministrador y nunca se muestra públicamente.</div></div></q-page></template>
-<style scoped>.auth-page{min-height:100vh;background:radial-gradient(circle at 80% 20%,#d9ecff,transparent 34%),#f5f8fc;padding:20px}.login-card{width:min(500px,100%);background:#fff;padding:42px;border-radius:22px;box-shadow:0 22px 65px rgba(18,45,78,.14)}.body--dark .auth-page{background:#06162b}.body--dark .login-card{background:#0c294c}@media(max-width:600px){.auth-page{padding:0;align-items:stretch}.login-card{width:100%;min-height:100vh;padding:28px 16px;border-radius:0;box-shadow:none}.page-title{font-size:28px}.q-btn-toggle{font-size:13px}}</style>
+
+<template>
+  <q-page class="auth-page flex flex-center">
+    <div class="login-card">
+      <AppBrand/>
+      <div class="q-mt-xl section-label">VITI · producto de AGR Studio</div>
+      <h1 class="page-title">Acceso a la plataforma</h1>
+      <p class="page-subtitle">Solicitudes, proyectos, aplicaciones y seguimiento desde un solo espacio.</p>
+
+      <q-btn-toggle
+        v-model="mode"
+        spread
+        no-caps
+        unelevated
+        toggle-color="primary"
+        :color="$q.dark.isActive?'grey-10':'grey-2'"
+        :text-color="$q.dark.isActive?'grey-4':'dark'"
+        class="q-mt-lg access-toggle"
+        :options="[{label:'Administrador',value:'admin',icon:'admin_panel_settings'},{label:'Cliente',value:'cliente',icon:'person'}]"
+      />
+
+      <q-form class="q-mt-lg" @submit="submit">
+        <q-input v-model="form.acceso" outlined label="Usuario, teléfono o CI" hint="Puedes ingresar con cualquiera de estos tres datos." :rules="[v=>!!v||'Este campo es obligatorio.']"><template #prepend><q-icon name="badge"/></template></q-input>
+        <q-input v-model="form.password" outlined class="q-mt-sm" :type="show?'text':'password'" label="Contraseña" :rules="[v=>!!v||'Este campo es obligatorio.']"><template #append><q-icon :name="show?'visibility_off':'visibility'" class="cursor-pointer" @click="show=!show"/></template></q-input>
+        <q-input v-if="mode==='admin'" v-model="form.codigo_secreto" outlined class="q-mt-sm" :type="showSecret?'text':'password'" label="Código secreto (solo superadministrador)" hint="Los administradores dejan este campo vacío." clearable><template #prepend><q-icon name="key"/></template><template #append><q-icon :name="showSecret?'visibility_off':'visibility'" class="cursor-pointer" @click="showSecret=!showSecret"/></template></q-input>
+        <q-btn type="submit" color="primary" unelevated label="Ingresar a VITI" no-caps class="full-width q-mt-md" size="lg" :loading="auth.loading"><template #loading><q-spinner size="22px" class="q-mr-sm"/><span>{{ auth.loginStage || 'Conectando...' }}</span></template></q-btn>
+      </q-form>
+
+      <div v-if="mode==='cliente'" class="text-center q-mt-lg">¿Es tu primera vez? <router-link to="/registro">Crear cuenta de cliente</router-link></div>
+      <div v-else class="text-caption text-grey-6 q-mt-md text-center">El código secreto pertenece únicamente al superadministrador y nunca se muestra públicamente.</div>
+
+      <div class="agr-signature q-mt-xl">Desarrollado y administrado por <strong>AGR Studio</strong></div>
+    </div>
+  </q-page>
+</template>
+
+<style scoped>
+.auth-page{min-height:100vh;padding:20px;position:relative;overflow:hidden}.login-card{width:min(510px,100%);padding:40px;border-radius:18px}.page-title{margin-top:8px}.access-toggle{border:1px solid var(--viti-border);border-radius:12px;overflow:hidden}.agr-signature{padding-top:18px;border-top:1px solid var(--viti-border);font-size:11px;color:var(--viti-muted);text-align:center;letter-spacing:.02em}.agr-signature strong{color:var(--viti-text);font-weight:800}@media(max-width:600px){.auth-page{padding:0;align-items:stretch}.login-card{width:100%;min-height:100vh;padding:28px 16px;border-radius:0!important;border-left:0!important;border-right:0!important}.page-title{font-size:28px}.access-toggle{font-size:13px}}
+</style>

@@ -1,1 +1,1 @@
-<template><q-layout view="lHh Lpr lFf"><q-page-container><router-view /></q-page-container></q-layout></template>
+<template><q-layout view="lHh Lpr lFf" class="agr-viti-auth"><q-page-container><router-view /></q-page-container></q-layout></template>

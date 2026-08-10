@@ -1,3 +1,7 @@
 import { boot } from 'quasar/wrappers'
 import { Dark } from 'quasar'
-export default boot(() => { Dark.set(localStorage.getItem('viti-theme') === 'dark') })
+
+export default boot(() => {
+  const saved = localStorage.getItem('viti-theme')
+  Dark.set(saved ? saved === 'dark' : true)
+})
