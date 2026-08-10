@@ -9,6 +9,16 @@ export const initCsrf = () => axios.get(`${backendRoot}/sanctum/csrf-cookie`, { 
 api.interceptors.request.use(config => {
   const empresaId = localStorage.getItem('viti-empresa-id')
   if (empresaId) config.headers['X-VITI-Empresa'] = empresaId
+
+  // Cuando enviamos FormData (mensajes con texto/fotos, logos, etc.), el navegador
+  // debe construir el Content-Type con su boundary. Si una vista fija manualmente
+  // multipart/form-data, lo retiramos aquí para evitar peticiones que Laravel no
+  // pueda interpretar correctamente en algunos navegadores/WebView.
+  if (typeof FormData !== 'undefined' && config.data instanceof FormData) {
+    if (typeof config.headers?.delete === 'function') config.headers.delete('Content-Type')
+    else if (config.headers) delete config.headers['Content-Type']
+  }
+
   return config
 })
 
