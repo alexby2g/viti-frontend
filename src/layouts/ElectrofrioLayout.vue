@@ -1,0 +1,120 @@
+<script setup>
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { Dark, useQuasar } from 'quasar'
+import { useRouter } from 'vue-router'
+import { api } from '../boot/axios'
+import { useAuthStore } from '../stores/auth'
+import { useNotificationsStore } from '../stores/notifications'
+
+const $q = useQuasar()
+const router = useRouter()
+const auth = useAuthStore()
+const notifications = useNotificationsStore()
+const drawer = ref(false)
+const loading = ref(true)
+const appInfo = ref(null)
+const previousDark = ref(false)
+
+const businessName = computed(() => appInfo.value?.empresa?.nombre_comercial || 'Electrofrío')
+const unread = computed(() => notifications.unreadCount > 99 ? '99+' : String(notifications.unreadCount || ''))
+const menu = [
+  { label:'Inicio', icon:'dashboard', to:'/apps/electrofrio/inicio' },
+  { label:'Agenda', icon:'event', to:'/apps/electrofrio/agenda' },
+  { label:'Órdenes', icon:'assignment', to:'/apps/electrofrio/ordenes' },
+  { label:'Clientes', icon:'groups', to:'/apps/electrofrio/clientes' },
+  { label:'Equipos', icon:'ac_unit', to:'/apps/electrofrio/equipos' },
+  { label:'Técnicos', icon:'engineering', to:'/apps/electrofrio/tecnicos' },
+  { label:'Inventario', icon:'inventory_2', to:'/apps/electrofrio/inventario' },
+  { label:'Pagos', icon:'payments', to:'/apps/electrofrio/pagos' },
+  { label:'Garantías', icon:'verified', to:'/apps/electrofrio/garantias' },
+  { label:'Historial', icon:'history', to:'/apps/electrofrio/historial' },
+  { label:'Buzón VITI', icon:'forum', to:'/apps/electrofrio/buzon', badge:true },
+]
+
+function leaveTo(path){
+  if(!String(path).startsWith('/apps/electrofrio'))sessionStorage.setItem('viti-app-explicit-exit','1')
+  router.push(path)
+}
+async function loadState(){
+  loading.value=true
+  try{appInfo.value=(await api.get('/apps/electrofrio/resumen')).data.data}
+  catch(e){
+    $q.notify({type:'negative',message:e.response?.data?.message||'No se pudo abrir Electrofrío dentro de VITI.'})
+    router.replace('/aplicaciones')
+  }finally{loading.value=false}
+}
+
+onMounted(()=>{
+  previousDark.value=Dark.isActive
+  Dark.set(false)
+  drawer.value=$q.screen.gt.sm
+  notifications.start()
+  loadState()
+})
+onBeforeUnmount(()=>{
+  notifications.stop()
+  Dark.set(previousDark.value)
+})
+</script>
+
+<template>
+  <q-layout view="hHh LpR fFf" class="electro-app-shell">
+    <q-header class="electro-header text-dark">
+      <q-toolbar class="q-px-md q-px-lg-xl">
+        <q-btn flat round dense icon="menu" @click="drawer=!drawer"/>
+        <q-avatar size="40px" color="primary" text-color="white" icon="ac_unit" class="q-ml-sm"/>
+        <div class="q-ml-md">
+          <div class="text-weight-bold">Electrofrío</div>
+          <div class="text-caption text-grey-7">{{businessName}} · VITI App</div>
+        </div>
+        <q-space/>
+        <q-btn flat round icon="notifications_none" class="lt-sm" @click="leaveTo('/apps/electrofrio/buzon')">
+          <q-badge v-if="notifications.unreadCount" floating rounded color="negative" :label="unread"/>
+        </q-btn>
+        <q-btn flat no-caps icon="forum" label="Buzón VITI" class="gt-xs" @click="leaveTo('/apps/electrofrio/buzon')">
+          <q-badge v-if="notifications.unreadCount" rounded color="negative" :label="unread" class="q-ml-sm"/>
+        </q-btn>
+        <q-btn outline color="primary" no-caps icon="apps" label="Volver a VITI" class="q-ml-sm" @click="leaveTo('/aplicaciones')"/>
+      </q-toolbar>
+    </q-header>
+
+    <q-drawer v-model="drawer" :width="260" bordered class="electro-drawer">
+      <div class="q-pa-lg">
+        <div class="text-overline text-cyan-3">Aplicación nativa</div>
+        <div class="text-h6 text-weight-bold ellipsis">{{businessName}}</div>
+        <div class="text-caption text-blue-grey-2 q-mt-xs">Servicios técnicos organizados</div>
+      </div>
+      <q-separator/>
+      <q-scroll-area style="height:calc(100% - 175px)">
+        <q-list padding>
+          <q-item v-for="item in menu" :key="item.to" clickable v-ripple :to="item.to" active-class="electro-active" class="q-mx-sm rounded-borders">
+            <q-item-section avatar><q-icon :name="item.icon"/></q-item-section>
+            <q-item-section>{{item.label}}</q-item-section>
+            <q-item-section v-if="item.badge&&notifications.unreadCount" side><q-badge rounded color="negative" :label="unread"/></q-item-section>
+          </q-item>
+        </q-list>
+      </q-scroll-area>
+      <div class="absolute-bottom q-pa-md">
+        <q-separator class="q-mb-md"/>
+        <div class="text-caption text-blue-grey-2">Sesión de {{auth.user?.nombre}}</div>
+        <div class="text-caption text-cyan-3">Administrador de Electrofrío</div>
+      </div>
+    </q-drawer>
+
+    <q-page-container>
+      <q-inner-loading :showing="loading" label="Preparando Electrofrío..."/>
+      <router-view v-if="!loading"/>
+    </q-page-container>
+  </q-layout>
+</template>
+
+<style scoped>
+.electro-app-shell{--viti-bg:#f4f7fb;--viti-card:#fff;--viti-text:#162033;--viti-muted:#667085;--viti-border:#dfe5ec;background:var(--viti-bg);color:var(--viti-text);min-height:100vh}
+.electro-app-shell :deep(.q-page-container),.electro-app-shell :deep(.q-page){background:var(--viti-bg);color:var(--viti-text)}
+.electro-app-shell :deep(.q-card),.electro-app-shell :deep(.q-table),.electro-app-shell :deep(.viti-card),.electro-app-shell :deep(.viti-table){background:var(--viti-card);color:var(--viti-text);border-color:var(--viti-border)}
+.electro-app-shell :deep(.text-grey-6),.electro-app-shell :deep(.text-grey-7){color:var(--viti-muted)!important}
+.electro-header{background:rgba(255,255,255,.97);color:#162033!important;border-bottom:1px solid #dfe5ec;backdrop-filter:blur(12px)}
+.electro-drawer{background:#072746;color:#fff}.electro-drawer :deep(.q-separator){background:rgba(255,255,255,.18)}
+.electro-active{background:#e7f5ff!important;color:#0569a7!important;font-weight:700}.rounded-borders{border-radius:11px}
+@media(max-width:600px){.electro-header :deep(.q-toolbar){min-height:58px;padding-left:8px;padding-right:8px}.electro-header :deep(.q-btn__content .q-btn__content){white-space:nowrap}}
+</style>
