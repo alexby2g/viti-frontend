@@ -1,5 +1,5 @@
 <script setup>
-import { computed,onMounted,provide,ref } from 'vue'
+import { computed,onMounted,provide,ref,watch } from 'vue'
 import { useQuasar } from 'quasar'
 import { useRoute,useRouter } from 'vue-router'
 import { api } from '../boot/axios'
@@ -39,16 +39,22 @@ function leaveTo(path){
   if(!String(path).startsWith(appBase.value))sessionStorage.setItem('viti-app-explicit-exit','1')
   router.push(path)
 }
+function ensureAllowedRoute(){
+  if(loading.value||!appState.value)return
+  const module=String(route.meta.supportSection||'inicio')
+  if(!has(module))router.replace(`${appBase.value}/inicio`)
+}
 async function loadState(){
   loading.value=true
-  try{appState.value=(await api.get(`${apiBase.value}/estado`)).data.data}
+  try{appState.value=(await api.get(`${apiBase.value}/estado`)).data.data;ensureAllowedRoute()}
   catch(e){
     $q.notify({type:'negative',message:e.response?.data?.message||'No se pudo abrir Servicio Técnico VITI.'})
     sessionStorage.setItem('viti-app-explicit-exit','1')
     router.replace(homePath.value)
-  }finally{loading.value=false}
+  }finally{loading.value=false;ensureAllowedRoute()}
 }
 onMounted(loadState)
+watch(()=>route.fullPath,ensureAllowedRoute)
 </script>
 
 <template>
