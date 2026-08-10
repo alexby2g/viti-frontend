@@ -4,13 +4,14 @@ import { api } from '../boot/axios'
 import PageHeader from '../components/PageHeader.vue'
 
 const loading = ref(true)
-const data = ref({ configuracion:null, proyectos:[] })
+const data = ref({ negocio:null, configuracion:null, proyectos:[] })
 const qrFailed = ref(false)
 
 const money = value => `${Number(value || 0).toFixed(2)} Bs`
 const pretty = value => String(value || '').replaceAll('_',' ').replace(/\b\w/g,c=>c.toUpperCase())
 const statusColor = value => ({pagado:'positive',pendiente_saldo:'orange',pendiente_anticipo:'negative',activa:'positive',gracia:'orange',suspendida:'negative',cancelada:'grey'}[value]||'grey')
 const qrSrc = computed(() => data.value.configuracion?.qr_url && !qrFailed.value ? data.value.configuracion.qr_url : '/viti-payment-qr.png')
+const payerName = payment => payment.pagador ? `${payment.pagador.nombre||''} ${payment.pagador.apellido||''}`.trim() : ''
 
 onMounted(async()=>{
   try{data.value=(await api.get('/mi/pagos')).data.data}
@@ -24,6 +25,11 @@ onMounted(async()=>{
   <q-inner-loading :showing="loading" />
 
   <template v-if="!loading">
+    <q-banner rounded class="bg-blue-1 text-primary q-mb-lg">
+      <template #avatar><q-icon name="account_balance_wallet"/></template>
+      Método habitual de {{data.negocio?.nombre_comercial||'tu negocio'}}: <strong>{{pretty(data.negocio?.metodo_pago_preferido||'qr')}}</strong>. Cada pago mantiene registrado el método que realmente se utilizó.
+    </q-banner>
+
     <div class="row q-col-gutter-lg">
       <div class="col-12 col-lg-8">
         <q-card v-for="project in data.proyectos||[]" :key="project.id" flat class="viti-card q-mb-lg">
@@ -41,7 +47,7 @@ onMounted(async()=>{
           </q-card-section>
           <q-separator v-if="project.pagos?.length"/>
           <q-list v-if="project.pagos?.length" separator>
-            <q-item v-for="payment in project.pagos" :key="payment.id"><q-item-section avatar><q-avatar color="green-1" text-color="positive" icon="check"/></q-item-section><q-item-section><q-item-label class="text-weight-bold">{{pretty(payment.tipo)}} · {{money(payment.monto)}}</q-item-label><q-item-label caption>{{payment.fecha_pago}} · {{pretty(payment.metodo)}}</q-item-label></q-item-section></q-item>
+            <q-item v-for="payment in project.pagos" :key="payment.id"><q-item-section avatar><q-avatar color="green-1" text-color="positive" icon="check"/></q-item-section><q-item-section><q-item-label class="text-weight-bold">{{pretty(payment.tipo)}} · {{money(payment.monto)}}</q-item-label><q-item-label caption>{{payment.fecha_pago}} · {{pretty(payment.metodo)}}<span v-if="payerName(payment)"> · Cuenta: {{payerName(payment)}}</span></q-item-label></q-item-section></q-item>
           </q-list>
 
           <template v-if="project.suscripcion">
@@ -52,6 +58,9 @@ onMounted(async()=>{
                 <div class="col-auto"><q-badge :color="statusColor(project.suscripcion.estado)">{{pretty(project.suscripcion.estado)}}</q-badge></div>
               </div>
             </q-card-section>
+            <q-list v-if="project.pagos_suscripcion?.length" separator>
+              <q-item v-for="payment in project.pagos_suscripcion" :key="payment.id"><q-item-section avatar><q-avatar color="blue-1" text-color="primary" icon="autorenew"/></q-item-section><q-item-section><q-item-label class="text-weight-bold">Pago de suscripción · {{money(payment.monto)}}</q-item-label><q-item-label caption>{{payment.fecha_pago}} · {{pretty(payment.metodo)}}<span v-if="payerName(payment)"> · Cuenta: {{payerName(payment)}}</span></q-item-label></q-item-section></q-item>
+            </q-list>
           </template>
         </q-card>
 
