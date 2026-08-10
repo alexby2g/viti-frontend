@@ -34,7 +34,7 @@ async function load(){
       api.get('/empresas',{params:{per_page:100}}),
       api.get('/proyectos',{params:{per_page:100}}),
     ])
-    rows.value=a.data.data
+    rows.value=(a.data.data||[]).filter(item=>item.catalogo?.clave!=='electrofrio')
     companies.value=e.data.data
     projects.value=p.data.data
   } finally { loading.value=false }
@@ -76,6 +76,18 @@ onMounted(load)
         </q-card-section>
         <q-separator/>
         <q-card-actions align="right"><q-btn color="primary" unelevated no-caps icon-right="arrow_forward" label="Abrir aplicación" to="/apps/peluqueria"/></q-card-actions>
+      </q-card>
+      <q-card flat class="viti-card native-app-card electrofrio-card">
+        <q-card-section class="row items-start no-wrap q-gutter-md">
+          <q-avatar size="56px" color="primary" text-color="white" icon="ac_unit"/>
+          <div class="col">
+            <div class="row items-center q-gutter-sm"><div class="text-h6 text-weight-bold">Electrofrío</div><q-badge color="positive" label="VITI App activa"/></div>
+            <div class="text-body2 text-grey-7 q-mt-xs">Citas, diagnóstico, propuestas, órdenes de servicio, equipos, materiales, pagos, garantías, historial y buzón VITI.</div>
+            <div class="text-caption text-grey-6 q-mt-sm">Datos aislados de Electrofrío · Sin WhatsApp</div>
+          </div>
+        </q-card-section>
+        <q-separator/>
+        <q-card-actions align="right"><q-btn color="primary" unelevated no-caps icon-right="arrow_forward" label="Abrir Electrofrío" to="/apps/electrofrio/inicio"/></q-card-actions>
       </q-card>
     </div>
 
