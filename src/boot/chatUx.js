@@ -12,25 +12,37 @@ function findSendButton(composer) {
   return composer?.querySelector('.send-action') || null
 }
 
-function findConversationMenu(root = document) {
-  const icons = [...root.querySelectorAll('.chat-header .q-icon')]
-  const icon = icons.find(element => element.textContent?.trim() === 'more_vert')
-  return icon?.closest('.q-btn') || null
-}
+let forwardingContextMenu = false
 
-function openConversationActions(root) {
-  const button = findConversationMenu(root || document)
-  if (!button || button.hasAttribute('disabled') || button.getAttribute('aria-disabled') === 'true') return false
-  button.click()
-  return true
+function dispatchContextMenu(card, sourceEvent) {
+  if (!card) return false
+
+  forwardingContextMenu = true
+  try {
+    const forwarded = new MouseEvent('contextmenu', {
+      bubbles: true,
+      cancelable: true,
+      view: window,
+      button: 2,
+      buttons: 2,
+      clientX: sourceEvent?.clientX || Math.round(window.innerWidth / 2),
+      clientY: sourceEvent?.clientY || Math.round(window.innerHeight / 2),
+      screenX: sourceEvent?.screenX || 0,
+      screenY: sourceEvent?.screenY || 0,
+    })
+    card.dispatchEvent(forwarded)
+    return forwarded.defaultPrevented
+  } finally {
+    forwardingContextMenu = false
+  }
 }
 
 export default boot(() => {
   const style = document.createElement('style')
   style.dataset.vitiChatUx = 'true'
   style.textContent = `
-    .messenger-card .message-actions{opacity:.72!important}
-    @media (pointer:fine){.messenger-card .bubble:not(:hover) .message-actions{opacity:.48!important}}
+    .messenger-card .message-actions{opacity:.92!important}
+    .messenger-card .bubble:hover .message-actions,.messenger-card .message-actions:focus{opacity:1!important}
   `
   document.head.appendChild(style)
 
@@ -48,24 +60,34 @@ export default boot(() => {
   }
 
   const onContextMenu = event => {
+    if (forwardingContextMenu) return
+
     const target = event.target instanceof Element ? event.target : null
     if (!target) return
 
     const listItem = target.closest('.contacts-pane .q-item')
     if (listItem) {
       event.preventDefault()
+      event.stopPropagation()
       listItem.click()
-      window.setTimeout(() => openConversationActions(document), 0)
+      window.setTimeout(() => {
+        const card = document.querySelector('.messenger-card')
+        if (card) dispatchContextMenu(card, event)
+      }, 60)
       return
     }
 
     const card = target.closest('.messenger-card')
-    if (!card) return
-    if (target.closest('.bubble, .composer, button, a, input, textarea')) return
+    if (!card || target === card) return
 
-    if (openConversationActions(card)) event.preventDefault()
+    // QMenu con context-menu escucha al contenedor padre. Si el clic derecho
+    // ocurre sobre una burbuja, texto, imagen o compositor, reenviamos el evento
+    // al propio contenedor para que el menú aparezca siempre en el punto pulsado.
+    event.preventDefault()
+    event.stopPropagation()
+    dispatchContextMenu(card, event)
   }
 
   document.addEventListener('keydown', onKeydown, true)
-  document.addEventListener('contextmenu', onContextMenu)
+  document.addEventListener('contextmenu', onContextMenu, true)
 })
