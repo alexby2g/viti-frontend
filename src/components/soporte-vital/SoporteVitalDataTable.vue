@@ -6,9 +6,13 @@ const props=defineProps({
   grid:{type:Boolean,default:false},
   readonly:{type:Boolean,default:false},
   viewable:{type:Boolean,default:true},
+  editable:{type:Boolean,default:true},
+  deletable:{type:Boolean,default:true},
 })
 const emit=defineEmits(['view','edit','delete'])
 const locked=row=>props.readonly||['entregado','sin_reparacion'].includes(row?.estado)||Boolean(row?.garantia_fin)
+const canEdit=row=>props.editable&&!locked(row)
+const canDelete=row=>props.deletable&&!locked(row)
 const dataCols=cols=>cols.filter(col=>col.name!=='actions')
 </script>
 
@@ -17,7 +21,7 @@ const dataCols=cols=>cols.filter(col=>col.name!=='actions')
     <template #body-cell-estado="p"><q-td :props="p"><slot name="estado" :row="p.row" :value="p.value"><q-badge outline color="primary">{{p.value}}</q-badge></slot></q-td></template>
     <template #body-cell-total="p"><q-td :props="p"><slot name="total" :row="p.row" :value="p.value">{{p.value}}</slot></q-td></template>
     <template #body-cell-fecha="p"><q-td :props="p"><slot name="fecha" :row="p.row" :value="p.value">{{p.value}}</slot></q-td></template>
-    <template #body-cell-actions="p"><q-td :props="p"><q-btn v-if="viewable" flat round dense color="primary" icon="visibility" @click="emit('view',p.row)"/><q-btn v-if="!locked(p.row)" flat round dense icon="edit" @click="emit('edit',p.row)"/><q-btn v-if="!locked(p.row)" flat round dense color="negative" icon="delete" @click="emit('delete',p.row)"/></q-td></template>
+    <template #body-cell-actions="p"><q-td :props="p"><q-btn v-if="viewable" flat round dense color="primary" icon="visibility" @click="emit('view',p.row)"/><q-btn v-if="canEdit(p.row)" flat round dense icon="edit" @click="emit('edit',p.row)"/><q-btn v-if="canDelete(p.row)" flat round dense color="negative" icon="delete" @click="emit('delete',p.row)"/></q-td></template>
 
     <template #item="p">
       <div class="q-pa-xs col-12">
@@ -37,8 +41,8 @@ const dataCols=cols=>cols.filter(col=>col.name!=='actions')
           <q-separator v-if="columns.some(col=>col.name==='actions')"/>
           <q-card-actions v-if="columns.some(col=>col.name==='actions')" align="right">
             <q-btn v-if="viewable" flat round color="primary" icon="visibility" @click="emit('view',p.row)"/>
-            <q-btn v-if="!locked(p.row)" flat round icon="edit" @click="emit('edit',p.row)"/>
-            <q-btn v-if="!locked(p.row)" flat round color="negative" icon="delete" @click="emit('delete',p.row)"/>
+            <q-btn v-if="canEdit(p.row)" flat round icon="edit" @click="emit('edit',p.row)"/>
+            <q-btn v-if="canDelete(p.row)" flat round color="negative" icon="delete" @click="emit('delete',p.row)"/>
           </q-card-actions>
         </q-card>
       </div>
