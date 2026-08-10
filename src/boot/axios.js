@@ -37,16 +37,25 @@ api.interceptors.request.use(config => {
   if (empresaId) config.headers['X-VITI-Empresa'] = empresaId
 
   // La administración de Peluquería no debe reutilizar el padrón completo de empresas VITI.
-  // Su selector solo recibe negocios que realmente tienen una instancia Peluquería provisionada.
   if (typeof window !== 'undefined' && window.location.pathname.startsWith('/apps/peluqueria') && config.url === '/empresas') {
     config.url = '/apps/peluqueria/empresas'
     config.params = undefined
   }
 
-  // Cuando enviamos FormData (mensajes con texto/fotos, logos, etc.), el navegador
-  // debe construir el Content-Type con su boundary. Si una vista fija manualmente
-  // multipart/form-data, lo retiramos aquí para evitar peticiones que Laravel no
-  // pueda interpretar correctamente en algunos navegadores/WebView.
+  // Al abandonar un chat Vue puede intentar completar un último polling/ping con el ID anterior.
+  // No enviamos esa petición con el contexto de la pantalla nueva: evitamos 404 y, más importante,
+  // impedimos que un ID de conversación de una app termine consultándose contra otro buzón.
+  if (typeof window !== 'undefined') {
+    const url = String(config.url || '')
+    const path = window.location.pathname
+    const staleVitiChat = /^\/buzon\/\d+/.test(url) && !path.startsWith('/buzon')
+    const staleClientChat = /^\/mi\/buzon\/\d+/.test(url) && !path.startsWith('/mi-buzon')
+    if (staleVitiChat || staleClientChat) {
+      throw new axios.CanceledError('Petición de chat descartada al cambiar de pantalla.')
+    }
+  }
+
+  // El navegador debe construir el Content-Type de FormData con su boundary.
   if (typeof FormData !== 'undefined' && config.data instanceof FormData) {
     if (typeof config.headers?.delete === 'function') config.headers.delete('Content-Type')
     else if (config.headers) delete config.headers['Content-Type']
