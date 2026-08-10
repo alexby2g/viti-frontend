@@ -1,12 +1,13 @@
 <script setup>
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { Dark, useQuasar } from 'quasar'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { api } from '../boot/axios'
 import { useAuthStore } from '../stores/auth'
 import { useNotificationsStore } from '../stores/notifications'
 
 const $q = useQuasar()
+const route = useRoute()
 const router = useRouter()
 const auth = useAuthStore()
 const notifications = useNotificationsStore()
@@ -16,31 +17,37 @@ const appInfo = ref(null)
 const previousDark = ref(false)
 
 const businessName = computed(() => appInfo.value?.empresa?.nombre_comercial || 'Electrofrío')
+const clientMode = computed(() => route.path.startsWith('/mi-apps/electrofrio'))
+const appBase = computed(() => clientMode.value ? '/mi-apps/electrofrio' : '/apps/electrofrio')
+const apiBase = computed(() => clientMode.value ? '/mi/apps/electrofrio' : '/apps/electrofrio')
+const homePath = computed(() => clientMode.value ? '/mi-aplicaciones' : '/aplicaciones')
+const roleLabel = computed(() => clientMode.value ? 'Propietario de Electrofrío' : 'Superadministración VITI')
 const unread = computed(() => notifications.unreadCount > 99 ? '99+' : String(notifications.unreadCount || ''))
-const menu = [
-  { label:'Inicio', icon:'dashboard', to:'/apps/electrofrio/inicio' },
-  { label:'Agenda', icon:'event', to:'/apps/electrofrio/agenda' },
-  { label:'Órdenes', icon:'assignment', to:'/apps/electrofrio/ordenes' },
-  { label:'Clientes', icon:'groups', to:'/apps/electrofrio/clientes' },
-  { label:'Equipos', icon:'ac_unit', to:'/apps/electrofrio/equipos' },
-  { label:'Técnicos', icon:'engineering', to:'/apps/electrofrio/tecnicos' },
-  { label:'Inventario', icon:'inventory_2', to:'/apps/electrofrio/inventario' },
-  { label:'Pagos', icon:'payments', to:'/apps/electrofrio/pagos' },
-  { label:'Garantías', icon:'verified', to:'/apps/electrofrio/garantias' },
-  { label:'Historial', icon:'history', to:'/apps/electrofrio/historial' },
-  { label:'Buzón VITI', icon:'forum', to:'/apps/electrofrio/buzon', badge:true },
-]
+const menu = computed(() => [
+  { label:'Inicio', icon:'dashboard', to:`${appBase.value}/inicio` },
+  { label:'Agenda', icon:'event', to:`${appBase.value}/agenda` },
+  { label:'Órdenes', icon:'assignment', to:`${appBase.value}/ordenes` },
+  { label:'Clientes', icon:'groups', to:`${appBase.value}/clientes` },
+  { label:'Equipos', icon:'ac_unit', to:`${appBase.value}/equipos` },
+  { label:'Técnicos', icon:'engineering', to:`${appBase.value}/tecnicos` },
+  { label:'Inventario', icon:'inventory_2', to:`${appBase.value}/inventario` },
+  { label:'Pagos', icon:'payments', to:`${appBase.value}/pagos` },
+  { label:'Garantías', icon:'verified', to:`${appBase.value}/garantias` },
+  { label:'Historial', icon:'history', to:`${appBase.value}/historial` },
+  { label:'Buzón VITI', icon:'forum', to:`${appBase.value}/buzon`, badge:true },
+])
 
 function leaveTo(path){
-  if(!String(path).startsWith('/apps/electrofrio'))sessionStorage.setItem('viti-app-explicit-exit','1')
+  if(!String(path).startsWith(appBase.value))sessionStorage.setItem('viti-app-explicit-exit','1')
   router.push(path)
 }
 async function loadState(){
   loading.value=true
-  try{appInfo.value=(await api.get('/apps/electrofrio/resumen')).data.data}
+  try{appInfo.value=(await api.get(clientMode.value?`${apiBase.value}/estado`:`${apiBase.value}/resumen`)).data.data}
   catch(e){
     $q.notify({type:'negative',message:e.response?.data?.message||'No se pudo abrir Electrofrío dentro de VITI.'})
-    router.replace('/aplicaciones')
+    sessionStorage.setItem('viti-app-explicit-exit','1')
+    router.replace(homePath.value)
   }finally{loading.value=false}
 }
 
@@ -68,13 +75,13 @@ onBeforeUnmount(()=>{
           <div class="text-caption text-grey-7">{{businessName}} · VITI App</div>
         </div>
         <q-space/>
-        <q-btn flat round icon="notifications_none" class="lt-sm" @click="leaveTo('/apps/electrofrio/buzon')">
+        <q-btn flat round icon="notifications_none" class="lt-sm" @click="leaveTo(`${appBase}/buzon`)">
           <q-badge v-if="notifications.unreadCount" floating rounded color="negative" :label="unread"/>
         </q-btn>
-        <q-btn flat no-caps icon="forum" label="Buzón VITI" class="gt-xs" @click="leaveTo('/apps/electrofrio/buzon')">
+        <q-btn flat no-caps icon="forum" label="Buzón VITI" class="gt-xs" @click="leaveTo(`${appBase}/buzon`)">
           <q-badge v-if="notifications.unreadCount" rounded color="negative" :label="unread" class="q-ml-sm"/>
         </q-btn>
-        <q-btn outline color="primary" no-caps icon="apps" label="Volver a VITI" class="q-ml-sm" @click="leaveTo('/aplicaciones')"/>
+        <q-btn outline color="primary" no-caps icon="apps" label="Volver a VITI" class="q-ml-sm" @click="leaveTo(homePath)"/>
       </q-toolbar>
     </q-header>
 
@@ -97,7 +104,7 @@ onBeforeUnmount(()=>{
       <div class="absolute-bottom q-pa-md">
         <q-separator class="q-mb-md"/>
         <div class="text-caption text-blue-grey-2">Sesión de {{auth.user?.nombre}}</div>
-        <div class="text-caption text-cyan-3">Administrador de Electrofrío</div>
+        <div class="text-caption text-cyan-3">{{roleLabel}}</div>
       </div>
     </q-drawer>
 

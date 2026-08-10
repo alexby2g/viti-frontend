@@ -5,7 +5,8 @@ import { useQuasar } from 'quasar'
 import { api } from '../boot/axios'
 import { formatDateTime } from '../utils/date'
 
-const $q=useQuasar(),route=useRoute(),base='/apps/electrofrio'
+const $q=useQuasar(),route=useRoute()
+const base=computed(()=>route.path.startsWith('/mi-apps/electrofrio')?'/mi/apps/electrofrio':'/apps/electrofrio')
 const loading=ref(false),resumen=ref({clientes:0,equipos:0,citas_hoy:0,ordenes_abiertas:0,por_cobrar:0,ingresos_mes:0,garantias_vigentes:0,stock_bajo:0,agenda_hoy:[]})
 const clientes=ref([]),equipos=ref([]),tecnicos=ref([]),materiales=ref([]),ordenes=ref([]),pagos=ref([]),garantias=ref([]),historial=ref([])
 const dialog=ref(false),dialogType=ref(''),editingId=ref(null),detailDialog=ref(false),selectedOrder=ref(null)
@@ -61,7 +62,7 @@ async function loadAll(){
   loading.value=true
   try{
     const [r,c,e,t,m,o,p,g,h]=await Promise.all([
-      api.get(`${base}/resumen`),api.get(`${base}/clientes`),api.get(`${base}/equipos`),api.get(`${base}/tecnicos`),api.get(`${base}/materiales`),api.get(`${base}/ordenes`),api.get(`${base}/pagos`),api.get(`${base}/garantias`),api.get(`${base}/historial`),
+      api.get(`${base.value}/resumen`),api.get(`${base.value}/clientes`),api.get(`${base.value}/equipos`),api.get(`${base.value}/tecnicos`),api.get(`${base.value}/materiales`),api.get(`${base.value}/ordenes`),api.get(`${base.value}/pagos`),api.get(`${base.value}/garantias`),api.get(`${base.value}/historial`),
     ])
     resumen.value=r.data.data||resumen.value;clientes.value=c.data.data||[];equipos.value=e.data.data||[];tecnicos.value=t.data.data||[];materiales.value=m.data.data||[];ordenes.value=o.data.data||[];pagos.value=p.data.data||[];garantias.value=g.data.data||[];historial.value=h.data.data||[]
   }catch(e){notifyError(e,'No se pudieron cargar los datos de Electrofrío.')}finally{loading.value=false}
@@ -92,27 +93,27 @@ async function saveDialog(){
     const forms={cliente:clienteForm,equipo:equipoForm,tecnico:tecnicoForm,material:materialForm,orden:ordenForm}
     const endpoints={cliente:'clientes',equipo:'equipos',tecnico:'tecnicos',material:'materiales',orden:'ordenes'}
     const endpoint=endpoints[dialogType.value],body=clean({...forms[dialogType.value]})
-    if(editingId.value)await api.put(`${base}/${endpoint}/${editingId.value}`,body);else await api.post(`${base}/${endpoint}`,body)
+    if(editingId.value)await api.put(`${base.value}/${endpoint}/${editingId.value}`,body);else await api.post(`${base.value}/${endpoint}`,body)
     dialog.value=false;$q.notify({type:'positive',message:'Datos guardados correctamente.'});await loadAll()
   }catch(e){notifyError(e)}
 }
 function remove(type,row){
   const endpoints={cliente:'clientes',equipo:'equipos',tecnico:'tecnicos',material:'materiales',orden:'ordenes'}
-  $q.dialog({title:'Confirmar eliminación',message:'¿Eliminar este registro? El historial protegido no se borrará.',cancel:true,persistent:true}).onOk(async()=>{try{await api.delete(`${base}/${endpoints[type]}/${row.id}`);await loadAll()}catch(e){notifyError(e)}})
+  $q.dialog({title:'Confirmar eliminación',message:'¿Eliminar este registro? El historial protegido no se borrará.',cancel:true,persistent:true}).onOk(async()=>{try{await api.delete(`${base.value}/${endpoints[type]}/${row.id}`);await loadAll()}catch(e){notifyError(e)}})
 }
 function showOrder(row){selectedOrder.value=row;detailDialog.value=true}
 function decide(row,decision){
   if(decision==='aceptado')$q.dialog({title:'Confirmar servicio',message:'¿El cliente aceptó la propuesta y autoriza continuar con el trabajo?',cancel:true,persistent:true}).onOk(()=>saveDecision(row,'aceptado'))
   else $q.dialog({title:'Cerrar sin servicio',message:'Indica por qué el cliente no aceptó la propuesta.',prompt:{model:'',type:'textarea',isValid:v=>String(v||'').trim().length>=3},cancel:true,persistent:true}).onOk(reason=>saveDecision(row,'rechazado',reason))
 }
-async function saveDecision(row,decision,motivo_rechazo=null){try{await api.post(`${base}/ordenes/${row.id}/decision`,{decision,motivo_rechazo});detailDialog.value=false;$q.notify({type:'positive',message:decision==='aceptado'?'Servicio autorizado.':'Orden cerrada sin servicio.'});await loadAll()}catch(e){notifyError(e)}}
+async function saveDecision(row,decision,motivo_rechazo=null){try{await api.post(`${base.value}/ordenes/${row.id}/decision`,{decision,motivo_rechazo});detailDialog.value=false;$q.notify({type:'positive',message:decision==='aceptado'?'Servicio autorizado.':'Orden cerrada sin servicio.'});await loadAll()}catch(e){notifyError(e)}}
 function openFinish(row){finishOrder.value=row;Object.assign(finishForm,{trabajo_realizado:row.trabajo_realizado||'',recomendaciones:row.recomendaciones||'',garantia_dias:Number(row.garantia_dias||0),condiciones_garantia:row.condiciones_garantia||''});finishDialog.value=true}
-async function saveFinish(){try{await api.post(`${base}/ordenes/${finishOrder.value.id}/finalizar`,clean({...finishForm}));finishDialog.value=false;detailDialog.value=false;$q.notify({type:'positive',message:'Servicio finalizado y guardado en el historial.'});await loadAll()}catch(e){notifyError(e)}}
+async function saveFinish(){try{await api.post(`${base.value}/ordenes/${finishOrder.value.id}/finalizar`,clean({...finishForm}));finishDialog.value=false;detailDialog.value=false;$q.notify({type:'positive',message:'Servicio finalizado y guardado en el historial.'});await loadAll()}catch(e){notifyError(e)}}
 function openMaterial(row){materialOrder.value=row;Object.assign(usoForm,{material_id:null,cantidad:1});materialDialog.value=true}
-async function saveMaterial(){try{await api.post(`${base}/ordenes/${materialOrder.value.id}/materiales`,{...usoForm});materialDialog.value=false;detailDialog.value=false;$q.notify({type:'positive',message:'Material registrado en la orden.'});await loadAll()}catch(e){notifyError(e)}}
-async function removeMaterial(row,usage){try{await api.delete(`${base}/ordenes/${row.id}/materiales/${usage.material_id}`);detailDialog.value=false;await loadAll()}catch(e){notifyError(e)}}
+async function saveMaterial(){try{await api.post(`${base.value}/ordenes/${materialOrder.value.id}/materiales`,{...usoForm});materialDialog.value=false;detailDialog.value=false;$q.notify({type:'positive',message:'Material registrado en la orden.'});await loadAll()}catch(e){notifyError(e)}}
+async function removeMaterial(row,usage){try{await api.delete(`${base.value}/ordenes/${row.id}/materiales/${usage.material_id}`);detailDialog.value=false;await loadAll()}catch(e){notifyError(e)}}
 function openPayment(row){paymentOrder.value=row;Object.assign(pagoForm,{monto:Number(row.saldo||0),metodo:'efectivo',referencia:''});paymentDialog.value=true}
-async function savePayment(){try{await api.post(`${base}/ordenes/${paymentOrder.value.id}/pagos`,clean({...pagoForm}));paymentDialog.value=false;detailDialog.value=false;$q.notify({type:'positive',message:'Pago registrado.'});await loadAll()}catch(e){notifyError(e)}}
+async function savePayment(){try{await api.post(`${base.value}/ordenes/${paymentOrder.value.id}/pagos`,clean({...pagoForm}));paymentDialog.value=false;detailDialog.value=false;$q.notify({type:'positive',message:'Pago registrado.'});await loadAll()}catch(e){notifyError(e)}}
 function mobileEdit(type,row){open(type,row)}
 
 onMounted(loadAll)
