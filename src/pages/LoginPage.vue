@@ -7,7 +7,7 @@ import AppBrand from '../components/AppBrand.vue'
 const auth=useAuthStore(),router=useRouter(),route=useRoute(),$q=useQuasar(),show=ref(false),showSecret=ref(false),mode=ref(route.query.tipo==='cliente'?'cliente':'admin')
 const form=reactive({acceso:'',password:'',codigo_secreto:''})
 function errorMessage(e){const bag=e?.response?.data?.errors;if(bag)return Object.values(bag).flat()[0];return e?.response?.data?.message||'No se pudo iniciar sesión.'}
-async function submit(){try{await auth.login({...form,codigo_secreto:mode.value==='admin'?form.codigo_secreto:null});const target=auth.user?.rol==='cliente'?'/mi-cuenta':(route.query.redirect||'/');router.replace(target)}catch(e){$q.notify({type:'negative',message:errorMessage(e)})}}
+async function submit(){try{await auth.login({...form,codigo_secreto:mode.value==='admin'?form.codigo_secreto:null});const requested=typeof route.query.redirect==='string'?route.query.redirect:'';const safeClientTarget=requested.startsWith('/mi-')?requested:'/mi-aplicaciones';const target=auth.user?.rol==='cliente'?safeClientTarget:(requested||'/');router.replace(target)}catch(e){$q.notify({type:'negative',message:errorMessage(e)})}}
 </script>
 <template><q-page class="auth-page flex flex-center"><div class="login-card"><AppBrand/><div class="q-mt-xl section-label">Acceso a VITI</div><h1 class="page-title">Bienvenido</h1><p class="page-subtitle">Ingresa según el tipo de cuenta que utilizas.</p>
 <q-btn-toggle v-model="mode" spread no-caps unelevated toggle-color="primary" color="grey-2" text-color="dark" class="q-mt-lg" :options="[{label:'Administrador',value:'admin',icon:'admin_panel_settings'},{label:'Cliente',value:'cliente',icon:'person'}]"/>
