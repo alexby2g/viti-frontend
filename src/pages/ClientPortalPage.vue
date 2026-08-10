@@ -108,6 +108,7 @@ onMounted(load)
             </div>
             <div class="col">
               <div class="text-h5 text-weight-bold">{{ profile.nombre }}</div>
+              <div class="id-line"><span>Usuario para iniciar sesión</span><strong>@{{ profile.usuario?.usuario || 'Sin registrar' }}</strong></div>
               <div class="id-line"><span>CI</span><strong>{{ profile.documento || 'Sin registrar' }} {{ profile.ci_expedido || '' }}</strong></div>
               <div class="id-line"><span>Teléfono</span><strong>{{ profile.telefono }}</strong></div>
               <div class="id-line"><span>Ciudad</span><strong>{{ profile.ciudad || 'Sin registrar' }}</strong></div>
@@ -170,7 +171,7 @@ onMounted(load)
         <q-card-section><div class="row q-col-gutter-md">
           <div class="col-12"><q-input v-model="form.nombre" outlined label="Nombre completo *" /></div>
           <div class="col-12 col-sm-6"><q-input v-model="form.whatsapp" outlined label="WhatsApp" /></div>
-          <div class="col-12 col-sm-4"><q-input v-model="form.ci" outlined label="Cédula de identidad *" /></div>
+          <div class="col-12 col-sm-4"><q-input v-model="form.ci" outlined label="Cédula de identidad *" inputmode="numeric" maxlength="15" hint="También sirve para iniciar sesión." @update:model-value="v=>form.ci=String(v??'').replace(/\D/g,'')" /></div>
           <div class="col-12 col-sm-2"><q-input v-model="form.ci_expedido" outlined label="Expedido" /></div>
           <div class="col-12 col-sm-6"><q-input v-model="form.ciudad" outlined label="Ciudad o localidad *" /></div>
           <div class="col-12 col-sm-6"><q-input v-model="form.direccion" outlined label="Dirección o zona" /></div>
