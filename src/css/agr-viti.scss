@@ -1,0 +1,184 @@
+/*
+ * AGR Studio -> marca madre
+ * VITI -> producto/plataforma
+ * Esta capa se limita al panel VITI y a sus pantallas de acceso.
+ * Las VITI Apps conservan su identidad local.
+ */
+:root{
+  --agr-ink:#0b0b0d;
+  --agr-panel:#141418;
+  --agr-panel-soft:#19191f;
+  --agr-text:#f4f4f5;
+  --agr-muted:#a1a1aa;
+  --agr-border:#29292f;
+  --agr-blue:#4b86d8;
+  --agr-purple:#7566d6;
+  --agr-purple-soft:#8a7be2;
+}
+
+body.viti-main-active,
+body.agr-viti-auth{
+  --viti-bg:#f6f6f7;
+  --viti-card:#ffffff;
+  --viti-text:#1c1c21;
+  --viti-muted:#6f717a;
+  --viti-border:#e2e2e7;
+}
+
+body.body--dark.viti-main-active,
+body.body--dark.agr-viti-auth{
+  --viti-bg:#0b0b0d;
+  --viti-card:#151519;
+  --viti-text:#f4f4f5;
+  --viti-muted:#a1a1aa;
+  --viti-border:#29292f;
+}
+
+body.viti-main-active,
+body.agr-viti-auth{
+  background:var(--viti-bg);
+}
+
+body.viti-main-active .q-page-container,
+body.viti-main-active .q-page,
+body.agr-viti-auth .q-page-container,
+body.agr-viti-auth .q-page{
+  background-color:var(--viti-bg);
+  color:var(--viti-text);
+}
+
+body.body--dark.viti-main-active .q-page-container,
+body.body--dark.agr-viti-auth .q-page-container{
+  background-image:
+    radial-gradient(circle at 94% -8%,rgba(75,134,216,.075),transparent 29rem),
+    radial-gradient(circle at -10% 88%,rgba(117,102,214,.055),transparent 31rem);
+  background-attachment:fixed;
+}
+
+body.viti-main-active .viti-header{
+  background:rgba(255,255,255,.9);
+  color:#1c1c21;
+  border-color:#e6e6ea;
+  backdrop-filter:blur(16px);
+  -webkit-backdrop-filter:blur(16px);
+}
+body.body--dark.viti-main-active .viti-header{
+  background:rgba(11,11,13,.91);
+  color:#f4f4f5;
+  border-color:#242429;
+}
+
+body.viti-main-active .viti-drawer{
+  background:#0b0b0d;
+  color:#f5f5f6;
+  border-right:1px solid #242429;
+}
+body.viti-main-active .viti-drawer .q-separator{background:#26262c}
+body.viti-main-active .viti-drawer .q-item,
+body.viti-main-active .viti-drawer .q-expansion-item__container>.q-item{
+  margin:2px 10px;
+  min-height:44px;
+  border-radius:10px;
+  color:#c7c7ce;
+}
+body.viti-main-active .viti-drawer .q-item .q-icon,
+body.viti-main-active .viti-drawer .q-expansion-item__container>.q-item .q-icon{color:#8d8d98}
+body.viti-main-active .viti-drawer .q-item.q-router-link--active,
+body.viti-main-active .viti-drawer .q-item:hover,
+body.viti-main-active .viti-drawer .q-expansion-item__container>.q-item:hover{
+  background:#1a1a20;
+  color:#fff;
+}
+body.viti-main-active .viti-drawer .q-item.q-router-link--active .q-icon,
+body.viti-main-active .viti-drawer .q-item:hover .q-icon{color:#8d80e7}
+body.viti-main-active .client-badge{
+  background:#15151a!important;
+  border:1px solid #27272d;
+}
+
+body.viti-main-active .viti-card,
+body.viti-main-active .viti-table,
+body.viti-main-active .q-menu .q-card,
+body.agr-viti-auth .login-card{
+  box-shadow:none!important;
+}
+body.viti-main-active .viti-card,
+body.viti-main-active .viti-table{
+  border-color:var(--viti-border);
+  border-radius:14px;
+}
+body.body--dark.viti-main-active .viti-card,
+body.body--dark.viti-main-active .viti-table,
+body.body--dark.viti-main-active .q-card,
+body.body--dark.agr-viti-auth .q-card{
+  background:var(--viti-card);
+  color:var(--viti-text);
+}
+
+body.viti-main-active .section-label,
+body.agr-viti-auth .section-label,
+body.viti-main-active .text-primary,
+body.agr-viti-auth .text-primary{
+  color:#6b5fd2!important;
+}
+body.body--dark.viti-main-active .section-label,
+body.body--dark.agr-viti-auth .section-label,
+body.body--dark.viti-main-active .text-primary,
+body.body--dark.agr-viti-auth .text-primary{
+  color:#9589eb!important;
+}
+body.viti-main-active .bg-primary,
+body.agr-viti-auth .bg-primary{
+  background:#675bd0!important;
+}
+body.viti-main-active .q-btn.bg-primary,
+body.agr-viti-auth .q-btn.bg-primary{
+  box-shadow:0 0 0 1px rgba(117,102,214,.12)!important;
+}
+body.viti-main-active .q-btn.bg-primary:hover,
+body.agr-viti-auth .q-btn.bg-primary:hover{
+  background:#5d52bf!important;
+}
+body.viti-main-active .q-avatar.bg-accent,
+body.agr-viti-auth .q-avatar.bg-accent{
+  background:linear-gradient(145deg,#3f74bb,#7566d6)!important;
+}
+
+body.viti-main-active .q-field--outlined .q-field__control:before,
+body.agr-viti-auth .q-field--outlined .q-field__control:before{border-color:var(--viti-border)}
+body.body--dark.viti-main-active .q-field__label,
+body.body--dark.viti-main-active .q-field__native,
+body.body--dark.viti-main-active .q-field__input,
+body.body--dark.viti-main-active .q-field__marginal,
+body.body--dark.agr-viti-auth .q-field__label,
+body.body--dark.agr-viti-auth .q-field__native,
+body.body--dark.agr-viti-auth .q-field__input,
+body.body--dark.agr-viti-auth .q-field__marginal{color:#e8e8eb}
+body.body--dark.viti-main-active .q-separator,
+body.body--dark.agr-viti-auth .q-separator{background:#2a2a30}
+body.body--dark.viti-main-active .q-table thead th{background:#19191e;color:#d9d9de}
+body.body--dark.viti-main-active .q-table tbody td{color:#efeff1}
+
+/* El scroll vertical debe pertenecer a la página. Las tablas conservan scroll horizontal. */
+body.viti-main-active .viti-table .q-table__middle,
+.sv-table .q-table__middle{
+  overscroll-behavior-y:auto;
+}
+
+/* Login y acceso público: negro/blanco con acentos AGR discretos. */
+body.agr-viti-auth .auth-page{
+  background:
+    radial-gradient(circle at 86% 12%,rgba(75,134,216,.10),transparent 24rem),
+    radial-gradient(circle at 10% 92%,rgba(117,102,214,.08),transparent 26rem),
+    var(--viti-bg)!important;
+}
+body.agr-viti-auth .login-card{
+  background:var(--viti-card)!important;
+  color:var(--viti-text);
+  border:1px solid var(--viti-border);
+}
+
+@media(max-width:600px){
+  body.viti-main-active .viti-page{padding:14px 12px}
+  body.viti-main-active .viti-card,body.viti-main-active .viti-table{border-radius:12px}
+}
