@@ -24,7 +24,7 @@ const form = reactive({
   titulo_sistema:'', resumen:'',
 })
 
-const canContinue1 = computed(() => form.nombre.trim().length >= 3 && /^(?=.*[a-z])[a-z0-9_-]{4,40}$/.test(form.usuario) && /^\d{7,15}$/.test(form.telefono) && form.ci.trim() && form.ciudad.trim() && form.password.length >= 10 && form.password === form.password_confirmation)
+const canContinue1 = computed(() => form.nombre.trim().length >= 3 && /^(?=.*[a-z])[a-z0-9_-]{4,40}$/.test(form.usuario) && /^\d{7,15}$/.test(form.telefono) && /^\d{5,15}$/.test(form.ci) && form.ciudad.trim() && form.password.length >= 10 && form.password === form.password_confirmation)
 const canContinue2 = computed(() => form.empresa_nombre.trim().length >= 2 && form.titulo_sistema.trim().length >= 3)
 
 function errorMessage(e, fallback) {
@@ -109,7 +109,7 @@ onMounted(load)
             <div class="col-12 col-sm-4"><q-input v-model="form.telefono" outlined label="Teléfono *" inputmode="numeric" maxlength="15" /></div>
             <div class="col-12"><q-input v-model="form.usuario" outlined label="Nombre de usuario *" autocomplete="username" maxlength="40" hint="Lo usarás junto con tu contraseña para ingresar a VITI." @update:model-value="v => form.usuario = String(v ?? '').toLowerCase().replace(/\s+/g,'')"><template #prepend><q-icon name="alternate_email" /></template></q-input></div>
             <div class="col-12 col-sm-6"><q-input v-model="form.whatsapp" outlined label="WhatsApp" inputmode="numeric" maxlength="15" hint="Si lo dejas vacío usaremos tu teléfono." /></div>
-            <div class="col-12 col-sm-6"><q-input v-model="form.ci" outlined label="Cédula de identidad *" /></div>
+            <div class="col-12 col-sm-6"><q-input v-model="form.ci" outlined label="Cédula de identidad *" inputmode="numeric" maxlength="15" hint="También podrás iniciar sesión con tu CI." @update:model-value="v=>form.ci=String(v??'').replace(/\D/g,'')" /></div>
             <div class="col-12 col-sm-4"><q-input v-model="form.ci_expedido" outlined label="Expedido" placeholder="Ej.: BEN" /></div>
             <div class="col-12 col-sm-8"><q-input v-model="form.ciudad" outlined label="Ciudad o localidad *" /></div>
             <div class="col-12"><q-input v-model="form.direccion" outlined label="Dirección o zona" /></div>
