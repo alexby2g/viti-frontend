@@ -43,7 +43,7 @@ async function load(){
     projects.value=p.data.data
   } finally { loading.value=false }
 }
-function openElectro(app){if(!app?.empresa_id)return;$q.localStorage.set('viti-empresa-id',String(app.empresa_id));router.push('/apps/electrofrio/inicio')}
+function openElectro(app){if(!app?.empresa_id)return;localStorage.setItem('viti-empresa-id',String(app.empresa_id));router.push('/apps/electrofrio/inicio')}
 function open(row=null){editing.value=row;Object.assign(form,empty(),row||{});dialog.value=true}
 async function save(){try{editing.value?await api.put(`/aplicaciones/${editing.value.id}`,form):await api.post('/aplicaciones',form);$q.notify({type:'positive',message:editing.value?'Aplicación actualizada.':'Aplicación integrada.'});dialog.value=false;load()}catch(e){$q.notify({type:'negative',message:e.response?.data?.message||'No se pudo guardar.'})}}
 function remove(row){$q.dialog({title:'Retirar aplicación',message:`¿Retirar ${row.nombre}?`,cancel:true}).onOk(async()=>{try{await api.delete(`/aplicaciones/${row.id}`);load()}catch(e){$q.notify({type:'negative',message:e.response?.data?.message||'No se puede retirar.'})}})}
