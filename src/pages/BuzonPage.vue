@@ -141,11 +141,17 @@ async function send(){
   if(!message&&!attachment.value)return
   sending.value=true
   try{
-    const payload=new FormData()
-    if(message)payload.append('mensaje',message)
-    if(attachment.value)payload.append('archivo',attachment.value)
-    payload.append('client_request_id',requestId())
-    await api.post(`${apiBase.value}/${current.value.id}/mensajes`,payload,{headers:{'Content-Type':'multipart/form-data'}})
+    const url=`${apiBase.value}/${current.value.id}/mensajes`
+    const clientRequestId=requestId()
+    if(attachment.value){
+      const payload=new FormData()
+      if(message)payload.append('mensaje',message)
+      payload.append('archivo',attachment.value)
+      payload.append('client_request_id',clientRequestId)
+      await api.post(url,payload)
+    }else{
+      await api.post(url,{mensaje:message,client_request_id:clientRequestId})
+    }
     reply.value=''; clearAttachment(); await loadCurrent()
   }catch(error){$q.notify({type:'negative',message:error.response?.data?.message||'No se pudo enviar la respuesta.'})}
   finally{sending.value=false}
@@ -229,12 +235,21 @@ onBeforeUnmount(()=>{if(pollTimer)window.clearInterval(pollTimer);heartbeat(fals
 
       <div v-show="showChat" class="conversation-pane">
         <q-card v-if="current" flat class="viti-card messenger-card">
+          <q-menu v-if="canManage&&!isMobile" context-menu>
+            <q-list style="min-width:210px">
+              <q-item clickable v-close-popup class="text-negative" @click="deleteConversation">
+                <q-item-section avatar><q-icon name="delete_forever"/></q-item-section>
+                <q-item-section>Eliminar chat</q-item-section>
+              </q-item>
+            </q-list>
+          </q-menu>
+
           <q-card-section class="row items-center no-wrap chat-header">
             <q-btn v-if="isMobile" round flat icon="arrow_back" color="primary" class="q-mr-xs" @click="backToChats"/>
             <q-avatar size="48px" color="primary" text-color="white" class="q-mr-sm"><img v-if="currentContact?.foto_url||currentContact?.foto_path" :src="currentContact?.foto_url||mediaUrl(currentContact?.foto_path)"/><span v-else>{{currentContact?.nombre?.[0]||'C'}}</span></q-avatar>
             <div class="col min-width-0"><div class="text-subtitle1 text-weight-bold ellipsis">{{currentContact?.nombre}}</div><div class="text-caption ellipsis" :class="presence.escribiendo||presence.en_linea?'text-positive':'text-grey-6'">{{presenceText}} · {{isElectrofrio?'Electrofrío':'Atención VITI'}}</div></div>
             <q-btn round flat color="primary" :icon="callsEnabled?'video_call':'event'" @click="startSession"><q-tooltip>{{callsEnabled?'Iniciar sesión habilitada':'Agendar llamada o videollamada'}}</q-tooltip></q-btn>
-            <q-btn v-if="canManage" round flat color="grey-7" icon="more_vert"><q-menu><q-list style="min-width:210px"><q-item clickable v-close-popup class="text-negative" @click="deleteConversation"><q-item-section avatar><q-icon name="delete_forever"/></q-item-section><q-item-section>Eliminar chat</q-item-section></q-item></q-list></q-menu></q-btn>
+            <q-btn v-if="canManage&&isMobile" round flat color="grey-7" icon="more_vert"><q-menu><q-list style="min-width:210px"><q-item clickable v-close-popup class="text-negative" @click="deleteConversation"><q-item-section avatar><q-icon name="delete_forever"/></q-item-section><q-item-section>Eliminar chat</q-item-section></q-item></q-list></q-menu></q-btn>
           </q-card-section>
 
           <q-banner v-if="pendingSession" class="bg-orange-1 text-orange-10 q-mx-md q-mb-sm" rounded><template #avatar><q-icon name="support_agent"/></template><div class="text-weight-bold">El cliente solicita {{modalityLabel(pendingSession.modalidad)}}</div><div class="text-caption">{{pendingSession.motivo}}</div><template #action><q-btn flat dense no-caps color="negative" label="Rechazar" @click="rejectPending"/><q-btn flat dense no-caps color="primary" label="Aprobar / agendar" @click="openSchedule(pendingSession.modalidad,pendingSession)"/></template></q-banner>
@@ -258,7 +273,7 @@ onBeforeUnmount(()=>{if(pollTimer)window.clearInterval(pollTimer);heartbeat(fals
 
           <div v-if="attachmentPreview" class="attachment-preview q-px-md q-pt-sm"><img :src="attachmentPreview" alt="Vista previa"/><div class="col"><div class="text-weight-medium">{{attachment?.name}}</div><div class="text-caption text-grey-6">Imagen privada para esta conversación.</div></div><q-btn flat round icon="close" :disable="sending" @click="clearAttachment"/></div>
           <q-separator/>
-          <q-card-section class="composer"><input ref="fileInput" type="file" accept="image/jpeg,image/png,image/webp" hidden @change="onAttachment"/><q-btn round flat color="primary" icon="add_photo_alternate" class="composer-action" :disable="sending" @click="chooseAttachment"><q-tooltip>Adjuntar imagen</q-tooltip></q-btn><q-input v-model="reply" class="message-input" rounded outlined autogrow placeholder="Responder al cliente..." :disable="sending" @keyup.ctrl.enter="send"/><q-btn color="primary" unelevated round icon="send" class="composer-action send-action" :loading="sending" :disable="(!reply.trim()&&!attachment)||sending" @click="send"><q-tooltip>Enviar</q-tooltip></q-btn></q-card-section>
+          <q-card-section class="composer"><input ref="fileInput" type="file" accept="image/jpeg,image/png,image/webp" hidden @change="onAttachment"/><q-btn round flat color="primary" icon="add_photo_alternate" class="composer-action" :disable="sending" @click="chooseAttachment"><q-tooltip>Adjuntar imagen</q-tooltip></q-btn><q-input v-model="reply" class="message-input" rounded outlined autogrow placeholder="Responder al cliente..." :disable="sending" @keydown.enter.exact.prevent="send"><q-tooltip>Enter envía · Shift + Enter crea una línea nueva</q-tooltip></q-input><q-btn color="primary" unelevated round icon="send" class="composer-action send-action" :loading="sending" :disable="(!reply.trim()&&!attachment)||sending" @click="send"><q-tooltip>Enviar mensaje</q-tooltip></q-btn></q-card-section>
         </q-card>
         <div v-else-if="!isMobile" class="empty-state">Selecciona un cliente para atenderlo.</div>
       </div>
