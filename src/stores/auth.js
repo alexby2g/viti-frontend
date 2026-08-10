@@ -100,6 +100,7 @@ export const useAuthStore = defineStore('auth', {
     },
     async logout() {
       try {
+        await unregisterNativePushDevice(api)
         await initCsrf()
         await api.post('/auth/logout', null, { timeout: 30000 })
       } catch {}
