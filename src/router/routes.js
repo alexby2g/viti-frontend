@@ -4,9 +4,11 @@ import PeluqueriaClientLayout from '../layouts/PeluqueriaClientLayout.vue'
 import PeluqueriaAdminLayout from '../layouts/PeluqueriaAdminLayout.vue'
 import ElectrofrioLayout from '../layouts/ElectrofrioLayout.vue'
 import ElectrofrioCustomerLayout from '../layouts/ElectrofrioCustomerLayout.vue'
+import SoporteVitalLayout from '../layouts/SoporteVitalLayout.vue'
 
 const hairPage = () => import('../pages/ClientPeluqueriaWorkspacePage.vue')
 const electroPage = () => import('../pages/ElectrofrioWorkspacePage.vue')
+const supportPage = () => import('../pages/SoporteVitalWorkspacePage.vue')
 
 export default [
   { path: '/configuracion-inicial', component: AuthLayout, children: [{ path: '', name: 'setup', component: () => import('../pages/SetupPage.vue') }] },
@@ -73,6 +75,17 @@ export default [
       {path:'garantias',name:'electro-warranties',component:electroPage,meta:{requiresAuth:true,adminOnly:true,appShell:'electrofrio',electroSection:'garantias'}},
       {path:'historial',name:'electro-history',component:electroPage,meta:{requiresAuth:true,adminOnly:true,appShell:'electrofrio',electroSection:'historial'}},
       {path:'buzon',name:'electro-inbox',component:()=>import('../pages/BuzonPage.vue'),meta:{requiresAuth:true,adminOnly:true,appShell:'electrofrio',chatContext:'electrofrio'}},
+    ],
+  },
+  {
+    path:'/apps/servicio-tecnico', component:SoporteVitalLayout, meta:{requiresAuth:true,adminOnly:true,appShell:'servicio-tecnico'}, children:[
+      {path:'',redirect:'/apps/servicio-tecnico/inicio'},
+      {path:'inicio',name:'support-home',component:supportPage,meta:{requiresAuth:true,adminOnly:true,appShell:'servicio-tecnico',supportSection:'inicio'}},
+      {path:'clientes',name:'support-clients',component:supportPage,meta:{requiresAuth:true,adminOnly:true,appShell:'servicio-tecnico',supportSection:'clientes'}},
+      {path:'equipos',name:'support-equipment',component:supportPage,meta:{requiresAuth:true,adminOnly:true,appShell:'servicio-tecnico',supportSection:'equipos'}},
+      {path:'tecnicos',name:'support-technicians',component:supportPage,meta:{requiresAuth:true,adminOnly:true,appShell:'servicio-tecnico',supportSection:'tecnicos'}},
+      {path:'ordenes',name:'support-orders',component:supportPage,meta:{requiresAuth:true,adminOnly:true,appShell:'servicio-tecnico',supportSection:'ordenes'}},
+      {path:'agenda',name:'support-agenda',component:supportPage,meta:{requiresAuth:true,adminOnly:true,appShell:'servicio-tecnico',supportSection:'agenda'}},
     ],
   },
   {

@@ -54,9 +54,11 @@ onMounted(async()=>{
             <q-separator/>
             <q-card-section class="subscription-box">
               <div class="row items-center q-col-gutter-md">
-                <div class="col"><div class="text-caption text-grey-6">Suscripción</div><div class="text-h6 text-weight-bold">{{project.suscripcion.plan||'VITI Soporte'}}</div><div class="text-body2">{{money(project.suscripcion.monto)}} / {{project.suscripcion.frecuencia==='anual'?'año':'mes'}} · Vence {{project.suscripcion.fecha_vencimiento}}</div></div>
-                <div class="col-auto"><q-badge :color="statusColor(project.suscripcion.estado)">{{pretty(project.suscripcion.estado)}}</q-badge></div>
+                <div class="col"><div class="text-caption text-grey-6">Suscripción</div><div class="text-h6 text-weight-bold">{{project.suscripcion.plan||'VITI'}}</div><div class="text-body2">{{money(project.suscripcion.monto)}} / {{project.suscripcion.frecuencia==='anual'?'año':'mes'}} · Vence {{project.suscripcion.fecha_vencimiento}}</div></div>
+                <div class="col-auto"><q-badge :color="statusColor(project.suscripcion.estado)">{{project.suscripcion.en_prueba?'Prueba gratuita':pretty(project.suscripcion.estado)}}</q-badge></div>
               </div>
+              <q-banner v-if="project.suscripcion.en_prueba" rounded class="bg-green-1 text-green-9 q-mt-md"><template #avatar><q-icon name="verified"/></template>Prueba gratuita hasta {{project.suscripcion.prueba_hasta}}. Durante este periodo no se cobra mensualidad.</q-banner>
+              <q-banner v-if="project.suscripcion.primer_cobro_monto!==null&&!project.suscripcion.primer_cobro_pagado" rounded class="bg-orange-1 text-orange-10 q-mt-md"><template #avatar><q-icon name="calendar_month"/></template>Primer periodo pagado: {{project.suscripcion.primer_cobro_desde}} al {{project.suscripcion.primer_cobro_hasta}} · monto proporcional {{money(project.suscripcion.primer_cobro_monto)}}. Desde el mes siguiente corresponde la mensualidad completa.</q-banner>
             </q-card-section>
             <q-list v-if="project.pagos_suscripcion?.length" separator>
               <q-item v-for="payment in project.pagos_suscripcion" :key="payment.id"><q-item-section avatar><q-avatar color="blue-1" text-color="primary" icon="autorenew"/></q-item-section><q-item-section><q-item-label class="text-weight-bold">Pago de suscripción · {{money(payment.monto)}}</q-item-label><q-item-label caption>{{payment.fecha_pago}} · {{pretty(payment.metodo)}}<span v-if="payerName(payment)"> · Cuenta: {{payerName(payment)}}</span></q-item-label></q-item-section></q-item>
