@@ -13,7 +13,8 @@ export default defineRouter(({ store }) => {
     if (to.meta.requiresAuth) {
       await auth.initialize()
       if (!auth.isAuthenticated) return { name: 'login', query: { redirect: to.fullPath } }
-      if (to.meta.adminOnly && auth.user?.rol==='cliente') return {name:'client-portal'}
+      if (to.meta.adminOnly && !['superadmin','administrador'].includes(auth.user?.rol)) return auth.user?.rol==='cliente'?{name:'client-portal'}:{name:'login'}
+      if (to.meta.superAdminOnly && auth.user?.rol!=='superadmin') return {name:'dashboard'}
       if (to.meta.clientOnly && auth.user?.rol!=='cliente') return {name:'dashboard'}
     }
 
