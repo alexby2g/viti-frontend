@@ -39,11 +39,7 @@ export default [
     ],
   },
   { path:'/mi-aplicaciones/peluqueria', redirect:'/mi-apps/peluqueria/inicio' },
-  {
-    path:'/apps/peluqueria', component:PeluqueriaAdminLayout, meta:{requiresAuth:true,adminOnly:true,appShell:'peluqueria-admin'}, children:[
-      {path:'',name:'app-peluqueria',component:()=>import('../pages/PeluqueriaPage.vue'),meta:{requiresAuth:true,adminOnly:true,appShell:'peluqueria-admin'}},
-    ],
-  },
+  { path:'/apps/peluqueria', component:PeluqueriaAdminLayout, meta:{requiresAuth:true,adminOnly:true,appShell:'peluqueria-admin'}, children:[{path:'',name:'app-peluqueria',component:()=>import('../pages/PeluqueriaPage.vue'),meta:{requiresAuth:true,adminOnly:true,appShell:'peluqueria-admin'}}] },
   {
     path:'/mi-apps/electrofrio', component:ElectrofrioLayout, meta:{requiresAuth:true,clientOnly:true,appShell:'electrofrio'}, children:[
       {path:'',redirect:'/mi-apps/electrofrio/inicio'},
@@ -111,7 +107,7 @@ export default [
       { path: 'mantenimientos', name: 'mantenimientos', component: () => import('../pages/MantenimientosPage.vue'), meta:{adminOnly:true} },
       { path: 'archivos', name: 'archivos', component: () => import('../pages/ArchivosPage.vue'), meta:{adminOnly:true} },
       { path: 'reportes', name: 'reportes', component: () => import('../pages/ReportesPage.vue'), meta:{adminOnly:true} },
-      { path: 'buzon', name: 'buzon', component: () => import('../pages/BuzonPage.vue'), meta:{adminOnly:true} },
+      { path: 'buzon', name: 'buzon', component: () => import('../pages/BuzonPage.vue'), meta:{adminOnly:true,superAdminOnly:true} },
       { path: 'auditoria', name: 'auditoria', component: () => import('../pages/AuditoriaPage.vue'), meta:{adminOnly:true,superAdminOnly:true} },
       { path: 'usuarios', name: 'usuarios', component: () => import('../pages/UsuariosPage.vue'), meta:{adminOnly:true,superAdminOnly:true} },
       { path: 'almacenamiento', name: 'almacenamiento', component: () => import('../pages/StoragePage.vue'), meta:{adminOnly:true,superAdminOnly:true} },
