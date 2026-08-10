@@ -10,6 +10,24 @@ const hairPage = () => import('../pages/ClientPeluqueriaWorkspacePage.vue')
 const electroPage = () => import('../pages/ElectrofrioWorkspacePage.vue')
 const supportPage = () => import('../pages/SoporteVitalWorkspacePage.vue')
 
+function supportChildren(client=false) {
+  const base=client?'/mi-apps/servicio-tecnico':'/apps/servicio-tecnico'
+  const authMeta=client?{requiresAuth:true,clientOnly:true,appShell:'servicio-tecnico'}:{requiresAuth:true,adminOnly:true,appShell:'servicio-tecnico'}
+  const prefix=client?'support-client':'support'
+  return [
+    {path:'',redirect:`${base}/inicio`},
+    {path:'inicio',name:`${prefix}-home`,component:supportPage,meta:{...authMeta,supportSection:'inicio'}},
+    {path:'clientes',name:`${prefix}-clients`,component:supportPage,meta:{...authMeta,supportSection:'clientes'}},
+    {path:'equipos',name:`${prefix}-equipment`,component:supportPage,meta:{...authMeta,supportSection:'equipos'}},
+    {path:'tecnicos',name:`${prefix}-technicians`,component:supportPage,meta:{...authMeta,supportSection:'tecnicos'}},
+    {path:'ordenes',name:`${prefix}-orders`,component:supportPage,meta:{...authMeta,supportSection:'ordenes'}},
+    {path:'agenda',name:`${prefix}-agenda`,component:supportPage,meta:{...authMeta,supportSection:'agenda'}},
+    {path:'pagos',name:`${prefix}-payments`,component:supportPage,meta:{...authMeta,supportSection:'pagos'}},
+    {path:'garantias',name:`${prefix}-warranties`,component:supportPage,meta:{...authMeta,supportSection:'garantias'}},
+    {path:'historial',name:`${prefix}-history`,component:supportPage,meta:{...authMeta,supportSection:'historial'}},
+  ]
+}
+
 export default [
   { path: '/configuracion-inicial', component: AuthLayout, children: [{ path: '', name: 'setup', component: () => import('../pages/SetupPage.vue') }] },
   { path: '/registro', component: AuthLayout, children: [{ path: '', name: 'client-register', component: () => import('../pages/ClientRegisterPage.vue') }] },
@@ -73,17 +91,9 @@ export default [
       {path:'buzon',name:'electro-inbox',component:()=>import('../pages/BuzonPage.vue'),meta:{requiresAuth:true,adminOnly:true,appShell:'electrofrio',chatContext:'electrofrio'}},
     ],
   },
-  {
-    path:'/apps/servicio-tecnico', component:SoporteVitalLayout, meta:{requiresAuth:true,adminOnly:true,appShell:'servicio-tecnico'}, children:[
-      {path:'',redirect:'/apps/servicio-tecnico/inicio'},
-      {path:'inicio',name:'support-home',component:supportPage,meta:{requiresAuth:true,adminOnly:true,appShell:'servicio-tecnico',supportSection:'inicio'}},
-      {path:'clientes',name:'support-clients',component:supportPage,meta:{requiresAuth:true,adminOnly:true,appShell:'servicio-tecnico',supportSection:'clientes'}},
-      {path:'equipos',name:'support-equipment',component:supportPage,meta:{requiresAuth:true,adminOnly:true,appShell:'servicio-tecnico',supportSection:'equipos'}},
-      {path:'tecnicos',name:'support-technicians',component:supportPage,meta:{requiresAuth:true,adminOnly:true,appShell:'servicio-tecnico',supportSection:'tecnicos'}},
-      {path:'ordenes',name:'support-orders',component:supportPage,meta:{requiresAuth:true,adminOnly:true,appShell:'servicio-tecnico',supportSection:'ordenes'}},
-      {path:'agenda',name:'support-agenda',component:supportPage,meta:{requiresAuth:true,adminOnly:true,appShell:'servicio-tecnico',supportSection:'agenda'}},
-    ],
-  },
+  { path:'/mi-apps/servicio-tecnico', component:SoporteVitalLayout, meta:{requiresAuth:true,clientOnly:true,appShell:'servicio-tecnico'}, children:supportChildren(true) },
+  { path:'/mi-aplicaciones/servicio-tecnico', redirect:'/mi-apps/servicio-tecnico/inicio' },
+  { path:'/apps/servicio-tecnico', component:SoporteVitalLayout, meta:{requiresAuth:true,adminOnly:true,appShell:'servicio-tecnico'}, children:supportChildren(false) },
   {
     path: '/', component: MainLayout, meta: { requiresAuth: true }, children: [
       { path: '', name: 'dashboard', component: () => import('../pages/DashboardPage.vue'), meta:{adminOnly:true} },
