@@ -1,6 +1,6 @@
 <script setup>
 import { mediaUrl } from '../utils/media.js'
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, inject, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useQuasar } from 'quasar'
 import { useRoute, useRouter } from 'vue-router'
 import { api } from '../boot/axios'
@@ -12,6 +12,7 @@ const $q = useQuasar()
 const route = useRoute()
 const router = useRouter()
 const notifications = useNotificationsStore()
+const canManage = inject('electrofrioCanManage', computed(() => true))
 const rows = ref([])
 const selected = ref(null)
 const mobileChatOpen = ref(false)
@@ -37,12 +38,14 @@ let lastTypingAt = 0
 
 const context = computed(() => route.meta.chatContext === 'electrofrio' ? 'electrofrio' : 'viti')
 const isElectrofrio = computed(() => context.value === 'electrofrio')
-const apiBase = computed(() => isElectrofrio.value ? '/apps/electrofrio/buzon' : '/buzon')
-const attentionBase = computed(() => isElectrofrio.value ? '/apps/electrofrio/atencion' : '/atencion')
+const businessMode = computed(() => isElectrofrio.value && route.path.startsWith('/mi-apps/'))
+const apiBase = computed(() => isElectrofrio.value ? (businessMode.value?'/mi/apps/electrofrio/buzon':'/apps/electrofrio/buzon') : '/buzon')
+const attentionBase = computed(() => isElectrofrio.value ? (businessMode.value?'/mi/apps/electrofrio/atencion':'/apps/electrofrio/atencion') : '/atencion')
 const inboxTitle = computed(() => isElectrofrio.value ? 'Mensajes Electrofrío' : 'Atención VITI')
 const inboxSubtitle = computed(() => isElectrofrio.value ? 'Conversaciones independientes de la aplicación Electrofrío.' : 'Conversaciones y atención de la plataforma VITI.')
 const isMobile = computed(() => $q.screen.lt.md)
 const current = computed(() => rows.value.find(item => item.id === selected.value) || null)
+const currentContact = computed(() => current.value?.contacto || current.value?.electrofrio_cliente || current.value?.cliente || null)
 const pendingSession = computed(() => sessions.value.find(session => session.estado === 'solicitada') || null)
 const activeSession = computed(() => sessions.value.find(session => {
   if (session.estado !== 'aprobada' || !session.habilitada_desde || !session.habilitada_hasta) return false
@@ -215,8 +218,8 @@ onBeforeUnmount(()=>{if(pollTimer)window.clearInterval(pollTimer);heartbeat(fals
         <q-card flat class="viti-card contacts-card">
           <q-list separator>
             <q-item v-for="conversation in rows" :key="conversation.id" clickable :active="!isMobile&&selected===conversation.id" active-class="bg-blue-1 text-primary" @click="choose(conversation.id)">
-              <q-item-section avatar><q-avatar color="primary" text-color="white"><img v-if="conversation.cliente?.foto_url||conversation.cliente?.foto_path" :src="conversation.cliente?.foto_url||mediaUrl(conversation.cliente?.foto_path)"/><span v-else>{{conversation.cliente?.nombre?.[0]||'C'}}</span></q-avatar></q-item-section>
-              <q-item-section><q-item-label class="text-weight-bold">{{conversation.cliente?.nombre}}</q-item-label><q-item-label v-if="conversation.empresa" caption>{{conversation.empresa.nombre_comercial}}</q-item-label><q-item-label caption lines="1">{{conversation.mensajes?.[0]?.eliminado?'Mensaje eliminado':(conversation.mensajes?.[0]?.mensaje||(conversation.mensajes?.[0]?.archivo_path?'📷 Imagen adjunta':'Sin mensajes'))}}</q-item-label><q-item-label caption>{{conversation.ultimo_mensaje_at?formatDateTime(conversation.ultimo_mensaje_at):'Sin mensajes todavía'}}</q-item-label></q-item-section>
+              <q-item-section avatar><q-avatar color="primary" text-color="white"><img v-if="conversation.contacto?.foto_url||conversation.contacto?.foto_path" :src="conversation.contacto?.foto_url||mediaUrl(conversation.contacto?.foto_path)"/><span v-else>{{conversation.contacto?.nombre?.[0]||conversation.cliente?.nombre?.[0]||'C'}}</span></q-avatar></q-item-section>
+              <q-item-section><q-item-label class="text-weight-bold">{{conversation.contacto?.nombre||conversation.cliente?.nombre}}</q-item-label><q-item-label v-if="conversation.empresa" caption>{{conversation.empresa.nombre_comercial}}</q-item-label><q-item-label caption lines="1">{{conversation.mensajes?.[0]?.eliminado?'Mensaje eliminado':(conversation.mensajes?.[0]?.mensaje||(conversation.mensajes?.[0]?.archivo_path?'📷 Imagen adjunta':'Sin mensajes'))}}</q-item-label><q-item-label caption>{{conversation.ultimo_mensaje_at?formatDateTime(conversation.ultimo_mensaje_at):'Sin mensajes todavía'}}</q-item-label></q-item-section>
               <q-item-section side class="items-end q-gutter-xs"><q-badge v-if="conversation.no_leidos" rounded color="negative" :label="conversation.no_leidos>99?'99+':conversation.no_leidos"/><q-icon v-if="isMobile" name="chevron_right" color="grey-6" size="24px"/></q-item-section>
             </q-item>
             <div v-if="!rows.length&&!loading" class="empty-state">No hay conversaciones en este buzón.</div>
@@ -228,10 +231,10 @@ onBeforeUnmount(()=>{if(pollTimer)window.clearInterval(pollTimer);heartbeat(fals
         <q-card v-if="current" flat class="viti-card messenger-card">
           <q-card-section class="row items-center no-wrap chat-header">
             <q-btn v-if="isMobile" round flat icon="arrow_back" color="primary" class="q-mr-xs" @click="backToChats"/>
-            <q-avatar size="48px" color="primary" text-color="white" class="q-mr-sm"><img v-if="current.cliente?.foto_url||current.cliente?.foto_path" :src="current.cliente?.foto_url||mediaUrl(current.cliente?.foto_path)"/><span v-else>{{current.cliente?.nombre?.[0]||'C'}}</span></q-avatar>
-            <div class="col min-width-0"><div class="text-subtitle1 text-weight-bold ellipsis">{{current.cliente?.nombre}}</div><div class="text-caption ellipsis" :class="presence.escribiendo||presence.en_linea?'text-positive':'text-grey-6'">{{presenceText}} · {{isElectrofrio?'Electrofrío':'Atención VITI'}}</div></div>
+            <q-avatar size="48px" color="primary" text-color="white" class="q-mr-sm"><img v-if="currentContact?.foto_url||currentContact?.foto_path" :src="currentContact?.foto_url||mediaUrl(currentContact?.foto_path)"/><span v-else>{{currentContact?.nombre?.[0]||'C'}}</span></q-avatar>
+            <div class="col min-width-0"><div class="text-subtitle1 text-weight-bold ellipsis">{{currentContact?.nombre}}</div><div class="text-caption ellipsis" :class="presence.escribiendo||presence.en_linea?'text-positive':'text-grey-6'">{{presenceText}} · {{isElectrofrio?'Electrofrío':'Atención VITI'}}</div></div>
             <q-btn round flat color="primary" :icon="callsEnabled?'video_call':'event'" @click="startSession"><q-tooltip>{{callsEnabled?'Iniciar sesión habilitada':'Agendar llamada o videollamada'}}</q-tooltip></q-btn>
-            <q-btn round flat color="grey-7" icon="more_vert"><q-menu><q-list style="min-width:210px"><q-item clickable v-close-popup class="text-negative" @click="deleteConversation"><q-item-section avatar><q-icon name="delete_forever"/></q-item-section><q-item-section>Eliminar chat</q-item-section></q-item></q-list></q-menu></q-btn>
+            <q-btn v-if="canManage" round flat color="grey-7" icon="more_vert"><q-menu><q-list style="min-width:210px"><q-item clickable v-close-popup class="text-negative" @click="deleteConversation"><q-item-section avatar><q-icon name="delete_forever"/></q-item-section><q-item-section>Eliminar chat</q-item-section></q-item></q-list></q-menu></q-btn>
           </q-card-section>
 
           <q-banner v-if="pendingSession" class="bg-orange-1 text-orange-10 q-mx-md q-mb-sm" rounded><template #avatar><q-icon name="support_agent"/></template><div class="text-weight-bold">El cliente solicita {{modalityLabel(pendingSession.modalidad)}}</div><div class="text-caption">{{pendingSession.motivo}}</div><template #action><q-btn flat dense no-caps color="negative" label="Rechazar" @click="rejectPending"/><q-btn flat dense no-caps color="primary" label="Aprobar / agendar" @click="openSchedule(pendingSession.modalidad,pendingSession)"/></template></q-banner>
@@ -241,13 +244,13 @@ onBeforeUnmount(()=>{if(pollTimer)window.clearInterval(pollTimer);heartbeat(fals
           <q-separator/>
           <q-card-section ref="messagesBox" class="messages messenger-bg">
             <div v-if="!current.mensajes?.length" class="empty-state q-my-xl">Aún no hay mensajes en esta conversación.</div>
-            <div v-for="message in current.mensajes" :key="message.id" class="message-row" :class="message.usuario?.rol==='cliente'?'client':'admin'">
-              <q-avatar v-if="message.usuario?.rol==='cliente'" size="28px" color="primary" text-color="white" class="message-avatar"><img v-if="current.cliente?.foto_url" :src="current.cliente.foto_url"/><span v-else>{{current.cliente?.nombre?.[0]||'C'}}</span></q-avatar>
-              <div class="bubble" :class="message.usuario?.rol==='cliente'?'bubble-client':'bubble-admin'">
+            <div v-for="message in current.mensajes" :key="message.id" class="message-row" :class="message.es_cliente_final?'client':'admin'">
+              <q-avatar v-if="message.es_cliente_final" size="28px" color="primary" text-color="white" class="message-avatar"><img v-if="currentContact?.foto_url" :src="currentContact.foto_url"/><span v-else>{{currentContact?.nombre?.[0]||'C'}}</span></q-avatar>
+              <div class="bubble" :class="message.es_cliente_final?'bubble-client':'bubble-admin'">
                 <q-btn v-if="message.puede_editar||message.puede_eliminar" flat round dense size="sm" icon="more_vert" class="message-actions"><q-menu><q-list dense style="min-width:150px"><q-item v-if="message.puede_editar" clickable v-close-popup @click="openEdit(message)"><q-item-section avatar><q-icon name="edit"/></q-item-section><q-item-section>Editar</q-item-section></q-item><q-item v-if="message.puede_eliminar" clickable v-close-popup class="text-negative" @click="removeMessage(message)"><q-item-section avatar><q-icon name="delete"/></q-item-section><q-item-section>Eliminar</q-item-section></q-item></q-list></q-menu></q-btn>
                 <div v-if="message.eliminado" class="deleted-message"><q-icon name="block"/> Mensaje eliminado</div>
                 <template v-else><div v-if="message.archivo_url" class="attachment-wrap"><a :href="message.archivo_url" target="_blank" rel="noopener"><img :src="message.archivo_url" :alt="message.archivo_nombre||'Imagen adjunta'" class="chat-image"/></a></div><div v-if="message.mensaje" class="message-text">{{message.mensaje}}</div></template>
-                <div class="message-meta"><span v-if="message.editado_at">editado · </span>{{formatDateTime(message.created_at)}}<q-icon v-if="message.usuario?.rol!=='cliente'&&!message.eliminado" :name="statusIcon(message)" size="15px" :color="statusColor(message)" class="q-ml-xs"><q-tooltip>{{message.estado_envio}}</q-tooltip></q-icon></div>
+                <div class="message-meta"><span v-if="message.editado_at">editado · </span>{{formatDateTime(message.created_at)}}<q-icon v-if="!message.es_cliente_final&&!message.eliminado" :name="statusIcon(message)" size="15px" :color="statusColor(message)" class="q-ml-xs"><q-tooltip>{{message.estado_envio}}</q-tooltip></q-icon></div>
               </div>
             </div>
             <div v-if="presence.escribiendo" class="typing-bubble">Escribiendo<span>.</span><span>.</span><span>.</span></div>

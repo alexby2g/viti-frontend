@@ -1,12 +1,16 @@
 <script setup>
-import { onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
+import { useRouter } from 'vue-router'
 import { useQuasar } from 'quasar'
 import { api } from '../boot/axios'
 import PageHeader from '../components/PageHeader.vue'
 import RowActionsMenu from '../components/RowActionsMenu.vue'
 
 const $q = useQuasar()
-const rows = ref([])
+const router=useRouter()
+const allApps=ref([])
+const rows = computed(()=>allApps.value.filter(item=>item.catalogo?.clave!=='electrofrio'))
+const electroApps=computed(()=>allApps.value.filter(item=>item.catalogo?.clave==='electrofrio'&&item.estado==='activo'))
 const companies = ref([])
 const projects = ref([])
 const dialog = ref(false)
@@ -34,11 +38,12 @@ async function load(){
       api.get('/empresas',{params:{per_page:100}}),
       api.get('/proyectos',{params:{per_page:100}}),
     ])
-    rows.value=(a.data.data||[]).filter(item=>item.catalogo?.clave!=='electrofrio')
+    allApps.value=a.data.data||[]
     companies.value=e.data.data
     projects.value=p.data.data
   } finally { loading.value=false }
 }
+function openElectro(app){if(!app?.empresa_id)return;$q.localStorage.set('viti-empresa-id',String(app.empresa_id));router.push('/apps/electrofrio/inicio')}
 function open(row=null){editing.value=row;Object.assign(form,empty(),row||{});dialog.value=true}
 async function save(){try{editing.value?await api.put(`/aplicaciones/${editing.value.id}`,form):await api.post('/aplicaciones',form);$q.notify({type:'positive',message:editing.value?'Aplicación actualizada.':'Aplicación integrada.'});dialog.value=false;load()}catch(e){$q.notify({type:'negative',message:e.response?.data?.message||'No se pudo guardar.'})}}
 function remove(row){$q.dialog({title:'Retirar aplicación',message:`¿Retirar ${row.nombre}?`,cancel:true}).onOk(async()=>{try{await api.delete(`/aplicaciones/${row.id}`);load()}catch(e){$q.notify({type:'negative',message:e.response?.data?.message||'No se puede retirar.'})}})}
@@ -77,17 +82,17 @@ onMounted(load)
         <q-separator/>
         <q-card-actions align="right"><q-btn color="primary" unelevated no-caps icon-right="arrow_forward" label="Abrir aplicación" to="/apps/peluqueria"/></q-card-actions>
       </q-card>
-      <q-card flat class="viti-card native-app-card electrofrio-card">
+      <q-card v-for="app in electroApps" :key="app.id" flat class="viti-card native-app-card electrofrio-card">
         <q-card-section class="row items-start no-wrap q-gutter-md">
           <q-avatar size="56px" color="primary" text-color="white" icon="ac_unit"/>
           <div class="col">
             <div class="row items-center q-gutter-sm"><div class="text-h6 text-weight-bold">Electrofrío</div><q-badge color="positive" label="VITI App activa"/></div>
-            <div class="text-body2 text-grey-7 q-mt-xs">Citas, diagnóstico, propuestas, órdenes de servicio, equipos, materiales, pagos, garantías, historial y buzón VITI.</div>
-            <div class="text-caption text-grey-6 q-mt-sm">Datos aislados de Electrofrío · Sin WhatsApp</div>
+            <div class="text-body2 text-grey-7 q-mt-xs">{{app.empresa?.nombre_comercial}} · agenda, órdenes, clientes, equipos, técnicos, historial y mensajes propios.</div>
+            <div class="text-caption text-grey-6 q-mt-sm">Empresa dinámica · datos aislados por negocio</div>
           </div>
         </q-card-section>
         <q-separator/>
-        <q-card-actions align="right"><q-btn color="primary" unelevated no-caps icon-right="arrow_forward" label="Abrir Electrofrío" to="/apps/electrofrio/inicio"/></q-card-actions>
+        <q-card-actions align="right"><q-btn color="primary" unelevated no-caps icon-right="arrow_forward" label="Abrir Electrofrío" @click="openElectro(app)"/></q-card-actions>
       </q-card>
     </div>
 

@@ -2,6 +2,7 @@ import AuthLayout from '../layouts/AuthLayout.vue'
 import MainLayout from '../layouts/MainLayout.vue'
 import PeluqueriaClientLayout from '../layouts/PeluqueriaClientLayout.vue'
 import ElectrofrioLayout from '../layouts/ElectrofrioLayout.vue'
+import ElectrofrioCustomerLayout from '../layouts/ElectrofrioCustomerLayout.vue'
 
 const hairPage = () => import('../pages/ClientPeluqueriaWorkspacePage.vue')
 const electroPage = () => import('../pages/ElectrofrioWorkspacePage.vue')
@@ -13,6 +14,12 @@ export default [
   { path: '/solicitud', component: AuthLayout, children: [{ path: '', name: 'public-request-start', component: () => import('../pages/PublicSolicitudStartPage.vue') }] },
   { path: '/solicitar/:token', component: AuthLayout, children: [{ path: '', name: 'public-request', component: () => import('../pages/PublicSolicitudPage.vue') }] },
   { path: '/login', component: AuthLayout, children: [{ path: '', name: 'login', component: () => import('../pages/LoginPage.vue') }] },
+  { path:'/electrofrio/acceso',component:AuthLayout,children:[{path:'',name:'electro-customer-login',component:()=>import('../pages/ElectrofrioCustomerLoginPage.vue')}]},
+  { path:'/portal/electrofrio',component:ElectrofrioCustomerLayout,meta:{requiresAuth:true,electroCustomerOnly:true},children:[
+    {path:'',redirect:'/portal/electrofrio/inicio'},
+    {path:'inicio',name:'electro-customer-home',component:()=>import('../pages/ElectrofrioCustomerHomePage.vue'),meta:{requiresAuth:true,electroCustomerOnly:true}},
+    {path:'mensajes',name:'electro-customer-messages',component:()=>import('../pages/ClientMessagesPage.vue'),meta:{requiresAuth:true,electroCustomerOnly:true,chatContext:'electrofrio',customerPortal:true}},
+  ]},
   {
     path: '/mi-apps/peluqueria', component: PeluqueriaClientLayout, meta: { requiresAuth:true, clientOnly:true, appShell:'peluqueria' }, children: [
       { path:'', redirect:'/mi-apps/peluqueria/inicio' },
@@ -36,13 +43,13 @@ export default [
       {path:'agenda',name:'electro-client-agenda',component:electroPage,meta:{requiresAuth:true,clientOnly:true,appShell:'electrofrio',electroSection:'agenda'}},
       {path:'ordenes',name:'electro-client-orders',component:electroPage,meta:{requiresAuth:true,clientOnly:true,appShell:'electrofrio',electroSection:'ordenes'}},
       {path:'clientes',name:'electro-client-clients',component:electroPage,meta:{requiresAuth:true,clientOnly:true,appShell:'electrofrio',electroSection:'clientes'}},
-      {path:'equipos',name:'electro-client-equipment',component:electroPage,meta:{requiresAuth:true,clientOnly:true,appShell:'electrofrio',electroSection:'equipos'}},
+      {path:'equipos',redirect:'/mi-apps/electrofrio/clientes'},
       {path:'tecnicos',name:'electro-client-technicians',component:electroPage,meta:{requiresAuth:true,clientOnly:true,appShell:'electrofrio',electroSection:'tecnicos'}},
       {path:'inventario',name:'electro-client-inventory',component:electroPage,meta:{requiresAuth:true,clientOnly:true,appShell:'electrofrio',electroSection:'inventario'}},
       {path:'pagos',name:'electro-client-payments',component:electroPage,meta:{requiresAuth:true,clientOnly:true,appShell:'electrofrio',electroSection:'pagos'}},
       {path:'garantias',name:'electro-client-warranties',component:electroPage,meta:{requiresAuth:true,clientOnly:true,appShell:'electrofrio',electroSection:'garantias'}},
       {path:'historial',name:'electro-client-history',component:electroPage,meta:{requiresAuth:true,clientOnly:true,appShell:'electrofrio',electroSection:'historial'}},
-      {path:'buzon',name:'electro-client-inbox',component:()=>import('../pages/ClientMessagesPage.vue'),meta:{requiresAuth:true,clientOnly:true,appShell:'electrofrio',chatContext:'electrofrio'}},
+      {path:'buzon',name:'electro-client-inbox',component:()=>import('../pages/BuzonPage.vue'),meta:{requiresAuth:true,clientOnly:true,appShell:'electrofrio',chatContext:'electrofrio'}},
     ],
   },
   { path:'/mi-aplicaciones/electrofrio', redirect:'/mi-apps/electrofrio/inicio' },
@@ -53,7 +60,7 @@ export default [
       {path:'agenda',name:'electro-agenda',component:electroPage,meta:{requiresAuth:true,adminOnly:true,appShell:'electrofrio',electroSection:'agenda'}},
       {path:'ordenes',name:'electro-orders',component:electroPage,meta:{requiresAuth:true,adminOnly:true,appShell:'electrofrio',electroSection:'ordenes'}},
       {path:'clientes',name:'electro-clients',component:electroPage,meta:{requiresAuth:true,adminOnly:true,appShell:'electrofrio',electroSection:'clientes'}},
-      {path:'equipos',name:'electro-equipment',component:electroPage,meta:{requiresAuth:true,adminOnly:true,appShell:'electrofrio',electroSection:'equipos'}},
+      {path:'equipos',redirect:'/apps/electrofrio/clientes'},
       {path:'tecnicos',name:'electro-technicians',component:electroPage,meta:{requiresAuth:true,adminOnly:true,appShell:'electrofrio',electroSection:'tecnicos'}},
       {path:'inventario',name:'electro-inventory',component:electroPage,meta:{requiresAuth:true,adminOnly:true,appShell:'electrofrio',electroSection:'inventario'}},
       {path:'pagos',name:'electro-payments',component:electroPage,meta:{requiresAuth:true,adminOnly:true,appShell:'electrofrio',electroSection:'pagos'}},
