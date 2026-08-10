@@ -1,6 +1,12 @@
 import { boot } from 'quasar/wrappers'
 
 export default boot(() => {
+  // Este puente existe únicamente para mouse/trackpad de escritorio.
+  // En pantallas táctiles dejamos que el navegador gestione el gesto vertical
+  // de forma nativa para no interferir con el scroll del teléfono.
+  const desktopPointer = window.matchMedia?.('(hover: hover) and (pointer: fine)')
+  if (!desktopPointer?.matches) return
+
   const selector = '.viti-table .q-table__middle, .sv-table .q-table__middle'
 
   const targetElement = (event) => event.target instanceof Element ? event.target : null
