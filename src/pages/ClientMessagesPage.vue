@@ -132,8 +132,17 @@ async function send(){
   if(!navigator.onLine){if(attachment.value)return $q.notify({type:'warning',message:'Conéctate a Internet para enviar una fotografía. El texto sí puede quedar pendiente.'});return queueReply(message)}
   sending.value=true
   try{
-    const payload=new FormData();if(message)payload.append('mensaje',message);if(attachment.value)payload.append('archivo',attachment.value);payload.append('client_request_id',requestId())
-    await api.post(`${apiBase.value}/${current.value.id}/mensajes`,payload,{headers:{'Content-Type':'multipart/form-data'}})
+    const url=`${apiBase.value}/${current.value.id}/mensajes`
+    const clientRequestId=requestId()
+    if(attachment.value){
+      const payload=new FormData()
+      if(message)payload.append('mensaje',message)
+      payload.append('archivo',attachment.value)
+      payload.append('client_request_id',clientRequestId)
+      await api.post(url,payload)
+    }else{
+      await api.post(url,{mensaje:message,client_request_id:clientRequestId})
+    }
     reply.value='';clearAttachment();await loadCurrent()
   }catch(error){if(networkFailure(error)&&!attachment.value)return queueReply(message);$q.notify({type:'negative',message:error.response?.data?.message||'No se pudo enviar el mensaje.'})}
   finally{sending.value=false}
@@ -206,7 +215,7 @@ onBeforeUnmount(()=>{window.removeEventListener('online',flushPending);window.re
 
         <div v-if="attachmentPreview" class="attachment-preview q-px-md q-pt-sm"><img :src="attachmentPreview" alt="Vista previa"/><div class="col"><div class="text-weight-medium">{{attachment?.name}}</div><div class="text-caption text-grey-6">Se enviará solo a esta conversación.</div></div><q-btn flat round icon="close" :disable="sending" @click="clearAttachment"/></div>
         <q-separator/>
-        <q-card-section class="composer"><input ref="fileInput" type="file" accept="image/jpeg,image/png,image/webp" hidden @change="onAttachment"/><q-btn round flat color="primary" icon="add_photo_alternate" class="composer-action" :disable="sending" @click="chooseAttachment"><q-tooltip>Enviar foto o captura</q-tooltip></q-btn><q-input v-model="reply" class="message-input" rounded outlined autogrow placeholder="Escribe un mensaje..." :disable="sending" @keyup.ctrl.enter="send"/><q-btn color="primary" unelevated round icon="send" class="composer-action send-action" :loading="sending" :disable="(!reply.trim()&&!attachment)||sending" @click="send"><q-tooltip>Enviar</q-tooltip></q-btn></q-card-section>
+        <q-card-section class="composer"><input ref="fileInput" type="file" accept="image/jpeg,image/png,image/webp" hidden @change="onAttachment"/><q-btn round flat color="primary" icon="add_photo_alternate" class="composer-action" :disable="sending" @click="chooseAttachment"><q-tooltip>Enviar foto o captura</q-tooltip></q-btn><q-input v-model="reply" class="message-input" rounded outlined autogrow placeholder="Escribe un mensaje..." :disable="sending" @keydown.enter.exact.prevent="send"><q-tooltip>Enter envía · Shift + Enter crea una línea nueva</q-tooltip></q-input><q-btn color="primary" unelevated round icon="send" class="composer-action send-action" :loading="sending" :disable="(!reply.trim()&&!attachment)||sending" @click="send"><q-tooltip>Enviar mensaje</q-tooltip></q-btn></q-card-section>
       </q-card>
     </div>
 
