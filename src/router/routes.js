@@ -1,8 +1,10 @@
 import AuthLayout from '../layouts/AuthLayout.vue'
 import MainLayout from '../layouts/MainLayout.vue'
 import PeluqueriaClientLayout from '../layouts/PeluqueriaClientLayout.vue'
+import ElectrofrioLayout from '../layouts/ElectrofrioLayout.vue'
 
 const hairPage = () => import('../pages/ClientPeluqueriaWorkspacePage.vue')
+const electroPage = () => import('../pages/ElectrofrioWorkspacePage.vue')
 
 export default [
   { path: '/configuracion-inicial', component: AuthLayout, children: [{ path: '', name: 'setup', component: () => import('../pages/SetupPage.vue') }] },
@@ -27,6 +29,22 @@ export default [
     ],
   },
   { path:'/mi-aplicaciones/peluqueria', redirect:'/mi-apps/peluqueria/inicio' },
+  {
+    path:'/apps/electrofrio', component:ElectrofrioLayout, meta:{requiresAuth:true,adminOnly:true,appShell:'electrofrio'}, children:[
+      {path:'',redirect:'/apps/electrofrio/inicio'},
+      {path:'inicio',name:'electro-home',component:electroPage,meta:{requiresAuth:true,adminOnly:true,appShell:'electrofrio',electroSection:'inicio'}},
+      {path:'agenda',name:'electro-agenda',component:electroPage,meta:{requiresAuth:true,adminOnly:true,appShell:'electrofrio',electroSection:'agenda'}},
+      {path:'ordenes',name:'electro-orders',component:electroPage,meta:{requiresAuth:true,adminOnly:true,appShell:'electrofrio',electroSection:'ordenes'}},
+      {path:'clientes',name:'electro-clients',component:electroPage,meta:{requiresAuth:true,adminOnly:true,appShell:'electrofrio',electroSection:'clientes'}},
+      {path:'equipos',name:'electro-equipment',component:electroPage,meta:{requiresAuth:true,adminOnly:true,appShell:'electrofrio',electroSection:'equipos'}},
+      {path:'tecnicos',name:'electro-technicians',component:electroPage,meta:{requiresAuth:true,adminOnly:true,appShell:'electrofrio',electroSection:'tecnicos'}},
+      {path:'inventario',name:'electro-inventory',component:electroPage,meta:{requiresAuth:true,adminOnly:true,appShell:'electrofrio',electroSection:'inventario'}},
+      {path:'pagos',name:'electro-payments',component:electroPage,meta:{requiresAuth:true,adminOnly:true,appShell:'electrofrio',electroSection:'pagos'}},
+      {path:'garantias',name:'electro-warranties',component:electroPage,meta:{requiresAuth:true,adminOnly:true,appShell:'electrofrio',electroSection:'garantias'}},
+      {path:'historial',name:'electro-history',component:electroPage,meta:{requiresAuth:true,adminOnly:true,appShell:'electrofrio',electroSection:'historial'}},
+      {path:'buzon',name:'electro-inbox',component:()=>import('../pages/BuzonPage.vue'),meta:{requiresAuth:true,adminOnly:true,appShell:'electrofrio'}},
+    ],
+  },
   {
     path: '/', component: MainLayout, meta: { requiresAuth: true }, children: [
       { path: '', name: 'dashboard', component: () => import('../pages/DashboardPage.vue'), meta:{adminOnly:true} },
