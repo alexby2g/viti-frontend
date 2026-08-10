@@ -1,6 +1,7 @@
 import AuthLayout from '../layouts/AuthLayout.vue'
 import MainLayout from '../layouts/MainLayout.vue'
 import PeluqueriaClientLayout from '../layouts/PeluqueriaClientLayout.vue'
+import PeluqueriaAdminLayout from '../layouts/PeluqueriaAdminLayout.vue'
 import ElectrofrioLayout from '../layouts/ElectrofrioLayout.vue'
 import ElectrofrioCustomerLayout from '../layouts/ElectrofrioCustomerLayout.vue'
 
@@ -36,6 +37,11 @@ export default [
     ],
   },
   { path:'/mi-aplicaciones/peluqueria', redirect:'/mi-apps/peluqueria/inicio' },
+  {
+    path:'/apps/peluqueria', component:PeluqueriaAdminLayout, meta:{requiresAuth:true,adminOnly:true,appShell:'peluqueria-admin'}, children:[
+      {path:'',name:'app-peluqueria',component:()=>import('../pages/PeluqueriaPage.vue'),meta:{requiresAuth:true,adminOnly:true,appShell:'peluqueria-admin'}},
+    ],
+  },
   {
     path:'/mi-apps/electrofrio', component:ElectrofrioLayout, meta:{requiresAuth:true,clientOnly:true,appShell:'electrofrio'}, children:[
       {path:'',redirect:'/mi-apps/electrofrio/inicio'},
@@ -88,7 +94,6 @@ export default [
       { path: 'aplicaciones', name: 'aplicaciones', component: () => import('../pages/AplicacionesPage.vue'), meta:{adminOnly:true} },
       { path: 'apps/externa/:id', name: 'external-app', component: () => import('../pages/ExternalAppPage.vue') },
       { path: 'saas', name: 'saas', component: () => import('../pages/SaasPage.vue'), meta:{adminOnly:true,superAdminOnly:true} },
-      { path: 'apps/peluqueria', name: 'app-peluqueria', component: () => import('../pages/PeluqueriaPage.vue'), meta:{adminOnly:true} },
       { path: 'pagos', name: 'billing', component: () => import('../pages/BillingPage.vue'), meta:{adminOnly:true,superAdminOnly:true} },
       { path: 'mantenimientos', name: 'mantenimientos', component: () => import('../pages/MantenimientosPage.vue'), meta:{adminOnly:true} },
       { path: 'archivos', name: 'archivos', component: () => import('../pages/ArchivosPage.vue'), meta:{adminOnly:true} },
