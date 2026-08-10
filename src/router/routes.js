@@ -30,6 +30,23 @@ export default [
   },
   { path:'/mi-aplicaciones/peluqueria', redirect:'/mi-apps/peluqueria/inicio' },
   {
+    path:'/mi-apps/electrofrio', component:ElectrofrioLayout, meta:{requiresAuth:true,clientOnly:true,appShell:'electrofrio'}, children:[
+      {path:'',redirect:'/mi-apps/electrofrio/inicio'},
+      {path:'inicio',name:'electro-client-home',component:electroPage,meta:{requiresAuth:true,clientOnly:true,appShell:'electrofrio',electroSection:'inicio'}},
+      {path:'agenda',name:'electro-client-agenda',component:electroPage,meta:{requiresAuth:true,clientOnly:true,appShell:'electrofrio',electroSection:'agenda'}},
+      {path:'ordenes',name:'electro-client-orders',component:electroPage,meta:{requiresAuth:true,clientOnly:true,appShell:'electrofrio',electroSection:'ordenes'}},
+      {path:'clientes',name:'electro-client-clients',component:electroPage,meta:{requiresAuth:true,clientOnly:true,appShell:'electrofrio',electroSection:'clientes'}},
+      {path:'equipos',name:'electro-client-equipment',component:electroPage,meta:{requiresAuth:true,clientOnly:true,appShell:'electrofrio',electroSection:'equipos'}},
+      {path:'tecnicos',name:'electro-client-technicians',component:electroPage,meta:{requiresAuth:true,clientOnly:true,appShell:'electrofrio',electroSection:'tecnicos'}},
+      {path:'inventario',name:'electro-client-inventory',component:electroPage,meta:{requiresAuth:true,clientOnly:true,appShell:'electrofrio',electroSection:'inventario'}},
+      {path:'pagos',name:'electro-client-payments',component:electroPage,meta:{requiresAuth:true,clientOnly:true,appShell:'electrofrio',electroSection:'pagos'}},
+      {path:'garantias',name:'electro-client-warranties',component:electroPage,meta:{requiresAuth:true,clientOnly:true,appShell:'electrofrio',electroSection:'garantias'}},
+      {path:'historial',name:'electro-client-history',component:electroPage,meta:{requiresAuth:true,clientOnly:true,appShell:'electrofrio',electroSection:'historial'}},
+      {path:'buzon',name:'electro-client-inbox',component:()=>import('../pages/ClientMessagesPage.vue'),meta:{requiresAuth:true,clientOnly:true,appShell:'electrofrio'}},
+    ],
+  },
+  { path:'/mi-aplicaciones/electrofrio', redirect:'/mi-apps/electrofrio/inicio' },
+  {
     path:'/apps/electrofrio', component:ElectrofrioLayout, meta:{requiresAuth:true,adminOnly:true,appShell:'electrofrio'}, children:[
       {path:'',redirect:'/apps/electrofrio/inicio'},
       {path:'inicio',name:'electro-home',component:electroPage,meta:{requiresAuth:true,adminOnly:true,appShell:'electrofrio',electroSection:'inicio'}},
