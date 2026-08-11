@@ -17,6 +17,12 @@ const qrPreview=ref('')
 const uploadingQr=ref(false)
 const qrFailed=ref(false)
 
+const proofDialog=ref(false)
+const proofRow=ref(null)
+const proofObjectUrl=ref('')
+const proofMime=ref('')
+const proofLoading=ref(false)
+
 const agreement=reactive({precio_acordado:0,anticipo_monto:0,observaciones:''})
 const projectPayment=reactive({tipo:'anticipo',monto:0,metodo:'qr',fecha_pago:'',referencia:'',observaciones:'',pagador_usuario_id:null})
 const subscription=reactive({plan:'VITI',monto:35,frecuencia:'mensual',fecha_inicio:'',fecha_vencimiento:'',dias_prueba:14,dias_gracia:7,estado:'activa'})
@@ -31,6 +37,7 @@ const statusColor=value=>({pagado:'positive',pendiente_saldo:'orange',pendiente_
 const reviewLabel=value=>({pendiente_revision:'Pendiente de revisión',confirmado:'Confirmado',rechazado:'Rechazado'}[value]||pretty(value))
 const qrSrc=computed(()=>qrPreview.value||(data.value.configuracion?.qr_url&&!qrFailed.value?data.value.configuracion.qr_url:'/viti-payment-qr.png'))
 const payerOptions=computed(()=>(current.value?.cuentas_empresa||[]).map(account=>({label:`${account.nombre}${account.rol_negocio?` · ${pretty(account.rol_negocio)}`:''}`,value:account.id})))
+const proofIsPdf=computed(()=>proofMime.value.includes('pdf')||String(proofRow.value?.payment?.comprobante_nombre||'').toLowerCase().endsWith('.pdf'))
 const clientProofs=computed(()=>{
   const rows=[]
   for(const project of data.value.proyectos||[]){
@@ -61,6 +68,11 @@ const subscriptionColumns=[
   {name:'estado',label:'Estado',field:'estado',align:'left'},
   {name:'acciones',label:'',field:'id',align:'right'},
 ]
+
+function formatDateTime(value){if(!value)return '—';const date=new Date(value);return Number.isNaN(date.getTime())?String(value):date.toLocaleString('es-BO',{dateStyle:'medium',timeStyle:'short'})}
+function payerName(row){const p=row?.payment?.pagador;if(p)return `${p.nombre||''} ${p.apellido||''}`.trim();return row?.reference?.cliente?.nombre||'Cuenta de la empresa'}
+function payerPhone(row){return row?.payment?.pagador?.telefono||row?.reference?.cliente?.telefono||'—'}
+function reviewerName(row){const r=row?.payment?.revisor;return r?`${r.nombre||''} ${r.apellido||''}`.trim():'—'}
 
 async function load(){
   loading.value=true
@@ -108,15 +120,26 @@ async function saveDialog(){
   }catch(e){$q.notify({type:'negative',message:e.response?.data?.message||Object.values(e.response?.data?.errors||{}).flat()[0]||'No se pudo guardar.'})}
 }
 function proofUrl(row){return row.kind==='subscription'?`/pagos/suscripcion-pagos/${row.payment.id}/comprobante`:`/pagos/proyecto-pagos/${row.payment.id}/comprobante`}
-async function openProof(row){try{await downloadFile(proofUrl(row),row.payment.comprobante_nombre||'comprobante')}catch(e){$q.notify({type:'negative',message:e.response?.data?.message||'No se pudo abrir el comprobante.'})}}
+function releaseProofObjectUrl(){if(proofObjectUrl.value){URL.revokeObjectURL(proofObjectUrl.value);proofObjectUrl.value=''}}
+function closeProof(){releaseProofObjectUrl();proofDialog.value=false;proofRow.value=null;proofMime.value='';proofLoading.value=false}
+async function openProof(row){
+  releaseProofObjectUrl();proofRow.value=row;proofDialog.value=true;proofLoading.value=true;proofMime.value=row.payment.comprobante_mime||''
+  try{
+    const response=await api.get(proofUrl(row),{responseType:'blob'})
+    proofMime.value=response.data?.type||row.payment.comprobante_mime||''
+    proofObjectUrl.value=URL.createObjectURL(response.data)
+  }catch(e){closeProof();$q.notify({type:'negative',message:e.response?.data?.message||'No se pudo abrir el comprobante.'})}
+  finally{proofLoading.value=false}
+}
+async function downloadProof(row=proofRow.value){if(!row)return;try{await downloadFile(proofUrl(row),row.payment.comprobante_nombre||'comprobante')}catch(e){$q.notify({type:'negative',message:e.response?.data?.message||'No se pudo descargar el comprobante.'})}}
 function confirmProof(row){
   $q.dialog({title:'Confirmar pago',message:`¿Confirmar ${money(row.payment.monto)} de ${row.empresa?.nombre_comercial||'esta empresa'}? El importe se aplicará al saldo.`,cancel:true,persistent:true}).onOk(async()=>{
-    try{const url=row.kind==='subscription'?`/pagos/suscripcion-pagos/${row.payment.id}/confirmar`:`/pagos/proyecto-pagos/${row.payment.id}/confirmar`;const r=await api.post(url);$q.notify({type:'positive',message:r.data?.message||'Pago confirmado.'});await load()}catch(e){$q.notify({type:'negative',message:e.response?.data?.message||'No se pudo confirmar.'})}
+    try{const url=row.kind==='subscription'?`/pagos/suscripcion-pagos/${row.payment.id}/confirmar`:`/pagos/proyecto-pagos/${row.payment.id}/confirmar`;const r=await api.post(url);closeProof();$q.notify({type:'positive',message:r.data?.message||'Pago confirmado.'});await load()}catch(e){$q.notify({type:'negative',message:e.response?.data?.message||'No se pudo confirmar.'})}
   })
 }
 function rejectProof(row){
   $q.dialog({title:'Rechazar comprobante',message:'Indica por qué no se puede confirmar este pago.',prompt:{model:'',type:'textarea',isValid:v=>String(v||'').trim().length>=5},cancel:true,persistent:true}).onOk(async motivo=>{
-    try{const url=row.kind==='subscription'?`/pagos/suscripcion-pagos/${row.payment.id}/rechazar`:`/pagos/proyecto-pagos/${row.payment.id}/rechazar`;const r=await api.post(url,{motivo});$q.notify({type:'positive',message:r.data?.message||'Comprobante rechazado.'});await load()}catch(e){$q.notify({type:'negative',message:e.response?.data?.message||'No se pudo rechazar.'})}
+    try{const url=row.kind==='subscription'?`/pagos/suscripcion-pagos/${row.payment.id}/rechazar`:`/pagos/proyecto-pagos/${row.payment.id}/rechazar`;const r=await api.post(url,{motivo});closeProof();$q.notify({type:'positive',message:r.data?.message||'Comprobante rechazado.'});await load()}catch(e){$q.notify({type:'negative',message:e.response?.data?.message||'No se pudo rechazar.'})}
   })
 }
 async function saveConfig(){try{const response=await api.put('/pagos/configuracion',configForm);data.value.configuracion=response.data.data;$q.notify({type:'positive',message:'Datos de cobro actualizados.'})}catch(e){$q.notify({type:'negative',message:e.response?.data?.message||'No se pudo actualizar.'})}}
@@ -130,7 +153,7 @@ async function uploadQr(){
 }
 
 onMounted(load)
-onBeforeUnmount(()=>{if(qrPreview.value)URL.revokeObjectURL(qrPreview.value)})
+onBeforeUnmount(()=>{if(qrPreview.value)URL.revokeObjectURL(qrPreview.value);releaseProofObjectUrl()})
 </script>
 
 <template>
@@ -154,12 +177,12 @@ onBeforeUnmount(()=>{if(qrPreview.value)URL.revokeObjectURL(qrPreview.value)})
 
   <q-tab-panels v-model="tab" animated class="transparent">
     <q-tab-panel name="comprobantes" class="q-pa-none">
-      <q-card flat class="viti-card"><q-card-section><div class="text-h6 text-weight-bold">Comprobantes enviados por clientes</div><div class="text-caption text-grey-6">Un comprobante pendiente no modifica el saldo hasta que lo confirmes.</div></q-card-section><q-separator/>
+      <q-card flat class="viti-card"><q-card-section><div class="text-h6 text-weight-bold">Comprobantes enviados por clientes</div><div class="text-caption text-grey-6">Revísalos dentro de VITI. Descargar queda como acción secundaria.</div></q-card-section><q-separator/>
         <q-list v-if="clientProofs.length" separator>
           <q-item v-for="row in clientProofs" :key="`${row.kind}-${row.payment.id}`" class="q-py-md">
             <q-item-section avatar><q-avatar :color="row.payment.estado_revision==='confirmado'?'green-1':row.payment.estado_revision==='rechazado'?'red-1':'orange-1'" :text-color="statusColor(row.payment.estado_revision)" :icon="row.kind==='subscription'?'autorenew':'payments'"/></q-item-section>
-            <q-item-section><q-item-label class="text-weight-bold">{{row.empresa?.nombre_comercial}} · {{row.concepto}}</q-item-label><q-item-label>{{money(row.payment.monto)}} · {{pretty(row.payment.metodo)}} · {{row.payment.fecha_pago}}</q-item-label><q-item-label caption>Enviado por {{row.payment.pagador?`${row.payment.pagador.nombre} ${row.payment.pagador.apellido||''}`:'cuenta del cliente'}}<span v-if="row.payment.referencia"> · Ref. {{row.payment.referencia}}</span></q-item-label><q-item-label v-if="row.payment.motivo_revision" caption class="text-negative">Motivo: {{row.payment.motivo_revision}}</q-item-label></q-item-section>
-            <q-item-section side><div class="column items-end q-gutter-sm"><q-badge :color="statusColor(row.payment.estado_revision)">{{reviewLabel(row.payment.estado_revision)}}</q-badge><q-btn v-if="row.payment.comprobante_path" outline dense no-caps color="primary" icon="receipt_long" label="Ver comprobante" @click="openProof(row)"/><div v-if="row.payment.estado_revision==='pendiente_revision'" class="row q-gutter-xs"><q-btn dense unelevated no-caps color="positive" icon="check" label="Confirmar" @click="confirmProof(row)"/><q-btn dense outline no-caps color="negative" icon="close" label="Rechazar" @click="rejectProof(row)"/></div></div></q-item-section>
+            <q-item-section><q-item-label class="text-weight-bold">{{row.empresa?.nombre_comercial}} · {{row.concepto}}</q-item-label><q-item-label>{{money(row.payment.monto)}} · {{pretty(row.payment.metodo)}} · {{row.payment.fecha_pago}}</q-item-label><q-item-label caption>Enviado por {{payerName(row)}}<span v-if="row.payment.referencia"> · Ref. {{row.payment.referencia}}</span></q-item-label><q-item-label v-if="row.payment.motivo_revision" caption class="text-negative">Motivo: {{row.payment.motivo_revision}}</q-item-label></q-item-section>
+            <q-item-section side><div class="column items-end q-gutter-sm"><q-badge :color="statusColor(row.payment.estado_revision)">{{reviewLabel(row.payment.estado_revision)}}</q-badge><q-btn v-if="row.payment.comprobante_path" outline dense no-caps color="primary" icon="visibility" label="Revisar" @click="openProof(row)"/><div v-if="row.payment.estado_revision==='pendiente_revision'" class="row q-gutter-xs"><q-btn dense unelevated no-caps color="positive" icon="check" label="Confirmar" @click="confirmProof(row)"/><q-btn dense outline no-caps color="negative" icon="close" label="Rechazar" @click="rejectProof(row)"/></div></div></q-item-section>
           </q-item>
         </q-list>
         <div v-else class="empty-state">Todavía no hay comprobantes enviados por clientes.</div>
@@ -201,9 +224,56 @@ onBeforeUnmount(()=>{if(qrPreview.value)URL.revokeObjectURL(qrPreview.value)})
       <div v-else class="row q-col-gutter-md"><div class="col-12"><q-banner rounded class="bg-blue-1 text-primary">Este pago se registra como confirmado inmediatamente.</q-banner></div><div class="col-12 col-sm-6"><q-input v-model.number="subscriptionPayment.monto" outlined type="number" label="Monto (Bs)"/></div><div class="col-12 col-sm-6"><q-select v-model="subscriptionPayment.metodo" outlined :options="paymentMethods" emit-value map-options label="Método"/></div><div class="col-12 col-sm-6"><q-input v-model="subscriptionPayment.fecha_pago" outlined type="date" label="Fecha" stack-label/></div><div class="col-12 col-sm-6"><q-input v-model="subscriptionPayment.referencia" outlined label="Referencia"/></div><div v-if="payerOptions.length" class="col-12"><q-select v-model="subscriptionPayment.pagador_usuario_id" outlined clearable :options="payerOptions" emit-value map-options label="Cuenta asociada al pago (opcional)"/></div><div class="col-12"><q-input v-model="subscriptionPayment.observaciones" outlined type="textarea" label="Observaciones"/></div></div>
     </q-card-section><q-card-actions align="right"><q-btn flat no-caps label="Cancelar" v-close-popup/><q-btn color="primary" unelevated no-caps label="Guardar" @click="saveDialog"/></q-card-actions></q-card>
   </q-dialog>
+
+  <q-dialog :model-value="proofDialog" maximized transition-show="slide-up" transition-hide="slide-down" @hide="closeProof">
+    <q-card class="proof-card">
+      <q-toolbar class="proof-toolbar">
+        <q-btn flat round dense icon="close" @click="closeProof"/>
+        <q-toolbar-title><div class="text-weight-bold">Revisión de comprobante</div><div class="text-caption">{{proofRow?.empresa?.nombre_comercial}} · {{proofRow?.concepto}}</div></q-toolbar-title>
+        <q-badge v-if="proofRow" :color="statusColor(proofRow.payment.estado_revision)" class="q-mr-sm">{{reviewLabel(proofRow.payment.estado_revision)}}</q-badge>
+        <q-btn flat no-caps icon="download" label="Descargar" :disable="!proofObjectUrl" @click="downloadProof()"/>
+      </q-toolbar>
+      <q-separator/>
+      <div v-if="proofRow" class="proof-layout">
+        <section class="proof-preview">
+          <q-inner-loading :showing="proofLoading"><q-spinner size="42px" color="primary"/></q-inner-loading>
+          <iframe v-if="proofObjectUrl&&proofIsPdf" :src="proofObjectUrl" title="Comprobante PDF" class="proof-pdf"/>
+          <img v-else-if="proofObjectUrl" :src="proofObjectUrl" alt="Comprobante de pago" class="proof-image"/>
+          <div v-else-if="!proofLoading" class="empty-state">No se pudo cargar la vista previa.</div>
+        </section>
+        <aside class="proof-details">
+          <div class="section-label">Presentación del pago</div>
+          <div class="text-h5 text-weight-bold q-mt-xs">{{money(proofRow.payment.monto)}}</div>
+          <div class="text-body2 text-grey-6 q-mt-xs">{{proofRow.concepto}}</div>
+          <q-separator class="q-my-lg"/>
+          <div class="detail-block"><div class="detail-label">Empresa</div><div class="detail-value">{{proofRow.empresa?.nombre_comercial||'—'}}</div></div>
+          <div class="detail-block"><div class="detail-label">Persona que envió</div><div class="detail-value">{{payerName(proofRow)}}</div><div class="detail-caption">{{payerPhone(proofRow)}}<span v-if="proofRow.payment.pagador?.usuario"> · @{{proofRow.payment.pagador.usuario}}</span></div></div>
+          <div class="detail-grid">
+            <div class="detail-block"><div class="detail-label">Método</div><div class="detail-value">{{pretty(proofRow.payment.metodo)}}</div></div>
+            <div class="detail-block"><div class="detail-label">Fecha del pago</div><div class="detail-value">{{proofRow.payment.fecha_pago||'—'}}</div></div>
+            <div class="detail-block"><div class="detail-label">Referencia</div><div class="detail-value">{{proofRow.payment.referencia||'—'}}</div></div>
+            <div class="detail-block"><div class="detail-label">Enviado</div><div class="detail-value">{{formatDateTime(proofRow.payment.enviado_at||proofRow.payment.created_at)}}</div></div>
+          </div>
+          <div v-if="proofRow.payment.observaciones" class="detail-block"><div class="detail-label">Observaciones</div><div class="detail-value">{{proofRow.payment.observaciones}}</div></div>
+          <q-separator class="q-my-lg"/>
+          <div class="detail-block"><div class="detail-label">Estado</div><q-badge :color="statusColor(proofRow.payment.estado_revision)">{{reviewLabel(proofRow.payment.estado_revision)}}</q-badge></div>
+          <div v-if="proofRow.payment.revisado_at" class="detail-block"><div class="detail-label">Revisado por</div><div class="detail-value">{{reviewerName(proofRow)}}</div><div class="detail-caption">{{formatDateTime(proofRow.payment.revisado_at)}}</div></div>
+          <div v-if="proofRow.payment.motivo_revision" class="detail-block"><div class="detail-label text-negative">Motivo de revisión</div><div class="detail-value text-negative">{{proofRow.payment.motivo_revision}}</div></div>
+          <div class="detail-block"><div class="detail-label">Archivo</div><div class="detail-value ellipsis">{{proofRow.payment.comprobante_nombre||'Comprobante'}}</div></div>
+          <div v-if="proofRow.payment.estado_revision==='pendiente_revision'" class="row q-col-gutter-sm q-mt-lg">
+            <div class="col-6"><q-btn class="full-width" unelevated color="positive" icon="check" label="Confirmar" no-caps @click="confirmProof(proofRow)"/></div>
+            <div class="col-6"><q-btn class="full-width" outline color="negative" icon="close" label="Rechazar" no-caps @click="rejectProof(proofRow)"/></div>
+          </div>
+        </aside>
+      </div>
+    </q-card>
+  </q-dialog>
 </q-page>
 </template>
 
 <style scoped>
 .qr-card{overflow:hidden}.qr-stage{display:flex;align-items:center;justify-content:center;min-height:320px;padding:18px;border:1px dashed var(--viti-border);border-radius:16px;background:#fff}.qr-img{display:block;width:min(100%,390px);height:auto;max-height:420px;object-fit:contain;background:#fff}.empty-state{text-align:center;padding:36px;color:var(--viti-muted)}
+.proof-card{min-height:100vh;background:var(--viti-bg);color:var(--viti-text)}.proof-toolbar{min-height:68px;background:var(--viti-card)}.proof-layout{display:grid;grid-template-columns:minmax(0,1fr) 390px;min-height:calc(100vh - 69px)}.proof-preview{position:relative;display:flex;align-items:center;justify-content:center;min-height:640px;padding:28px;background:#0b0b0d}.proof-image{display:block;max-width:100%;max-height:calc(100vh - 126px);object-fit:contain;border-radius:10px;background:#fff}.proof-pdf{width:100%;height:calc(100vh - 126px);border:0;border-radius:10px;background:#fff}.proof-details{padding:28px;background:var(--viti-card);border-left:1px solid var(--viti-border);overflow:auto}.detail-block{margin-bottom:18px}.detail-label{font-size:11px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--viti-muted);margin-bottom:4px}.detail-value{font-weight:650;overflow-wrap:anywhere}.detail-caption{font-size:12px;color:var(--viti-muted);margin-top:2px}.detail-grid{display:grid;grid-template-columns:1fr 1fr;gap:4px 18px}
+@media(max-width:900px){.proof-layout{grid-template-columns:1fr}.proof-preview{min-height:55vh;padding:14px}.proof-image{max-height:52vh}.proof-pdf{height:55vh}.proof-details{border-left:0;border-top:1px solid var(--viti-border);padding:20px}.proof-toolbar .q-toolbar__title{font-size:16px}.detail-grid{grid-template-columns:1fr 1fr}}
+@media(max-width:600px){.proof-toolbar{padding:0 6px}.proof-toolbar .q-btn .q-btn__content .block{display:none}.proof-preview{min-height:48vh}.proof-pdf{height:48vh}.detail-grid{grid-template-columns:1fr}}
 </style>
