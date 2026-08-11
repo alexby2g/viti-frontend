@@ -1,6 +1,6 @@
 <script setup>
-import { computed, ref } from 'vue'
-import { useQuasar } from 'quasar'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { Dark, useQuasar } from 'quasar'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
 import AppBrand from '../components/AppBrand.vue'
@@ -11,7 +11,10 @@ const items=[
   {label:'Mi trabajo',icon:'support_agent',to:'/soporte'},
   {label:'Mensajes asignados',icon:'forum',to:'/soporte/buzon'},
 ]
+function toggleDark(){Dark.toggle();localStorage.setItem('viti-theme',Dark.isActive?'dark':'light')}
 async function logout(){await auth.logout();router.replace('/login')}
+onMounted(()=>document.body.classList.add('viti-main-active'))
+onBeforeUnmount(()=>document.body.classList.remove('viti-main-active'))
 </script>
 
 <template>
@@ -21,7 +24,7 @@ async function logout(){await auth.logout();router.replace('/login')}
       <q-btn flat round dense icon="menu" @click="drawer=!drawer"/>
       <div class="q-ml-md"><strong>Soporte AGR Studio</strong><div class="text-caption">Espacio interno · acceso limitado</div></div>
       <q-space/>
-      <q-btn flat round dense :icon="$q.dark.isActive?'light_mode':'dark_mode'" @click="$q.dark.toggle()"/>
+      <q-btn flat round dense :icon="$q.dark.isActive?'light_mode':'dark_mode'" @click="toggleDark"/>
     </q-toolbar>
   </q-header>
 
