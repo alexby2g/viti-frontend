@@ -159,12 +159,6 @@ body.body--dark.viti-main-active .q-separator,
 body.body--dark.viti-main-active .q-table thead th{background:#19191e;color:#d9d9de}
 body.body--dark.viti-main-active .q-table tbody td{color:#efeff1}
 
-/* El scroll vertical debe pertenecer a la página. Las tablas conservan scroll horizontal. */
-body.viti-main-active .viti-table .q-table__middle,
-.sv-table .q-table__middle{
-  overscroll-behavior-y:auto;
-}
-
 /* Login y acceso público: negro/blanco con acentos AGR discretos. */
 .agr-viti-auth .auth-page{
   background:
