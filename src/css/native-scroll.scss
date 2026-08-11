@@ -1,0 +1,11 @@
+/*
+ * El desplazamiento vertical pertenece a la página.
+ * Las tablas solo administran su desbordamiento horizontal.
+ * No se interceptan eventos wheel, touchmove ni gestos del navegador.
+ */
+.viti-table .q-table__middle,
+.sv-table .q-table__middle {
+  overflow-x: auto;
+  overflow-y: hidden;
+  overscroll-behavior: auto;
+}
