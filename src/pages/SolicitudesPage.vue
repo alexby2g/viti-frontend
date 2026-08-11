@@ -10,7 +10,12 @@ import RowActionsMenu from '../components/RowActionsMenu.vue'
 const $q=useQuasar(), route=useRoute(), router=useRouter()
 const rows=ref([]), clients=ref([]), loading=ref(false), dialog=ref(false)
 const linkDialog=ref(false), linkLoading=ref(false), publicLink=ref(''), linkExpiresAt=ref(null)
+const search=ref(''), clientFilter=ref(null), statusFilter=ref(null)
 const form=reactive({empresa_id:null,cliente_id:null,titulo:'',resumen:'',prioridad:'normal',fecha_limite_deseada:null,presupuesto_estimado:null})
+const statusOptions=[
+ {label:'Borrador',value:'borrador'},{label:'En revisión',value:'en_revision'},{label:'Aprobada',value:'aprobada'},
+ {label:'Requiere ajustes',value:'rechazada'},{label:'Convertida en proyecto',value:'convertida'},{label:'Cerrada',value:'cerrada'},
+]
 const columns=[
  {name:'actions',label:'',field:'actions',align:'left'},
  {name:'codigo',label:'Código',field:'codigo',align:'left'},
@@ -23,16 +28,28 @@ const columns=[
 ]
 const selectedClient=computed(()=>clients.value.find(x=>x.id===form.cliente_id)||null)
 const companyOptions=computed(()=>selectedClient.value?.empresas?.map(x=>({label:x.nombre_comercial,value:x.id}))||[])
+const clientFilterOptions=computed(()=>clients.value.map(x=>({label:`${x.nombre} · ${x.telefono}`,value:x.id})))
+const filteredRows=computed(()=>{
+ const term=search.value.trim().toLocaleLowerCase('es')
+ return rows.value.filter(row=>{
+   if(clientFilter.value&&Number(row.cliente?.id)!==Number(clientFilter.value))return false
+   if(statusFilter.value&&row.estado!==statusFilter.value)return false
+   if(!term)return true
+   return `${row.codigo||''} ${row.titulo||''} ${row.cliente?.nombre||''} ${row.cliente?.telefono||''} ${row.empresa?.nombre_comercial||''}`.toLocaleLowerCase('es').includes(term)
+ })
+})
+const activeFilterLabel=computed(()=>clientFilter.value?clients.value.find(x=>x.id===clientFilter.value)?.nombre:null)
 
 async function load(){
  loading.value=true
  try{
    const [s,c]=await Promise.all([api.get('/solicitudes',{params:{per_page:100}}),api.get('/clientes',{params:{per_page:100}})])
-   rows.value=s.data.data;clients.value=c.data.data
+   rows.value=s.data.data||[];clients.value=c.data.data||[]
  }finally{loading.value=false}
 }
 function openNew(){Object.assign(form,{empresa_id:null,cliente_id:null,titulo:'',resumen:'',prioridad:'normal',fecha_limite_deseada:null,presupuesto_estimado:null});dialog.value=true}
 function clientChanged(){form.empresa_id=selectedClient.value?.empresas?.length===1?selectedClient.value.empresas[0].id:null}
+function clearFilters(){search.value='';clientFilter.value=null;statusFilter.value=null}
 async function save(){
  try{
    if(!form.cliente_id){$q.notify({type:'warning',message:'Selecciona al cliente responsable.'});return}
@@ -65,35 +82,45 @@ async function copyPublicLink(){
 }
 function openPublicForm(){if(publicLink.value)window.open(publicLink.value,'_blank','noopener,noreferrer')}
 function remove(row){$q.dialog({title:'Eliminar solicitud',message:`¿Eliminar ${row.codigo}?`,cancel:true}).onOk(async()=>{try{await api.delete(`/solicitudes/${row.id}`);load()}catch(e){$q.notify({type:'negative',message:e.response?.data?.message||'No se puede eliminar.'})}})}
-function stateLabel(value){return String(value||'').replaceAll('_',' ')}
-onMounted(async()=>{await load();if(route.query.new)openNew()})
+function stateLabel(value){return statusOptions.find(x=>x.value===value)?.label||String(value||'').replaceAll('_',' ')}
+function stateColor(value){return {borrador:'grey-7',en_revision:'orange',aprobada:'positive',rechazada:'negative',convertida:'purple',cerrada:'grey'}[value]||'grey'}
+onMounted(async()=>{await load();if(route.query.cliente_id)clientFilter.value=Number(route.query.cliente_id);if(route.query.new)openNew()})
 </script>
 
 <template>
 <q-page class="viti-page solicitudes-page">
-  <PageHeader eyebrow="Levantamiento" title="Solicitudes de sistema" subtitle="Cada solicitud contiene el cuestionario institucional y puede convertirse en un proyecto.">
+  <PageHeader eyebrow="Levantamiento" title="Solicitudes de sistema" subtitle="Cada solicitud tiene su propio código, cuestionario, cliente y trazabilidad.">
     <div class="header-actions">
       <q-btn outline color="primary" icon="person_add" label="Crear enlace de registro" no-caps @click="createRegistrationLink"/>
       <q-btn color="primary" unelevated icon="add" label="Nueva solicitud" no-caps @click="openNew"/>
     </div>
   </PageHeader>
 
-  <q-table v-if="$q.screen.gt.sm" flat class="viti-table" :rows="rows" :columns="columns" row-key="id" :loading="loading" :pagination="{rowsPerPage:20,sortBy:'id',descending:true}">
+  <q-card flat class="viti-card filters-card q-mb-lg">
+    <q-card-section class="row q-col-gutter-md items-center">
+      <div class="col-12 col-md-4"><q-input v-model="search" outlined dense clearable debounce="150" label="Buscar solicitud" placeholder="Código, título, cliente o empresa"><template #prepend><q-icon name="search"/></template></q-input></div>
+      <div class="col-12 col-sm-6 col-md-3"><q-select v-model="clientFilter" outlined dense clearable emit-value map-options :options="clientFilterOptions" label="Cliente"/></div>
+      <div class="col-12 col-sm-6 col-md-3"><q-select v-model="statusFilter" outlined dense clearable emit-value map-options :options="statusOptions" label="Estado"/></div>
+      <div class="col-12 col-md-2 row justify-end"><q-btn flat color="primary" no-caps icon="filter_alt_off" label="Limpiar" :disable="!search&&!clientFilter&&!statusFilter" @click="clearFilters"/></div>
+    </q-card-section>
+    <q-separator/>
+    <q-card-section class="row items-center q-py-sm"><div class="text-caption text-grey-6"><strong>{{filteredRows.length}}</strong> solicitud{{filteredRows.length===1?'':'es'}} mostrada{{filteredRows.length===1?'':'s'}}<span v-if="activeFilterLabel"> · Cliente: {{activeFilterLabel}}</span></div><q-space/><q-badge v-if="rows.length!==filteredRows.length" outline color="primary">{{rows.length}} en total</q-badge></q-card-section>
+  </q-card>
+
+  <q-table v-if="$q.screen.gt.sm" flat class="viti-table" :rows="filteredRows" :columns="columns" row-key="id" :loading="loading" :pagination="{rowsPerPage:20,sortBy:'id',descending:true}">
     <template #body-cell-actions="p"><q-td :props="p"><RowActionsMenu @open="router.push(`/solicitudes/${p.row.id}`)" @edit="router.push({path:`/solicitudes/${p.row.id}`,query:{editar:'1'}})" @delete="remove(p.row)"/></q-td></template>
-    <template #body-cell-estado="p"><q-td :props="p"><q-badge outline color="primary">{{stateLabel(p.value)}}</q-badge></q-td></template>
+    <template #body-cell-cliente="p"><q-td :props="p"><div class="text-weight-bold">{{p.row.cliente?.nombre||'Sin cliente'}}</div><div class="text-caption text-grey-6">{{p.row.cliente?.telefono||''}}</div></q-td></template>
+    <template #body-cell-estado="p"><q-td :props="p"><q-badge :color="stateColor(p.value)">{{stateLabel(p.value)}}</q-badge></q-td></template>
     <template #body-cell-created_at="p"><q-td :props="p">{{formatDateTime(p.value)}}</q-td></template>
-    <template #no-data><div class="empty-state full-width"><q-icon name="assignment" size="52px"/><div class="text-h6 q-mt-sm">No hay solicitudes</div><div>Comparte el formulario público o registra la solicitud manualmente.</div></div></template>
+    <template #no-data><div class="empty-state full-width"><q-icon name="assignment" size="52px"/><div class="text-h6 q-mt-sm">No hay solicitudes que coincidan</div><div>Prueba otro cliente, estado o término de búsqueda.</div></div></template>
   </q-table>
 
   <div v-else class="mobile-request-list">
     <q-inner-loading :showing="loading" />
-    <q-card v-for="row in rows" :key="row.id" flat class="viti-card mobile-request-card" @click="router.push(`/solicitudes/${row.id}`)">
+    <q-card v-for="row in filteredRows" :key="row.id" flat class="viti-card mobile-request-card" @click="router.push(`/solicitudes/${row.id}`)">
       <q-card-section class="row items-start no-wrap">
         <div class="col min-width-0">
-          <div class="row items-center q-gutter-sm q-mb-sm">
-            <q-badge color="primary" rounded>{{ row.codigo }}</q-badge>
-            <q-badge outline color="primary">{{ stateLabel(row.estado) }}</q-badge>
-          </div>
+          <div class="row items-center q-gutter-sm q-mb-sm"><q-badge color="primary" rounded>{{ row.codigo }}</q-badge><q-badge :color="stateColor(row.estado)">{{ stateLabel(row.estado) }}</q-badge></div>
           <div class="text-subtitle1 text-weight-bold ellipsis-2-lines">{{ row.titulo }}</div>
           <div class="mobile-meta q-mt-sm"><q-icon name="person" /> {{ row.cliente?.nombre || 'Sin cliente' }}</div>
           <div class="mobile-meta"><q-icon name="business" /> {{ row.empresa?.nombre_comercial || 'Sin empresa' }}</div>
@@ -102,32 +129,14 @@ onMounted(async()=>{await load();if(route.query.new)openNew()})
         <div @click.stop><RowActionsMenu @open="router.push(`/solicitudes/${row.id}`)" @edit="router.push({path:`/solicitudes/${row.id}`,query:{editar:'1'}})" @delete="remove(row)"/></div>
       </q-card-section>
     </q-card>
-    <div v-if="!rows.length && !loading" class="empty-state"><q-icon name="assignment" size="48px"/><div class="text-h6 q-mt-sm">No hay solicitudes</div><div>Comparte el formulario público y deja que el cliente complete todo desde su navegador.</div></div>
+    <div v-if="!filteredRows.length && !loading" class="empty-state"><q-icon name="assignment" size="48px"/><div class="text-h6 q-mt-sm">No hay solicitudes que coincidan</div><div>Cambia los filtros para ver otros registros.</div></div>
   </div>
 
   <q-dialog v-model="linkDialog">
     <q-card class="viti-card invite-card">
-      <q-card-section>
-        <div class="section-label">Registro seguro del cliente</div>
-        <div class="text-h5 text-weight-bold">Enlace personal de registro</div>
-        <div class="text-caption text-grey-6 q-mt-xs">Envíalo únicamente al cliente que se registrará. El enlace funciona una sola vez y vence en 7 días.</div>
-      </q-card-section>
-      <q-card-section class="q-gutter-md">
-        <q-skeleton v-if="linkLoading" type="QInput" />
-        <q-input v-else :model-value="publicLink" outlined readonly label="Enlace listo para compartir">
-          <template #append><q-btn flat round icon="content_copy" @click="copyPublicLink" /></template>
-        </q-input>
-        <q-banner rounded class="bg-blue-1 text-primary">
-          <template #avatar><q-icon name="phone_android" /></template>
-          El cliente creará su nombre de usuario y contraseña, registrará sus datos y negocio, y después completará el cuestionario. Su cuenta siempre quedará con rol Cliente.
-        </q-banner>
-        <div v-if="linkExpiresAt" class="text-caption text-grey-6"><q-icon name="schedule" class="q-mr-xs" />Vence: {{formatDateTime(linkExpiresAt)}}</div>
-      </q-card-section>
-      <q-card-actions align="right">
-        <q-btn flat no-caps label="Cerrar" v-close-popup />
-        <q-btn outline color="primary" no-caps icon="open_in_new" label="Probar registro" :disable="linkLoading||!publicLink" @click="openPublicForm" />
-        <q-btn color="primary" unelevated no-caps icon="content_copy" label="Copiar enlace" :loading="linkLoading" :disable="!publicLink" @click="copyPublicLink" />
-      </q-card-actions>
+      <q-card-section><div class="section-label">Registro seguro del cliente</div><div class="text-h5 text-weight-bold">Enlace personal de registro</div><div class="text-caption text-grey-6 q-mt-xs">Envíalo únicamente al cliente que se registrará. El enlace funciona una sola vez y vence en 7 días.</div></q-card-section>
+      <q-card-section class="q-gutter-md"><q-skeleton v-if="linkLoading" type="QInput" /><q-input v-else :model-value="publicLink" outlined readonly label="Enlace listo para compartir"><template #append><q-btn flat round icon="content_copy" @click="copyPublicLink" /></template></q-input><q-banner rounded class="bg-blue-1 text-primary"><template #avatar><q-icon name="phone_android" /></template>El cliente creará su nombre de usuario y contraseña, registrará sus datos y negocio, y después completará el cuestionario. Su cuenta siempre quedará con rol Cliente.</q-banner><div v-if="linkExpiresAt" class="text-caption text-grey-6"><q-icon name="schedule" class="q-mr-xs" />Vence: {{formatDateTime(linkExpiresAt)}}</div></q-card-section>
+      <q-card-actions align="right"><q-btn flat no-caps label="Cerrar" v-close-popup /><q-btn outline color="primary" no-caps icon="open_in_new" label="Probar registro" :disable="linkLoading||!publicLink" @click="openPublicForm" /><q-btn color="primary" unelevated no-caps icon="content_copy" label="Copiar enlace" :loading="linkLoading" :disable="!publicLink" @click="copyPublicLink" /></q-card-actions>
     </q-card>
   </q-dialog>
 
@@ -144,6 +153,6 @@ onMounted(async()=>{await load();if(route.query.new)openNew()})
 </template>
 
 <style scoped>
-.header-actions{display:flex;gap:10px;flex-wrap:wrap;justify-content:flex-end}.mobile-request-list{position:relative;display:flex;flex-direction:column;gap:12px}.mobile-request-card{cursor:pointer;overflow:hidden}.mobile-meta{display:flex;align-items:center;gap:7px;color:var(--viti-muted);font-size:13px;line-height:1.8}.min-width-0{min-width:0}.invite-card{width:620px;max-width:94vw}
+.header-actions{display:flex;gap:10px;flex-wrap:wrap;justify-content:flex-end}.filters-card{overflow:hidden}.mobile-request-list{position:relative;display:flex;flex-direction:column;gap:12px}.mobile-request-card{cursor:pointer;overflow:hidden}.mobile-meta{display:flex;align-items:center;gap:7px;color:var(--viti-muted);font-size:13px;line-height:1.8}.min-width-0{min-width:0}.invite-card{width:620px;max-width:94vw}
 @media(max-width:600px){.solicitudes-page{padding-top:16px}.header-actions{width:100%;display:grid;grid-template-columns:1fr}.header-actions .q-btn{width:100%}.mobile-request-card{border-radius:18px}.mobile-request-card .q-card__section{padding:16px}}
 </style>

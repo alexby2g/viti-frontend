@@ -18,17 +18,32 @@ provide('serviceTechnicalModules',modules)
 provide('serviceTechnicalCanManage',canManage)
 provide('serviceTechnicalApiBase',apiBase)
 
-const menu=computed(()=>[
-  {module:'inicio',label:'Inicio',icon:'dashboard',to:`${appBase.value}/inicio`},
-  {module:'clientes',label:'Clientes',icon:'people',to:`${appBase.value}/clientes`},
-  {module:'equipos',label:'Computadoras',icon:'computer',to:`${appBase.value}/equipos`},
-  {module:'tecnicos',label:'Técnicos',icon:'engineering',to:`${appBase.value}/tecnicos`},
-  {module:'ordenes',label:'Órdenes de servicio',icon:'fact_check',to:`${appBase.value}/ordenes`},
-  {module:'agenda',label:'Agenda',icon:'calendar_month',to:`${appBase.value}/agenda`},
-  {module:'pagos',label:'Pagos',icon:'payments',to:`${appBase.value}/pagos`},
-  {module:'garantias',label:'Garantías',icon:'verified',to:`${appBase.value}/garantias`},
-  {module:'historial',label:'Historial y reportes',icon:'history',to:`${appBase.value}/historial`},
-].filter(item=>has(item.module)))
+const menuGroups=computed(()=>[
+  {
+    title:'Trabajo técnico',
+    items:[
+      {module:'inicio',label:'Inicio',caption:'Resumen del negocio',icon:'dashboard',to:`${appBase.value}/inicio`},
+      {module:'agenda',label:'Agenda',caption:'Trabajos programados',icon:'calendar_month',to:`${appBase.value}/agenda`},
+      {module:'ordenes',label:'Órdenes de servicio',caption:'Diagnóstico, reparación y entrega',icon:'fact_check',to:`${appBase.value}/ordenes`},
+    ],
+  },
+  {
+    title:'Personas y equipos',
+    items:[
+      {module:'clientes',label:'Clientes',icon:'people',to:`${appBase.value}/clientes`},
+      {module:'equipos',label:'Computadoras',icon:'computer',to:`${appBase.value}/equipos`},
+      {module:'tecnicos',label:'Técnicos',icon:'engineering',to:`${appBase.value}/tecnicos`},
+    ],
+  },
+  {
+    title:'Control y seguimiento',
+    items:[
+      {module:'pagos',label:'Pagos',icon:'payments',to:`${appBase.value}/pagos`},
+      {module:'garantias',label:'Garantías',icon:'verified',to:`${appBase.value}/garantias`},
+      {module:'historial',label:'Historial y reportes',icon:'history',to:`${appBase.value}/historial`},
+    ],
+  },
+].map(group=>({...group,items:group.items.filter(item=>has(item.module))})).filter(group=>group.items.length))
 
 const version=computed(()=>appState.value?.aplicacion?.version||'1.0.0')
 const businessName=computed(()=>appState.value?.empresa?.nombre_comercial||'Soporte Vital PC')
@@ -62,6 +77,7 @@ watch(()=>route.fullPath,ensureAllowedRoute)
   <q-header bordered class="support-header">
     <q-toolbar class="q-px-md">
       <q-btn flat round dense icon="menu" aria-label="Abrir menú" @click="drawer=!drawer"/>
+      <q-avatar size="38px" class="support-header-avatar q-ml-sm"><q-icon name="computer" size="22px"/></q-avatar>
       <div class="q-ml-md header-copy">
         <div class="row items-center q-gutter-sm"><strong>{{businessName}}</strong><q-badge color="positive" :label="`V${version} · 100%`"/></div>
         <div class="text-caption gt-xs">Gestión de reparación y mantenimiento de computadoras</div>
@@ -71,24 +87,25 @@ watch(()=>route.fullPath,ensureAllowedRoute)
     </q-toolbar>
   </q-header>
 
-  <q-drawer v-model="drawer" show-if-above :overlay="$q.screen.lt.md" :breakpoint="900" :width="275" class="support-drawer">
+  <q-drawer v-model="drawer" show-if-above :overlay="$q.screen.lt.md" :breakpoint="900" :width="292" class="support-drawer">
     <div class="column fit no-wrap">
-      <div class="q-pa-lg">
-        <div class="row items-center q-gutter-md"><q-avatar color="primary" text-color="white" icon="computer"/><div class="col min-width-0"><div class="text-weight-bold ellipsis">{{businessName}}</div><div class="text-caption">{{deliveryLabel}}</div></div></div>
-        <q-linear-progress :value="1" rounded size="8px" color="positive" class="q-mt-md"/>
-        <div class="text-caption q-mt-xs">Desarrollo técnico: 100%</div>
+      <div class="support-brand q-pa-lg">
+        <div class="row items-center q-gutter-md"><q-avatar size="52px" class="support-brand-avatar" icon="computer"/><div class="col min-width-0"><div class="text-overline">VITI App</div><div class="text-weight-bold text-h6 ellipsis">{{businessName}}</div><div class="text-caption">{{deliveryLabel}}</div></div></div>
+        <q-linear-progress :value="1" rounded size="7px" color="positive" class="q-mt-md"/>
+        <div class="text-caption q-mt-xs">Desarrollo técnico: 100% · V{{version}}</div>
       </div>
       <q-separator/>
-      <q-scroll-area class="col"><q-list padding>
-        <q-item v-for="item in menu" :key="item.to" clickable v-ripple :to="item.to" exact @click="()=>{if($q.screen.lt.md)drawer=false}">
-          <q-item-section avatar><q-icon :name="item.icon"/></q-item-section><q-item-section>{{item.label}}</q-item-section>
-        </q-item>
+      <q-scroll-area class="col"><q-list padding class="support-menu">
+        <template v-for="group in menuGroups" :key="group.title">
+          <q-item-label header class="support-menu-title">{{group.title}}</q-item-label>
+          <q-item v-for="item in group.items" :key="item.to" clickable v-ripple :to="item.to" exact active-class="support-active" class="support-menu-item" @click="()=>{if($q.screen.lt.md)drawer=false}">
+            <q-item-section avatar><q-icon :name="item.icon"/></q-item-section>
+            <q-item-section><q-item-label>{{item.label}}</q-item-label><q-item-label v-if="item.caption" caption>{{item.caption}}</q-item-label></q-item-section>
+          </q-item>
+        </template>
         <q-separator class="q-my-md"/>
-        <div class="q-px-md q-pb-md">
-          <q-banner rounded class="release-box">
-            <div class="text-overline">V1.0 finalizada</div>
-            <div class="text-caption">{{clientMode?'Acceso según tu rol del negocio.':'Lista para que AGR Studio realice la entrega cuando corresponda.'}}</div>
-          </q-banner>
+        <div class="q-px-sm q-pb-md">
+          <q-banner rounded class="release-box"><div class="text-overline">V1.0 finalizada</div><div class="text-caption">{{clientMode?'Acceso según tu rol del negocio.':'Lista para que AGR Studio realice la entrega cuando corresponda.'}}</div></q-banner>
         </div>
       </q-list></q-scroll-area>
     </div>
@@ -102,5 +119,5 @@ watch(()=>route.fullPath,ensureAllowedRoute)
 </template>
 
 <style scoped>
-.support-shell{background:var(--viti-bg)}.support-header{background:#0d315b;color:#fff}.support-header :deep(.q-toolbar){min-height:64px}.support-drawer{background:#102f54;color:#fff}.support-drawer :deep(.q-item.q-router-link--active){background:rgba(255,255,255,.12);color:#fff}.release-box{background:rgba(255,255,255,.08);color:#fff;border:1px solid rgba(255,255,255,.14)}.min-width-0{min-width:0}@media(max-width:600px){.support-header :deep(.q-toolbar){min-height:58px}.header-copy{max-width:68vw}.header-copy strong{max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}}
+.support-shell{--support-primary:#0d5e94;--support-deep:#092b4e;--support-accent:#2f91d7;background:var(--viti-bg);color:var(--viti-text)}.support-header{background:linear-gradient(135deg,#092b4e,#0d4b7a 62%,#136da5);color:#fff;box-shadow:0 7px 22px rgba(5,31,54,.18)}.support-header :deep(.q-toolbar){min-height:64px}.support-header .text-caption{color:rgba(255,255,255,.74)}.support-header-avatar{background:rgba(255,255,255,.95);color:#0d5e94}.support-drawer{background:color-mix(in srgb,var(--viti-card) 96%,#0d5e94 4%);color:var(--viti-text)}.support-brand{background:linear-gradient(145deg,#0b355d,#0f5e91);color:#fff}.support-brand .text-overline{color:#a8d9f7}.support-brand .text-caption{color:rgba(255,255,255,.76)}.support-brand-avatar{background:rgba(255,255,255,.94);color:#0d5e94}.support-menu{padding:10px 10px 90px}.support-menu-title{padding:14px 10px 5px;font-size:11px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--viti-muted)}.support-menu-item{min-height:48px;margin:3px 0;border-radius:13px;color:inherit}.support-menu-item :deep(.q-item__label--caption){color:var(--viti-muted)}.support-active{color:#0d5e94!important;background:rgba(13,94,148,.11)!important;font-weight:800;box-shadow:inset 3px 0 0 #1687c8}.release-box{background:color-mix(in srgb,var(--viti-card) 92%,#0d5e94 8%);color:var(--viti-text);border:1px solid var(--viti-border)}.min-width-0{min-width:0}@media(max-width:600px){.support-header :deep(.q-toolbar){min-height:58px}.header-copy{max-width:62vw}.header-copy strong{max-width:165px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}}
 </style>
