@@ -111,13 +111,13 @@ onMounted(load)
 
 <template>
   <q-page class="viti-page users-page">
-    <PageHeader eyebrow="Administración" title="Cuentas y accesos" subtitle="Consulta clientes y crea administradores internos sin compartir tu cuenta de superadministrador.">
-      <q-btn class="responsive-primary-action" color="primary" unelevated icon="admin_panel_settings" label="Crear administrador" no-caps @click="open()" />
+    <PageHeader eyebrow="Administración" title="Cuentas y accesos" subtitle="Consulta clientes y crea accesos internos sin compartir tu cuenta de superadministrador.">
+      <q-btn class="responsive-primary-action" color="primary" unelevated icon="person_add" label="Crear usuario interno" no-caps @click="open()" />
     </PageHeader>
 
     <q-banner rounded class="bg-blue-1 text-primary q-mb-lg">
       <template #avatar><q-icon name="verified_user" /></template>
-      Las cuentas creadas desde un enlace siempre conservan el rol <strong>Cliente</strong>. No pueden convertirse en administrador ni en superadministrador.
+      Las cuentas creadas desde un enlace conservan el rol <strong>Cliente</strong>. Las cuentas internas pueden ser <strong>Administrador</strong> o <strong>Soporte interno</strong>; soporte entra por el login principal y solo ve trabajo asignado.
     </q-banner>
 
     <q-table v-if="$q.screen.gt.sm" flat class="viti-table" :rows="rows" :columns="columns" row-key="id" :loading="loading" :pagination="{rowsPerPage:20,sortBy:'id',descending:true}">
