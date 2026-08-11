@@ -1,5 +1,6 @@
 <script setup>
 import { mediaUrl } from '../utils/media.js'
+import { CHAT_FILE_ACCEPT, CHAT_FILE_MAX_BYTES, attachmentPreviewLabel, chatFileIcon, formatFileSize, isAllowedChatFile, isImageFile, isImageMessage } from '../utils/chatFiles.js'
 import { computed, inject, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useQuasar } from 'quasar'
 import { useRoute, useRouter } from 'vue-router'
@@ -129,9 +130,11 @@ function chooseAttachment(){ if(!sending.value) fileInput.value?.click() }
 function onAttachment(event){
   const file=event.target?.files?.[0]
   if(!file)return
-  if(!file.type.startsWith('image/'))return $q.notify({type:'negative',message:'Selecciona una imagen o captura de pantalla.'})
-  if(file.size>8*1024*1024)return $q.notify({type:'negative',message:'La imagen no puede superar 8 MB.'})
-  clearAttachment(); attachment.value=file; attachmentPreview.value=URL.createObjectURL(file)
+  if(!isAllowedChatFile(file))return $q.notify({type:'negative',message:'Puedes adjuntar imágenes, PDF, Word, Excel o TXT.'})
+  if(file.size>CHAT_FILE_MAX_BYTES)return $q.notify({type:'negative',message:'El archivo no puede superar 10 MB.'})
+  clearAttachment()
+  attachment.value=file
+  if(isImageFile(file))attachmentPreview.value=URL.createObjectURL(file)
 }
 function clearAttachment(){ if(attachmentPreview.value)URL.revokeObjectURL(attachmentPreview.value); attachmentPreview.value=''; attachment.value=null; if(fileInput.value)fileInput.value.value='' }
 
@@ -141,16 +144,18 @@ async function send(){
   if(!message&&!attachment.value)return
   sending.value=true
   try{
-    const url=`${apiBase.value}/${current.value.id}/mensajes`
-    const clientRequestId=requestId()
     if(attachment.value){
       const payload=new FormData()
       if(message)payload.append('mensaje',message)
       payload.append('archivo',attachment.value)
-      payload.append('client_request_id',clientRequestId)
-      await api.post(url,payload)
+      if(isImageFile(attachment.value)){
+        payload.append('client_request_id',requestId())
+        await api.post(`${apiBase.value}/${current.value.id}/mensajes`,payload)
+      }else{
+        await api.post(`${apiBase.value}/${current.value.id}/documentos`,payload)
+      }
     }else{
-      await api.post(url,{mensaje:message,client_request_id:clientRequestId})
+      await api.post(`${apiBase.value}/${current.value.id}/mensajes`,{mensaje:message,client_request_id:requestId()})
     }
     reply.value=''; clearAttachment(); await loadCurrent()
   }catch(error){$q.notify({type:'negative',message:error.response?.data?.message||'No se pudo enviar la respuesta.'})}
@@ -225,7 +230,7 @@ onBeforeUnmount(()=>{if(pollTimer)window.clearInterval(pollTimer);heartbeat(fals
           <q-list separator>
             <q-item v-for="conversation in rows" :key="conversation.id" clickable :active="!isMobile&&selected===conversation.id" active-class="bg-blue-1 text-primary" @click="choose(conversation.id)">
               <q-item-section avatar><q-avatar color="primary" text-color="white"><img v-if="conversation.contacto?.foto_url||conversation.contacto?.foto_path" :src="conversation.contacto?.foto_url||mediaUrl(conversation.contacto?.foto_path)"/><span v-else>{{conversation.contacto?.nombre?.[0]||conversation.cliente?.nombre?.[0]||'C'}}</span></q-avatar></q-item-section>
-              <q-item-section><q-item-label class="text-weight-bold">{{conversation.contacto?.nombre||conversation.cliente?.nombre}}</q-item-label><q-item-label v-if="conversation.empresa" caption>{{conversation.empresa.nombre_comercial}}</q-item-label><q-item-label caption lines="1">{{conversation.mensajes?.[0]?.eliminado?'Mensaje eliminado':(conversation.mensajes?.[0]?.mensaje||(conversation.mensajes?.[0]?.archivo_path?'📷 Imagen adjunta':'Sin mensajes'))}}</q-item-label><q-item-label caption>{{conversation.ultimo_mensaje_at?formatDateTime(conversation.ultimo_mensaje_at):'Sin mensajes todavía'}}</q-item-label></q-item-section>
+              <q-item-section><q-item-label class="text-weight-bold">{{conversation.contacto?.nombre||conversation.cliente?.nombre}}</q-item-label><q-item-label v-if="conversation.empresa" caption>{{conversation.empresa.nombre_comercial}}</q-item-label><q-item-label caption lines="1">{{conversation.mensajes?.[0]?.eliminado?'Mensaje eliminado':(conversation.mensajes?.[0]?.mensaje||attachmentPreviewLabel(conversation.mensajes?.[0]))}}</q-item-label><q-item-label caption>{{conversation.ultimo_mensaje_at?formatDateTime(conversation.ultimo_mensaje_at):'Sin mensajes todavía'}}</q-item-label></q-item-section>
               <q-item-section side class="items-end q-gutter-xs"><q-badge v-if="conversation.no_leidos" rounded color="negative" :label="conversation.no_leidos>99?'99+':conversation.no_leidos"/><q-icon v-if="isMobile" name="chevron_right" color="grey-6" size="24px"/></q-item-section>
             </q-item>
             <div v-if="!rows.length&&!loading" class="empty-state">No hay conversaciones en este buzón.</div>
@@ -235,14 +240,7 @@ onBeforeUnmount(()=>{if(pollTimer)window.clearInterval(pollTimer);heartbeat(fals
 
       <div v-show="showChat" class="conversation-pane">
         <q-card v-if="current" flat class="viti-card messenger-card">
-          <q-menu v-if="canManage&&!isMobile" context-menu>
-            <q-list style="min-width:210px">
-              <q-item clickable v-close-popup class="text-negative" @click="deleteConversation">
-                <q-item-section avatar><q-icon name="delete_forever"/></q-item-section>
-                <q-item-section>Eliminar chat</q-item-section>
-              </q-item>
-            </q-list>
-          </q-menu>
+          <q-menu v-if="canManage&&!isMobile" context-menu><q-list style="min-width:210px"><q-item clickable v-close-popup class="text-negative" @click="deleteConversation"><q-item-section avatar><q-icon name="delete_forever"/></q-item-section><q-item-section>Eliminar chat</q-item-section></q-item></q-list></q-menu>
 
           <q-card-section class="row items-center no-wrap chat-header">
             <q-btn v-if="isMobile" round flat icon="arrow_back" color="primary" class="q-mr-xs" @click="backToChats"/>
@@ -264,16 +262,24 @@ onBeforeUnmount(()=>{if(pollTimer)window.clearInterval(pollTimer);heartbeat(fals
               <div class="bubble" :class="message.es_cliente_final?'bubble-client':'bubble-admin'">
                 <q-btn v-if="message.puede_editar||message.puede_eliminar" flat round dense size="sm" icon="more_vert" class="message-actions"><q-menu><q-list dense style="min-width:150px"><q-item v-if="message.puede_editar" clickable v-close-popup @click="openEdit(message)"><q-item-section avatar><q-icon name="edit"/></q-item-section><q-item-section>Editar</q-item-section></q-item><q-item v-if="message.puede_eliminar" clickable v-close-popup class="text-negative" @click="removeMessage(message)"><q-item-section avatar><q-icon name="delete"/></q-item-section><q-item-section>Eliminar</q-item-section></q-item></q-list></q-menu></q-btn>
                 <div v-if="message.eliminado" class="deleted-message"><q-icon name="block"/> Mensaje eliminado</div>
-                <template v-else><div v-if="message.archivo_url" class="attachment-wrap"><a :href="message.archivo_url" target="_blank" rel="noopener"><img :src="message.archivo_url" :alt="message.archivo_nombre||'Imagen adjunta'" class="chat-image"/></a></div><div v-if="message.mensaje" class="message-text">{{message.mensaje}}</div></template>
+                <template v-else>
+                  <div v-if="message.archivo_url&&isImageMessage(message)" class="attachment-wrap"><a :href="message.archivo_url" target="_blank" rel="noopener"><img :src="message.archivo_url" :alt="message.archivo_nombre||'Imagen adjunta'" class="chat-image"/></a></div>
+                  <a v-else-if="message.archivo_url" :href="message.archivo_url" target="_blank" rel="noopener" class="document-card"><q-icon :name="chatFileIcon(message)" size="28px"/><div class="col min-width-0"><div class="document-name ellipsis">{{message.archivo_nombre||'Documento adjunto'}}</div><div class="document-meta">{{formatFileSize(message.archivo_tamano)}} · Abrir documento</div></div><q-icon name="open_in_new"/></a>
+                  <div v-if="message.mensaje" class="message-text">{{message.mensaje}}</div>
+                </template>
                 <div class="message-meta"><span v-if="message.editado_at">editado · </span>{{formatDateTime(message.created_at)}}<q-icon v-if="!message.es_cliente_final&&!message.eliminado" :name="statusIcon(message)" size="15px" :color="statusColor(message)" class="q-ml-xs"><q-tooltip>{{message.estado_envio}}</q-tooltip></q-icon></div>
               </div>
             </div>
             <div v-if="presence.escribiendo" class="typing-bubble">Escribiendo<span>.</span><span>.</span><span>.</span></div>
           </q-card-section>
 
-          <div v-if="attachmentPreview" class="attachment-preview q-px-md q-pt-sm"><img :src="attachmentPreview" alt="Vista previa"/><div class="col"><div class="text-weight-medium">{{attachment?.name}}</div><div class="text-caption text-grey-6">Imagen privada para esta conversación.</div></div><q-btn flat round icon="close" :disable="sending" @click="clearAttachment"/></div>
+          <div v-if="attachment" class="attachment-preview q-px-md q-pt-sm">
+            <img v-if="attachmentPreview" :src="attachmentPreview" alt="Vista previa"/>
+            <q-avatar v-else square color="grey-2" text-color="primary" :icon="chatFileIcon(attachment)"/>
+            <div class="col min-width-0"><div class="text-weight-medium ellipsis">{{attachment.name}}</div><div class="text-caption text-grey-6">{{formatFileSize(attachment.size)}} · Archivo privado para esta conversación.</div></div><q-btn flat round icon="close" :disable="sending" @click="clearAttachment"/>
+          </div>
           <q-separator/>
-          <q-card-section class="composer"><input ref="fileInput" type="file" accept="image/jpeg,image/png,image/webp" hidden @change="onAttachment"/><q-btn round flat color="primary" icon="add_photo_alternate" class="composer-action" :disable="sending" @click="chooseAttachment"><q-tooltip>Adjuntar imagen</q-tooltip></q-btn><q-input v-model="reply" class="message-input" rounded outlined autogrow placeholder="Responder al cliente..." :disable="sending" @keydown.enter.exact.prevent="send"><q-tooltip>Enter envía · Shift + Enter crea una línea nueva</q-tooltip></q-input><q-btn color="primary" unelevated round icon="send" class="composer-action send-action" :loading="sending" :disable="(!reply.trim()&&!attachment)||sending" @click="send"><q-tooltip>Enviar mensaje</q-tooltip></q-btn></q-card-section>
+          <q-card-section class="composer"><input ref="fileInput" type="file" :accept="CHAT_FILE_ACCEPT" hidden @change="onAttachment"/><q-btn round flat color="primary" icon="attach_file" class="composer-action" :disable="sending" @click="chooseAttachment"><q-tooltip>Adjuntar imagen o documento</q-tooltip></q-btn><q-input v-model="reply" class="message-input" rounded outlined autogrow placeholder="Responder al cliente..." :disable="sending" @keydown.enter.exact.prevent="send"><q-tooltip>Enter envía · Shift + Enter crea una línea nueva</q-tooltip></q-input><q-btn color="primary" unelevated round icon="send" class="composer-action send-action" :loading="sending" :disable="(!reply.trim()&&!attachment)||sending" @click="send"><q-tooltip>Enviar mensaje</q-tooltip></q-btn></q-card-section>
         </q-card>
         <div v-else-if="!isMobile" class="empty-state">Selecciona un cliente para atenderlo.</div>
       </div>
@@ -285,6 +291,6 @@ onBeforeUnmount(()=>{if(pollTimer)window.clearInterval(pollTimer);heartbeat(fals
 </template>
 
 <style scoped>
-.admin-chat-page{max-width:1500px}.min-width-0{min-width:0}.admin-chat-layout{display:grid;grid-template-columns:minmax(280px,390px) minmax(0,1fr);gap:18px}.contacts-card{max-height:74vh;overflow:auto}.messenger-card{overflow:hidden;display:flex;flex-direction:column}.chat-header{min-height:72px}.messages{display:flex;flex-direction:column;gap:6px;height:min(60vh,650px);min-height:430px;overflow:auto;padding:18px}.messenger-bg{background:linear-gradient(180deg,rgba(127,127,127,.035),rgba(127,127,127,.015))}.message-row{display:flex;align-items:flex-end;gap:7px}.message-row.client{justify-content:flex-start}.message-row.admin{justify-content:flex-end}.message-avatar{margin-bottom:3px}.bubble{position:relative;max-width:min(78%,620px);padding:9px 12px;border-radius:18px;box-shadow:0 1px 2px rgba(0,0,0,.07)}.bubble-client{background:var(--viti-card);color:var(--viti-text);border:1px solid var(--viti-border);border-bottom-left-radius:5px}.bubble-admin{background:#1976d2;color:#fff;border-bottom-right-radius:5px}.message-actions{position:absolute;top:1px;right:1px;opacity:0}.bubble:hover .message-actions,.message-actions:focus{opacity:.8}.message-text{white-space:pre-wrap;overflow-wrap:anywhere;padding-right:16px}.message-meta{font-size:10.5px;opacity:.74;text-align:right;margin-top:4px;display:flex;justify-content:flex-end;align-items:center}.deleted-message{font-style:italic;opacity:.72;padding-right:18px}.attachment-wrap{margin:-5px -8px 7px}.chat-image{display:block;max-width:100%;max-height:360px;border-radius:14px;object-fit:cover}.attachment-preview{display:flex;align-items:center;gap:12px}.attachment-preview img{width:64px;height:64px;border-radius:12px;object-fit:cover}.composer{display:grid;grid-template-columns:48px minmax(0,1fr) 48px;gap:8px;align-items:end;padding:10px 14px}.composer-action{width:48px;height:48px;min-width:48px;flex:none}.send-action{box-shadow:0 5px 14px rgba(25,118,210,.25)}.message-input :deep(.q-field__control){min-height:48px}.typing-bubble{align-self:flex-start;padding:8px 14px;border-radius:16px;background:var(--viti-card);border:1px solid var(--viti-border);font-size:12px;color:var(--viti-muted)}.typing-bubble span{animation:pulse 1.2s infinite}.typing-bubble span:nth-child(2){animation-delay:.2s}.typing-bubble span:nth-child(3){animation-delay:.4s}.mobile-section-title{font-size:24px;font-weight:800;margin:4px 4px 12px}@keyframes pulse{0%,60%,100%{opacity:.25}30%{opacity:1}}
-@media(max-width:1023px){.admin-chat-page{padding:0!important;max-width:none}.admin-chat-layout{display:block}.contacts-pane{padding:16px 12px}.contacts-card{max-height:none}.conversation-pane{height:calc(100dvh - 58px)}.messenger-card{height:100%;border-radius:0!important;border-left:0;border-right:0}.messages{flex:1;height:auto;min-height:0;padding:12px}.chat-header{position:sticky;top:0;z-index:5;padding:8px}.composer{position:sticky;bottom:0;z-index:5;padding:8px 10px max(8px,env(safe-area-inset-bottom))}.bubble{max-width:86%}.message-actions{opacity:.65}}
+.admin-chat-page{max-width:1500px}.min-width-0{min-width:0}.admin-chat-layout{display:grid;grid-template-columns:minmax(280px,390px) minmax(0,1fr);gap:18px}.contacts-card{max-height:74vh;overflow:auto}.messenger-card{overflow:hidden;display:flex;flex-direction:column}.chat-header{min-height:72px}.messages{display:flex;flex-direction:column;gap:6px;height:min(60vh,650px);min-height:430px;overflow:auto;padding:18px}.messenger-bg{background:linear-gradient(180deg,rgba(127,127,127,.035),rgba(127,127,127,.015))}.message-row{display:flex;align-items:flex-end;gap:7px}.message-row.client{justify-content:flex-start}.message-row.admin{justify-content:flex-end}.message-avatar{margin-bottom:3px}.bubble{position:relative;max-width:min(78%,620px);padding:9px 12px;border-radius:18px;box-shadow:0 1px 2px rgba(0,0,0,.07)}.bubble-client{background:var(--viti-card);color:var(--viti-text);border:1px solid var(--viti-border);border-bottom-left-radius:5px}.bubble-admin{background:#1976d2;color:#fff;border-bottom-right-radius:5px}.message-actions{position:absolute;top:1px;right:1px;opacity:0}.bubble:hover .message-actions,.message-actions:focus{opacity:.8}.message-text{white-space:pre-wrap;overflow-wrap:anywhere;padding-right:16px}.message-meta{font-size:10.5px;opacity:.74;text-align:right;margin-top:4px;display:flex;justify-content:flex-end;align-items:center}.deleted-message{font-style:italic;opacity:.72;padding-right:18px}.attachment-wrap{margin:-5px -8px 7px}.chat-image{display:block;max-width:100%;max-height:360px;border-radius:14px;object-fit:cover}.document-card{display:flex;align-items:center;gap:10px;padding:10px 12px;margin:0 0 7px;border-radius:12px;background:rgba(127,127,127,.12);color:inherit;text-decoration:none;min-width:min(320px,70vw)}.document-name{font-weight:700}.document-meta{font-size:11px;opacity:.72}.attachment-preview{display:flex;align-items:center;gap:12px}.attachment-preview img{width:64px;height:64px;border-radius:12px;object-fit:cover}.composer{display:grid;grid-template-columns:48px minmax(0,1fr) 48px;gap:8px;align-items:end;padding:10px 14px}.composer-action{width:48px;height:48px;min-width:48px;flex:none}.send-action{box-shadow:0 5px 14px rgba(25,118,210,.25)}.message-input :deep(.q-field__control){min-height:48px}.typing-bubble{align-self:flex-start;padding:8px 14px;border-radius:16px;background:var(--viti-card);border:1px solid var(--viti-border);font-size:12px;color:var(--viti-muted)}.typing-bubble span{animation:pulse 1.2s infinite}.typing-bubble span:nth-child(2){animation-delay:.2s}.typing-bubble span:nth-child(3){animation-delay:.4s}.mobile-section-title{font-size:24px;font-weight:800;margin:4px 4px 12px}@keyframes pulse{0%,60%,100%{opacity:.25}30%{opacity:1}}
+@media(max-width:1023px){.admin-chat-page{padding:0!important;max-width:none}.admin-chat-layout{display:block}.contacts-pane{padding:16px 12px}.contacts-card{max-height:none}.conversation-pane{height:calc(100dvh - 58px)}.messenger-card{height:100%;border-radius:0!important;border-left:0;border-right:0}.messages{flex:1;height:auto;min-height:0;padding:12px}.chat-header{position:sticky;top:0;z-index:5;padding:8px}.composer{position:sticky;bottom:0;z-index:5;padding:8px 10px max(8px,env(safe-area-inset-bottom))}.bubble{max-width:86%}.message-actions{opacity:.65}.document-card{min-width:0;max-width:78vw}}
 </style>
