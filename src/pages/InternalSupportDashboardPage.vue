@@ -7,7 +7,7 @@ import PageHeader from '../components/PageHeader.vue'
 const $q=useQuasar(),loading=ref(true)
 const data=ref({resumen:{},solicitudes:[],proyectos:[],mantenimientos:[],conversaciones:[]})
 const tabs=ref('casos')
-const states=['abierto','en_proceso','esperando_cliente','resuelto','cerrado']
+const states=['abierto','en_proceso','en_espera','resuelto','cerrado']
 const pretty=v=>String(v||'').replaceAll('_',' ').replace(/\b\w/g,c=>c.toUpperCase())
 async function load(){loading.value=true;try{data.value=(await api.get('/soporte/resumen')).data.data}catch(e){$q.notify({type:'negative',message:e.response?.data?.message||'No se pudo cargar tu trabajo asignado.'})}finally{loading.value=false}}
 async function changeState(row,value){try{await api.put(`/soporte/mantenimientos/${row.id}/estado`,{estado:value});row.estado=value;$q.notify({type:'positive',message:'Estado actualizado.'})}catch(e){$q.notify({type:'negative',message:e.response?.data?.message||'No se pudo actualizar el caso.'})}}
