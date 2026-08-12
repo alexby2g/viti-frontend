@@ -1,23 +1,28 @@
 <script setup>
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { Dark, useQuasar } from 'quasar'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { api } from '../boot/axios'
 import { useAuthStore } from '../stores/auth'
+import { useBrandingStore } from '../stores/branding'
 import { useNotificationsStore } from '../stores/notifications'
 import { useTenantStore } from '../stores/tenant'
 import { formatDateTime } from '../utils/date'
 import AppBrand from '../components/AppBrand.vue'
+import BrandingSettingsDialog from '../components/BrandingSettingsDialog.vue'
 import CallCenter from '../components/CallCenter.vue'
 
 const adminPhotoInput = ref(null)
 const uploadingPhoto = ref(false)
 const router = useRouter()
+const route = useRoute()
 const $q = useQuasar()
 const drawer = ref(false)
 const quickSearch = ref(false)
 const quickTerm = ref('')
+const brandingDialog = ref(false)
 const auth = useAuthStore()
+const branding = useBrandingStore()
 const notifications = useNotificationsStore()
 const tenant = useTenantStore()
 
@@ -32,8 +37,11 @@ const isManager = computed(() => ['propietario', 'administrador'].includes(tenan
 const profilePhoto = computed(() => isClient.value ? auth.user?.cliente?.foto_url : auth.user?.foto_url)
 const unreadLabel = computed(() => notifications.unreadCount > 99 ? '99+' : String(notifications.unreadCount || ''))
 const businessOptions = computed(() => tenant.businesses.map(b => ({ label: b.nombre_comercial, value: b.id })))
+const guideFloatClass = computed(() => branding.guide_position === 'right-bottom' ? 'guide-right-bottom' : 'guide-right-center')
+const showGuideFloat = computed(() => branding.guide_enabled && route.path !== '/guia-viti')
 
 const menu = computed(() => {
+  const guideLabel = `Guía ${branding.product_name}`
   if (isClient.value) {
     const items = []
     if (hasClientProfile.value) items.push({ label: 'Mi cuenta', icon: 'account_circle', to: '/mi-cuenta' })
@@ -53,7 +61,7 @@ const menu = computed(() => {
     }
     if (hasClientProfile.value && isManager.value) items.push({ label: 'Nueva solicitud', icon: 'assignment_add', action: 'request' })
     if (hasClientProfile.value) items.push({ label: 'Mi buzón', icon: 'forum', to: '/mi-buzon', badge: notifications.unreadCount })
-    items.push({ label: 'Guía VITI', icon: 'help_center', to: '/guia-viti' })
+    items.push({ label: guideLabel, icon: 'help_center', to: '/guia-viti' })
     return items
   }
 
@@ -71,7 +79,7 @@ const menu = computed(() => {
     ] },
     { label: 'Archivos', icon: 'folder', children: [{ label: 'Archivos de empresas', icon: 'folder_shared', to: '/archivos' }] },
     { label: 'Control', icon: 'analytics', children: [{ label: 'Reportes', icon: 'picture_as_pdf', to: '/reportes' }] },
-    { label: 'Guía VITI', icon: 'help_center', to: '/guia-viti' },
+    { label: guideLabel, icon: 'help_center', to: '/guia-viti' },
   ]
 
   if (isSuperAdmin.value) {
@@ -80,7 +88,7 @@ const menu = computed(() => {
       icon: 'hub',
       children: [
         { label: 'Planes y módulos', icon: 'cloud_circle', to: '/saas' },
-        { label: 'Pagos VITI', icon: 'payments', to: '/pagos' },
+        { label: `Pagos ${branding.product_name}`, icon: 'payments', to: '/pagos' },
       ],
     })
     const files = operational.find(item => item.label === 'Archivos')
@@ -91,6 +99,7 @@ const menu = computed(() => {
       children: [
         { label: 'Usuarios', icon: 'manage_accounts', to: '/usuarios' },
         { label: 'Auditoría', icon: 'history', to: '/auditoria' },
+        { label: 'Marca y apariencia', icon: 'palette', action: 'branding' },
       ],
     })
   }
@@ -98,7 +107,7 @@ const menu = computed(() => {
 })
 
 const quickItems = computed(() => menu.value.flatMap(item => item.children
-  ? item.children.map(child => ({ ...child, group: item.label }))
+  ? item.children.filter(child => child.to).map(child => ({ ...child, group: item.label }))
   : item.to ? [{ ...item, group: null }] : []))
 const filteredQuickItems = computed(() => {
   const term = quickTerm.value.trim().toLocaleLowerCase('es')
@@ -132,6 +141,10 @@ async function uploadAdminPhoto(event) {
 async function logout() { notifications.clear(); tenant.clear(); await auth.logout(); router.replace('/login') }
 async function handleItem(item) {
   closeMobileDrawer()
+  if (item.action === 'branding') {
+    brandingDialog.value = true
+    return
+  }
   if (item.action === 'request') {
     try {
       const { data } = await api.post('/mi/solicitud')
@@ -146,10 +159,12 @@ function refreshWhenVisible() { if (document.visibilityState === 'visible') noti
 function openQuickSearch() { quickTerm.value = ''; quickSearch.value = true }
 function goQuick(item) { quickSearch.value = false; router.push(item.to) }
 function handleGlobalShortcut(event) { if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') { event.preventDefault(); openQuickSearch() } }
+function openGuide() { router.push('/guia-viti') }
 
 onMounted(async () => {
   document.body.classList.add('viti-main-active')
   drawer.value = $q.screen.gt.sm
+  branding.load().catch(() => {})
   if (isClient.value) { try { await tenant.load() } catch { /* mantiene acceso básico */ } }
   notifications.start()
   document.addEventListener('visibilitychange', refreshWhenVisible)
@@ -168,10 +183,10 @@ onBeforeUnmount(() => {
     <q-header bordered class="viti-header">
       <q-toolbar class="viti-toolbar">
         <q-btn flat round dense icon="menu" @click="drawer = !drawer" />
-        <div class="q-ml-md text-weight-bold gt-xs">{{ isClient ? (tenant.active?.nombre_comercial || 'Mi espacio VITI') : 'Panel VITI' }}</div>
+        <div class="q-ml-md text-weight-bold gt-xs">{{ isClient ? (tenant.active?.nombre_comercial || `Mi espacio ${branding.product_name}`) : `Panel ${branding.product_name}` }}</div>
         <q-space />
-        <q-btn flat round dense icon="refresh" @click="refreshApp"><q-tooltip>Actualizar VITI</q-tooltip></q-btn>
-        <q-btn flat round icon="search" @click="openQuickSearch"><q-tooltip>Buscar en VITI · Ctrl K</q-tooltip></q-btn>
+        <q-btn flat round dense icon="refresh" @click="refreshApp"><q-tooltip>Actualizar {{ branding.product_name }}</q-tooltip></q-btn>
+        <q-btn flat round icon="search" @click="openQuickSearch"><q-tooltip>Buscar en {{ branding.product_name }} · Ctrl K</q-tooltip></q-btn>
         <q-btn flat round :icon="$q.dark.isActive ? 'light_mode' : 'dark_mode'" @click="toggleDark"><q-tooltip>Cambiar tema</q-tooltip></q-btn>
         <q-btn flat round :icon="notifications.unreadCount ? 'notifications_active' : 'notifications_none'">
           <q-badge v-if="notifications.unreadCount" floating rounded color="negative" :label="unreadLabel" />
@@ -205,7 +220,7 @@ onBeforeUnmount(() => {
       </q-toolbar>
     </q-header>
 
-    <q-drawer v-model="drawer" show-if-above :breakpoint="900" :overlay="$q.screen.lt.md" :width="272" class="viti-drawer">
+    <q-drawer v-model="drawer" show-if-above :breakpoint="900" :overlay="$q.screen.lt.md" :width="288" class="viti-drawer" :style="{ background: branding.drawer_color }">
       <div class="column fit no-wrap">
         <div class="q-pa-lg"><AppBrand /></div>
         <div v-if="!isClient" class="q-px-md q-pb-md">
@@ -215,7 +230,7 @@ onBeforeUnmount(() => {
           <div class="client-badge">
             <div class="text-caption">Negocio activo</div>
             <q-select v-if="tenant.businesses.length > 1" dark borderless dense :model-value="tenant.activeId" :options="businessOptions" emit-value map-options @update:model-value="switchBusiness" />
-            <div v-else class="text-weight-bold ellipsis">{{ tenant.active?.nombre_comercial || 'Mi espacio VITI' }}</div>
+            <div v-else class="text-weight-bold ellipsis">{{ tenant.active?.nombre_comercial || `Mi espacio ${branding.product_name}` }}</div>
             <div v-if="tenant.active?.rol" class="text-caption q-mt-xs">{{ tenant.active.rol }}</div>
           </div>
         </div>
@@ -229,7 +244,7 @@ onBeforeUnmount(() => {
                 <q-item-section v-if="item.badge" side><q-badge rounded color="negative" :label="item.badge > 99 ? '99+' : item.badge" /></q-item-section>
               </q-item>
               <q-expansion-item v-else :icon="item.icon" :label="item.label" group="menu">
-                <q-item v-for="sub in item.children" :key="sub.to" clickable v-ripple :to="sub.to" class="q-ml-sm" @click="closeMobileDrawer">
+                <q-item v-for="sub in item.children" :key="sub.to || sub.action" clickable v-ripple :to="sub.to" class="q-ml-sm" @click="handleItem(sub)">
                   <q-item-section avatar><q-icon :name="sub.icon" /></q-item-section>
                   <q-item-section>{{ sub.label }}</q-item-section>
                   <q-item-section v-if="sub.badge" side><q-badge rounded color="negative" :label="sub.badge > 99 ? '99+' : sub.badge" /></q-item-section>
@@ -264,6 +279,23 @@ onBeforeUnmount(() => {
     <q-page-container><router-view /></q-page-container>
     <CallCenter />
 
+    <q-btn
+      v-if="showGuideFloat"
+      class="viti-guide-float"
+      :class="guideFloatClass"
+      outline
+      rounded
+      color="primary"
+      icon="help_outline"
+      label="Guía"
+      no-caps
+      @click="openGuide"
+    >
+      <q-tooltip>Guía {{ branding.product_name }}</q-tooltip>
+    </q-btn>
+
+    <BrandingSettingsDialog v-if="isSuperAdmin" v-model="brandingDialog" />
+
     <q-dialog v-model="quickSearch" position="top">
       <q-card class="quick-search-card">
         <q-card-section>
@@ -293,5 +325,7 @@ onBeforeUnmount(() => {
 .client-badge{padding:14px 16px;border-radius:14px;background:rgba(255,255,255,.08)}
 .viti-toolbar{min-height:64px}
 .quick-search-card{width:620px;max-width:94vw;margin-top:9vh;border-radius:18px}
+.viti-guide-float{position:fixed;z-index:2200;background:var(--viti-card);box-shadow:0 10px 28px rgba(5,20,40,.18);min-height:48px;padding:0 18px}.guide-right-center{right:18px;top:52%;transform:translateY(-50%)}.guide-right-bottom{right:20px;bottom:22px}
+@media(max-width:900px){.viti-guide-float{right:12px!important;top:auto!important;bottom:max(14px,env(safe-area-inset-bottom))!important;transform:none!important;min-width:48px;padding:0 13px}.viti-guide-float :deep(.q-btn__content .block){display:none}}
 @media(max-width:600px){.viti-toolbar{min-height:58px;padding-left:10px;padding-right:10px}.quick-search-card{margin-top:4vh}}
 </style>
