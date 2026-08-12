@@ -12,7 +12,9 @@ import AppBrand from '../components/AppBrand.vue'
 import BrandingSettingsDialog from '../components/BrandingSettingsDialog.vue'
 import CallCenter from '../components/CallCenter.vue'
 
-const adminPhotoInput = ref(null)
+const profilePhotoInput = ref(null)
+const profileCameraInput = ref(null)
+const profileDialog = ref(false)
 const uploadingPhoto = ref(false)
 const router = useRouter()
 const route = useRoute()
@@ -35,6 +37,7 @@ const accountRoleLabel = computed(() => isClient.value
 const hasClientProfile = computed(() => !!auth.user?.cliente_id)
 const isManager = computed(() => ['propietario', 'administrador'].includes(tenant.role))
 const profilePhoto = computed(() => isClient.value ? auth.user?.cliente?.foto_url : auth.user?.foto_url)
+const canChangeProfilePhoto = computed(() => isClient.value || isSuperAdmin.value)
 const unreadLabel = computed(() => notifications.unreadCount > 99 ? '99+' : String(notifications.unreadCount || ''))
 const businessOptions = computed(() => tenant.businesses.map(b => ({ label: b.nombre_comercial, value: b.id })))
 const guideFloatClass = computed(() => branding.guide_position === 'right-bottom' ? 'guide-right-bottom' : 'guide-right-center')
@@ -119,17 +122,38 @@ const filteredQuickItems = computed(() => {
 function toggleDark() { Dark.toggle(); localStorage.setItem('viti-theme', Dark.isActive ? 'dark' : 'light') }
 function refreshApp() { window.location.reload() }
 function closeMobileDrawer() { if ($q.screen.lt.md) drawer.value = false }
-function chooseAdminPhoto() { if (isSuperAdmin.value && !uploadingPhoto.value) adminPhotoInput.value?.click() }
+function openProfile() { profileDialog.value = true }
+function chooseProfilePhoto() { if (canChangeProfilePhoto.value && !uploadingPhoto.value) profilePhotoInput.value?.click() }
+function takeProfilePhoto() { if (canChangeProfilePhoto.value && !uploadingPhoto.value) profileCameraInput.value?.click() }
+function editProfile() {
+  profileDialog.value = false
+  closeMobileDrawer()
+  if (isClient.value && hasClientProfile.value) router.push('/mi-cuenta')
+}
 function switchBusiness(id) { if (!id || Number(id) === Number(tenant.activeId)) return; tenant.select(id); window.location.assign('/mi-aplicaciones') }
-async function uploadAdminPhoto(event) {
+async function uploadProfilePhoto(event) {
   const file = event.target?.files?.[0]
   if (!file) return
   uploadingPhoto.value = true
   try {
     const payload = new FormData()
     payload.append('foto', file)
-    const { data } = await api.post('/auth/perfil/foto', payload, { headers: { 'Content-Type': 'multipart/form-data' } })
-    auth.user = data.usuario
+    const endpoint = isClient.value ? '/mi/perfil/foto' : '/auth/perfil/foto'
+    const { data } = await api.post(endpoint, payload, { headers: { 'Content-Type': 'multipart/form-data' } })
+    if (isClient.value) {
+      const client = data.data || {}
+      auth.user = {
+        ...auth.user,
+        nombre: client.nombre || auth.user?.nombre,
+        cliente: {
+          ...(auth.user?.cliente || {}),
+          ...client,
+          foto_url: data.foto_url || client.foto_url || auth.user?.cliente?.foto_url,
+        },
+      }
+    } else if (data.usuario) {
+      auth.user = data.usuario
+    }
     $q.notify({ type: 'positive', message: 'Fotografía de perfil actualizada.' })
   } catch (e) {
     $q.notify({ type: 'negative', message: e.response?.data?.message || 'No se pudo actualizar la fotografía.' })
@@ -138,7 +162,7 @@ async function uploadAdminPhoto(event) {
     if (event.target) event.target.value = ''
   }
 }
-async function logout() { notifications.clear(); tenant.clear(); await auth.logout(); router.replace('/login') }
+async function logout() { profileDialog.value = false; notifications.clear(); tenant.clear(); await auth.logout(); router.replace('/login') }
 async function handleItem(item) {
   closeMobileDrawer()
   if (item.action === 'branding') {
@@ -255,14 +279,12 @@ onBeforeUnmount(() => {
         </q-scroll-area>
 
         <q-separator />
-        <q-item class="q-ma-sm q-py-md">
+        <q-item clickable v-ripple class="q-ma-sm q-py-md profile-footer" @click="openProfile">
           <q-item-section avatar>
-            <q-avatar color="accent" text-color="white" :class="{ 'cursor-pointer': isSuperAdmin }" @click="chooseAdminPhoto">
+            <q-avatar color="accent" text-color="white">
               <img v-if="profilePhoto" :src="profilePhoto" alt="Foto de perfil" />
               <span v-else>{{ initials || 'VT' }}</span>
-              <q-tooltip v-if="isSuperAdmin">Cambiar fotografía</q-tooltip>
             </q-avatar>
-            <input ref="adminPhotoInput" type="file" accept="image/jpeg,image/png,image/webp" hidden @change="uploadAdminPhoto" />
           </q-item-section>
           <q-item-section>
             <q-item-label>{{ auth.user?.nombre }} {{ auth.user?.apellido }}</q-item-label>
@@ -270,9 +292,11 @@ onBeforeUnmount(() => {
           </q-item-section>
           <q-item-section side>
             <q-spinner v-if="uploadingPhoto" size="20px" color="primary" />
-            <q-btn v-else flat round dense icon="logout" @click="logout"><q-tooltip>Cerrar sesión</q-tooltip></q-btn>
+            <q-btn v-else flat round dense icon="logout" @click.stop="logout"><q-tooltip>Cerrar sesión</q-tooltip></q-btn>
           </q-item-section>
         </q-item>
+        <input ref="profilePhotoInput" type="file" accept="image/jpeg,image/png,image/webp" hidden @change="uploadProfilePhoto" />
+        <input ref="profileCameraInput" type="file" accept="image/*" capture="user" hidden @change="uploadProfilePhoto" />
       </div>
     </q-drawer>
 
@@ -295,6 +319,55 @@ onBeforeUnmount(() => {
     </q-btn>
 
     <BrandingSettingsDialog v-if="isSuperAdmin" v-model="brandingDialog" />
+
+    <q-dialog v-model="profileDialog">
+      <q-card class="profile-card">
+        <q-card-section class="row items-start">
+          <div>
+            <div class="text-overline text-primary text-weight-bold">MI PERFIL</div>
+            <div class="text-h6 text-weight-bold">{{ auth.user?.nombre }} {{ auth.user?.apellido }}</div>
+            <div class="text-caption text-grey-6">{{ accountRoleLabel }}</div>
+          </div>
+          <q-space />
+          <q-btn flat round dense icon="close" v-close-popup />
+        </q-card-section>
+
+        <q-separator />
+
+        <q-card-section class="column items-center q-py-xl">
+          <q-avatar size="132px" color="accent" text-color="white" class="profile-photo-large">
+            <img v-if="profilePhoto" :src="profilePhoto" alt="Fotografía de perfil" />
+            <span v-else class="text-h4 text-weight-bold">{{ initials || 'VT' }}</span>
+          </q-avatar>
+          <div class="text-subtitle1 text-weight-bold q-mt-md">{{ auth.user?.nombre }} {{ auth.user?.apellido }}</div>
+          <div class="text-caption text-grey-6">{{ accountRoleLabel }}</div>
+          <div v-if="isClient && tenant.active?.nombre_comercial" class="text-caption text-grey-6 q-mt-xs">{{ tenant.active.nombre_comercial }}</div>
+
+          <q-spinner v-if="uploadingPhoto" size="32px" color="primary" class="q-mt-lg" />
+
+          <div v-if="canChangeProfilePhoto" class="row q-col-gutter-sm q-mt-lg full-width">
+            <div class="col-12 col-sm-6">
+              <q-btn outline color="primary" icon="photo_library" label="Cambiar foto" no-caps class="full-width" :disable="uploadingPhoto" @click="chooseProfilePhoto" />
+            </div>
+            <div class="col-12 col-sm-6">
+              <q-btn unelevated color="primary" icon="photo_camera" label="Tomar foto" no-caps class="full-width" :disable="uploadingPhoto" @click="takeProfilePhoto" />
+            </div>
+          </div>
+
+          <q-banner v-else rounded class="bg-grey-2 text-grey-8 q-mt-lg full-width">
+            Tu fotografía de usuario es administrada por el Superadministrador.
+          </q-banner>
+        </q-card-section>
+
+        <q-separator />
+
+        <q-card-actions class="q-pa-md">
+          <q-btn v-if="isClient && hasClientProfile" flat color="primary" icon="manage_accounts" label="Editar mis datos" no-caps @click="editProfile" />
+          <q-space />
+          <q-btn flat color="negative" icon="logout" label="Cerrar sesión" no-caps @click="logout" />
+        </q-card-actions>
+      </q-card>
+    </q-dialog>
 
     <q-dialog v-model="quickSearch" position="top">
       <q-card class="quick-search-card">
@@ -325,7 +398,9 @@ onBeforeUnmount(() => {
 .client-badge{padding:14px 16px;border-radius:14px;background:rgba(255,255,255,.08)}
 .viti-toolbar{min-height:64px}
 .quick-search-card{width:620px;max-width:94vw;margin-top:9vh;border-radius:18px}
+.profile-footer{border-radius:14px;transition:background .18s ease}.profile-footer:hover{background:rgba(255,255,255,.07)}
+.profile-card{width:520px;max-width:94vw;border-radius:20px;overflow:hidden}.profile-photo-large{box-shadow:0 12px 34px rgba(5,20,40,.22);border:4px solid rgba(255,255,255,.22)}
 .viti-guide-float{position:fixed;z-index:2200;background:var(--viti-card);box-shadow:0 10px 28px rgba(5,20,40,.18);min-height:48px;padding:0 18px}.guide-right-center{right:18px;top:52%;transform:translateY(-50%)}.guide-right-bottom{right:20px;bottom:22px}
 @media(max-width:900px){.viti-guide-float{right:12px!important;top:auto!important;bottom:max(14px,env(safe-area-inset-bottom))!important;transform:none!important;min-width:48px;padding:0 13px}.viti-guide-float :deep(.q-btn__content .block){display:none}}
-@media(max-width:600px){.viti-toolbar{min-height:58px;padding-left:10px;padding-right:10px}.quick-search-card{margin-top:4vh}}
+@media(max-width:600px){.viti-toolbar{min-height:58px;padding-left:10px;padding-right:10px}.quick-search-card{margin-top:4vh}.profile-card{width:94vw}.profile-photo-large{font-size:1.1rem}}
 </style>
