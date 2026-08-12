@@ -53,6 +53,7 @@ const menu = computed(() => {
     }
     if (hasClientProfile.value && isManager.value) items.push({ label: 'Nueva solicitud', icon: 'assignment_add', action: 'request' })
     if (hasClientProfile.value) items.push({ label: 'Mi buzón', icon: 'forum', to: '/mi-buzon', badge: notifications.unreadCount })
+    items.push({ label: 'Guía VITI', icon: 'help_center', to: '/guia-viti' })
     return items
   }
 
@@ -70,6 +71,7 @@ const menu = computed(() => {
     ] },
     { label: 'Archivos', icon: 'folder', children: [{ label: 'Archivos de empresas', icon: 'folder_shared', to: '/archivos' }] },
     { label: 'Control', icon: 'analytics', children: [{ label: 'Reportes', icon: 'picture_as_pdf', to: '/reportes' }] },
+    { label: 'Guía VITI', icon: 'help_center', to: '/guia-viti' },
   ]
 
   if (isSuperAdmin.value) {
