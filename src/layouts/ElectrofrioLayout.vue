@@ -26,6 +26,16 @@ const roleLabel = computed(() => clientMode.value ? ({propietario:'Propietario',
 const electroUnreadCount = computed(() => notifications.items.filter(item => item.contexto === 'electrofrio').length)
 const unread = computed(() => electroUnreadCount.value > 99 ? '99+' : String(electroUnreadCount.value || ''))
 const themeIcon = computed(() => theme.value === 'dark' ? 'light_mode' : 'dark_mode')
+const drawerThemeStyle = computed(() => theme.value === 'dark'
+  ? {
+      background: 'linear-gradient(180deg,#102a43 0%,#091e31 100%)',
+      color: '#f4fbff',
+      borderRightColor: 'rgba(146,211,229,.22)',
+    }
+  : {
+      background: 'linear-gradient(180deg,#fff 0%,#f3f8fc 100%)',
+      color: '#244256',
+    })
 const enabledModules = computed(() => {
   const modules = appInfo.value?.plan?.modulos
   return Array.isArray(modules) ? modules : allModules
@@ -139,7 +149,13 @@ watch(()=>route.fullPath,ensureAllowedRoute)
       </q-toolbar>
     </q-header>
 
-    <q-drawer v-model="drawer" :width="292" bordered class="electro-drawer">
+    <q-drawer
+      v-model="drawer"
+      :width="292"
+      bordered
+      :style="drawerThemeStyle"
+      :class="['electro-drawer', theme==='dark' ? 'electro-drawer--dark' : 'electro-drawer--light']"
+    >
       <div class="electro-drawer-brand q-pa-lg">
         <div class="row items-center no-wrap">
           <q-avatar size="54px" class="electro-brand-avatar">
@@ -200,30 +216,26 @@ watch(()=>route.fullPath,ensureAllowedRoute)
 .electro-header :deep(.q-toolbar){min-height:64px}.electro-header .text-caption{color:rgba(255,255,255,.78)}
 .electro-brand-avatar{color:#0f5d7b;background:rgba(255,255,255,.94);box-shadow:0 8px 20px rgba(7,38,61,.2)}
 .electro-brand-copy{line-height:1.15}.electro-back-btn{border-color:rgba(255,255,255,.66)}
-.electro-drawer{background:linear-gradient(180deg,#fff 0%,#f3f8fc 100%);color:#244256}
-.electro-dark .electro-drawer{background:linear-gradient(180deg,#102a43 0%,#091e31 100%);color:#f4fbff}
+.electro-drawer{transition:background .18s ease,color .18s ease,border-color .18s ease}
+.electro-drawer--light{background:linear-gradient(180deg,#fff 0%,#f3f8fc 100%)!important;color:#244256!important}
+.electro-drawer--dark{background:linear-gradient(180deg,#102a43 0%,#091e31 100%)!important;color:#f4fbff!important;border-right-color:rgba(146,211,229,.22)!important}
 .electro-drawer-brand{color:#fff;background:linear-gradient(135deg,#0b3d68,#0f4c81 58%,#127f9c);box-shadow:0 10px 28px rgba(8,44,74,.2)}
 .electro-drawer-brand .text-overline{color:#9debf0}.electro-drawer-brand .text-caption{color:rgba(255,255,255,.76)}
 .electro-menu{padding:12px 10px 90px}.electro-menu-title{padding:14px 10px 6px;color:#6b7d8c;font-size:11px;font-weight:800;letter-spacing:.08em;text-transform:uppercase}
-.electro-dark .electro-menu-title{color:#b6cad6}
 .electro-menu-item{min-height:50px;margin:4px 0;border-radius:14px;color:inherit}.electro-menu-item :deep(.q-icon){font-size:23px}.electro-menu-item :deep(.q-item__label--caption){color:var(--viti-muted)}
 .electro-active{color:#0b4f83!important;background:linear-gradient(135deg,rgba(25,118,210,.14),rgba(0,172,193,.11))!important;font-weight:800;box-shadow:inset 3px 0 0 #1976d2}
-.electro-dark .electro-active{color:#8fe9ef!important;background:linear-gradient(135deg,rgba(25,118,210,.28),rgba(0,172,193,.2))!important;box-shadow:inset 3px 0 0 #44d1dc}
 .electro-session{border-top:1px solid var(--viti-border);background:color-mix(in srgb,var(--viti-card) 92%,transparent);backdrop-filter:blur(12px);color:var(--viti-text)}
-.electro-dark .electro-session{color:#f4fbff}
 
-/* El drawer de Quasar puede quedar fuera del alcance efectivo del selector scoped.
-   Estas reglas usan el estado global exclusivo de Electrofrío para que el tema
-   oscuro cubra navegación, estados y sesión sin alterar VITI ni otras apps. */
-:global(body.electrofrio-local-dark) .electro-drawer{background:linear-gradient(180deg,#102a43 0%,#091e31 100%)!important;color:#f4fbff!important;border-right-color:rgba(146,211,229,.22)!important}
-:global(body.electrofrio-local-dark) .electro-drawer .electro-menu-title{color:#a9c4d4!important}
-:global(body.electrofrio-local-dark) .electro-drawer .electro-menu-item{color:#edf8ff!important}
-:global(body.electrofrio-local-dark) .electro-drawer .electro-menu-item .q-icon{color:#9fdde8!important}
-:global(body.electrofrio-local-dark) .electro-drawer .electro-menu-item .q-item__label--caption{color:#a9c7d7!important}
-:global(body.electrofrio-local-dark) .electro-drawer .electro-menu-item.electro-active{color:#9af1f2!important;background:linear-gradient(135deg,rgba(35,124,201,.3),rgba(0,178,194,.2))!important;box-shadow:inset 3px 0 0 #44d1dc!important}
-:global(body.electrofrio-local-dark) .electro-drawer .electro-session{background:#0b2237!important;color:#f4fbff!important;border-top-color:#284b63!important}
-:global(body.electrofrio-local-dark) .electro-drawer .electro-session .text-caption{color:#d9edf7!important}
-:global(body.electrofrio-local-light) .electro-drawer{background:linear-gradient(180deg,#fff 0%,#f3f8fc 100%)!important;color:#244256!important}
+.electro-drawer--dark .electro-menu-title{color:#a9c4d4!important}
+.electro-drawer--dark .electro-menu-item{color:#edf8ff!important}
+.electro-drawer--dark .electro-menu-item :deep(.q-icon){color:#9fdde8!important}
+.electro-drawer--dark .electro-menu-item :deep(.q-item__label--caption){color:#a9c7d7!important}
+.electro-drawer--dark .electro-menu-item.electro-active{color:#9af1f2!important;background:linear-gradient(135deg,rgba(35,124,201,.3),rgba(0,178,194,.2))!important;box-shadow:inset 3px 0 0 #44d1dc!important}
+.electro-drawer--dark .electro-session{background:#0b2237!important;color:#f4fbff!important;border-top-color:#284b63!important}
+.electro-drawer--dark .electro-session .text-caption{color:#d9edf7!important}
+.electro-drawer--light .electro-menu-item{color:#244256}
+.electro-drawer--light .electro-menu-item :deep(.q-item__label--caption){color:#63798a}
+.electro-drawer--light .electro-session{background:rgba(255,255,255,.94);color:#123047;border-top-color:rgba(15,76,129,.11)}
 
 :global(body.electrofrio-local-dark) .q-dialog__inner .q-card,:global(body.electrofrio-local-dark) .q-menu{background:#102a43;color:#f4fbff}
 :global(body.electrofrio-local-dark) .q-dialog__inner .text-grey-6,:global(body.electrofrio-local-dark) .q-dialog__inner .text-grey-7{color:#bed0dc!important}
