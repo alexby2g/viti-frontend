@@ -60,13 +60,12 @@ const operationNumbers = computed(() => {
   return numbers
 })
 const operationQuestions = computed(() => operationNumbers.value.map(questionByNumber).filter(Boolean))
-const answeredOperation = computed(() => operationQuestions.value.filter(q => hasValue(answers[q.id])).length)
 
 const planBenefits = key => ({
   initial:['1 aplicación VITI','Hasta 3 usuarios','Agenda, órdenes, clientes, equipos e historial'],
   professional:['1 aplicación VITI','Hasta 6 usuarios','Pagos, saldos, comprobantes y garantías'],
   enterprise:['Hasta 3 aplicaciones','Hasta 15 usuarios','Inventario técnico y operación avanzada'],
-  custom:['AGR Studio revisa el alcance contigo','Sin cuestionario interminable','Cotización antes de desarrollar'],
+  custom:['AGR Studio revisa el alcance contigo','Revisión corta y directa','Cotización antes de desarrollar'],
 }[key] || [])
 
 function annualSaving(plan) {
@@ -284,13 +283,12 @@ onBeforeUnmount(() => window.removeEventListener('online', syncDraft))
 
     <q-stepper v-model="step" flat animated color="primary" class="viti-card q-mt-lg">
       <q-step :name="1" title="Plan" icon="workspace_premium" :done="step>1">
-        <q-banner rounded class="bg-blue-1 text-primary q-mb-lg"><template #avatar><q-icon name="info"/></template>Compara precio y alcance. No necesitas responder otro diagnóstico antes de elegir.</q-banner>
         <div class="plan-grid">
           <q-card v-for="plan in plans" :key="plan.id" flat bordered :class="['plan-card',{selected:Number(commercial.plan_viti_id)===Number(plan.id)}]" @click="selectPlan(plan)">
             <q-card-section>
               <div class="row items-start no-wrap q-gutter-sm"><div class="col"><div class="text-h6 text-weight-bold">{{plan.nombre}}</div><div class="text-caption text-grey-7 q-mt-sm">{{plan.descripcion}}</div></div><q-radio :model-value="commercial.plan_viti_id" :val="plan.id" color="primary" :disable="sent" @update:model-value="selectPlan(plan)"/></div>
               <div v-if="planKey(plan)!=='custom'" class="price-box q-mt-lg"><div><div class="price-label">Implementación</div><div class="price-value">{{money(plan.precio_proyecto)}}</div></div><div><div class="price-label">Suscripción</div><div class="text-weight-bold">{{money(plan.precio_mensual)}}/mes</div><div class="text-caption text-positive">{{money(plan.precio_anual)}}/año</div></div></div>
-              <div v-else class="custom-price q-mt-lg"><q-icon name="request_quote" color="primary" size="28px"/><div><div class="text-weight-bold">Cotización después de una revisión corta</div><div class="text-caption text-grey-7">No se despliegan 70 preguntas. Solo nos cuentas lo esencial.</div></div></div>
+              <div v-else class="custom-price q-mt-lg"><q-icon name="request_quote" color="primary" size="28px"/><div><div class="text-weight-bold">Cotización después de una revisión corta</div><div class="text-caption text-grey-7">Cuéntanos lo esencial y AGR Studio revisará el alcance contigo.</div></div></div>
               <q-list dense class="q-mt-md"><q-item v-for="benefit in planBenefits(planKey(plan))" :key="benefit" class="q-px-none"><q-item-section avatar style="min-width:30px"><q-icon name="check_circle" color="positive"/></q-item-section><q-item-section>{{benefit}}</q-item-section></q-item></q-list>
               <div v-if="annualSaving(plan)>0" class="text-caption text-positive text-weight-bold q-mt-sm">Ahorro anual: {{money(annualSaving(plan))}}.</div>
             </q-card-section>
@@ -300,7 +298,7 @@ onBeforeUnmount(() => window.removeEventListener('online', syncDraft))
 
       <q-step :name="2" title="Configuración" icon="tune" :done="step>2">
         <div class="row items-start justify-between q-gutter-md q-mb-lg">
-          <div><div class="text-h6 text-weight-bold">Solo lo necesario para {{selectedPlan?.nombre}}</div><div class="text-body2 text-grey-7">Son {{operationQuestions.length}} preguntas como máximo y ninguna bloquea el envío. Puedes usar sugerencias o saltar este paso.</div></div>
+          <div><div class="text-h6 text-weight-bold">Configuración de {{selectedPlan?.nombre}}</div><div class="text-body2 text-grey-7">Responde solo lo que tengas claro. También puedes saltar este paso y completar los detalles durante la revisión.</div></div>
           <q-btn outline no-caps color="primary" icon="skip_next" label="Saltar configuración" :disable="sent" @click="skipOperation"/>
         </div>
 
@@ -314,7 +312,6 @@ onBeforeUnmount(() => window.removeEventListener('online', syncDraft))
           <div v-else-if="q.tipo==='seleccion_unica'"><q-option-group v-model="answers[q.id]" :options="optionsFor(q).map(x=>({label:x,value:x}))" type="radio" color="primary" :disable="sent"/><q-input v-if="hasOther(q)&&selectedOther(q)" v-model="otherAnswers[q.id]" outlined dense class="q-mt-sm" label="Especifica" :disable="sent"/></div>
           <div v-else><q-option-group v-model="answers[q.id]" :options="optionsFor(q).map(x=>({label:x,value:x}))" type="checkbox" color="primary" :disable="sent"/><q-input v-if="hasOther(q)&&selectedOther(q)" v-model="otherAnswers[q.id]" outlined dense class="q-mt-sm" label="Especifica" :disable="sent"/></div>
         </div>
-        <q-banner rounded class="bg-grey-2 text-grey-8 q-mt-lg">Respondidas: {{answeredOperation}} de {{operationQuestions.length}}. Las que falten las podemos definir contigo durante la revisión.</q-banner>
       </q-step>
 
       <q-step :name="3" title="Acuerdo" icon="handshake">
