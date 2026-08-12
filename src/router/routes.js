@@ -121,6 +121,7 @@ export default [
       { path: 'auditoria', name: 'auditoria', component: () => import('../pages/AuditoriaPage.vue'), meta:{adminOnly:true,superAdminOnly:true} },
       { path: 'usuarios', name: 'usuarios', component: () => import('../pages/UsuariosPage.vue'), meta:{adminOnly:true,superAdminOnly:true} },
       { path: 'almacenamiento', name: 'almacenamiento', component: () => import('../pages/StoragePage.vue'), meta:{adminOnly:true,superAdminOnly:true} },
+      { path: 'guia-viti', name: 'viti-guide', component: () => import('../pages/VitiGuidePage.vue') },
     ],
   },
   { path: '/:catchAll(.*)*', redirect: '/' },
