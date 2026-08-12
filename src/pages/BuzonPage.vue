@@ -58,6 +58,39 @@ const callsEnabled = computed(() => Boolean(activeSession.value))
 const showContacts = computed(() => !isMobile.value || !mobileChatOpen.value)
 const showChat = computed(() => !isMobile.value || mobileChatOpen.value)
 const presenceText = computed(() => presence.value.escribiendo ? 'Escribiendo…' : (presence.value.en_linea ? 'En línea' : 'Desconectado'))
+const showQuickReplies = computed(() => Boolean(canManage.value) && (!isElectrofrio.value || !businessMode.value))
+const contactFirstName = computed(() => String(currentContact.value?.nombre || 'estimado/a').trim().split(/\s+/)[0])
+const quickReplies = computed(() => {
+  const name = contactFirstName.value
+  if (isElectrofrio.value) return [
+    { label:'Equipo recibido', icon:'inventory_2', text:`Hola ${name}. Hemos recibido tu equipo y registramos la información inicial. Te avisaremos cuando termine la revisión.` },
+    { label:'Diagnóstico en proceso', icon:'search', text:`Hola ${name}. Tu equipo se encuentra en diagnóstico. Estamos verificando la falla antes de proponerte el trabajo a realizar.` },
+    { label:'Propuesta lista', icon:'description', text:`Hola ${name}. El diagnóstico ya está listo y tenemos una propuesta de solución. Revísala y confírmanos si autorizas continuar con la reparación.` },
+    { label:'Esperando autorización', icon:'how_to_reg', text:`Hola ${name}. Para continuar necesitamos tu autorización sobre la propuesta enviada. Cuando la confirmes pasaremos a reparación.` },
+    { label:'Reparación terminada', icon:'build_circle', text:`Hola ${name}. El trabajo de reparación terminó y el equipo está pasando por las pruebas finales antes de la entrega.` },
+    { label:'Listo para entregar', icon:'task_alt', text:`Hola ${name}. Tu equipo está listo para entrega. Podemos coordinar la entrega y cualquier saldo pendiente por este mismo chat.` },
+    { label:'Pago recibido', icon:'payments', text:`Hola ${name}. Recibimos tu pago/comprobante. Gracias. Quedará registrado junto al servicio realizado.` },
+  ]
+  return [
+    { label:'Solicitud recibida', icon:'assignment_turned_in', text:`Hola ${name}. Ya recibimos tu solicitud en VITI. Vamos a revisar el alcance y el plan seleccionado antes de continuar.` },
+    { label:'Revisión de alcance', icon:'manage_search', text:`Hola ${name}. Estamos revisando tu solicitud. Verificaremos que el plan cubra las funciones que necesitas y te confirmaremos el siguiente paso por este buzón.` },
+    { label:'Falta información', icon:'help_outline', text:`Hola ${name}. Para continuar con la revisión necesitamos confirmar un dato adicional de tu operación. Te indicaremos exactamente qué información falta para no hacerte repetir todo el formulario.` },
+    { label:'Plan / cotización', icon:'request_quote', text:`Hola ${name}. Revisamos el alcance comercial de tu solicitud. Antes de iniciar confirmaremos contigo el plan, el costo de implementación y la modalidad de suscripción.` },
+    { label:'Comprobante recibido', icon:'receipt_long', text:`Hola ${name}. Recibimos tu comprobante de pago. Está en revisión y el saldo se actualizará cuando quede confirmado por AGR Studio.` },
+    { label:'Nuevo avance', icon:'timeline', text:`Hola ${name}. Tu proyecto tiene un nuevo avance disponible en VITI. Puedes revisarlo desde Mi proyecto y escribirnos aquí si necesitas una aclaración.` },
+    { label:'Beta disponible', icon:'science', text:`Hola ${name}. Ya tenemos una versión de prueba disponible. Esta etapa sirve para validar el funcionamiento antes de la entrega definitiva.` },
+    { label:'Entrega lista', icon:'verified_user', text:`Hola ${name}. Tu aplicación está lista para la siguiente etapa de entrega. Confirmaremos acceso, estado del proyecto y condiciones de soporte desde VITI.` },
+    { label:'Seguimiento', icon:'forum', text:`Hola ${name}. Te escribimos para dar seguimiento a tu proceso en VITI. Si tienes alguna observación o cambio importante, puedes responder directamente por este chat.` },
+  ]
+})
+
+function useQuickReply(item) {
+  reply.value = item.text
+  nextTick(() => {
+    const input = document.querySelector('.message-input textarea, .message-input input')
+    input?.focus()
+  })
+}
 
 function requestId() {
   return globalThis.crypto?.randomUUID?.() || 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, char => {
@@ -273,15 +306,27 @@ onBeforeUnmount(()=>{if(pollTimer)window.clearInterval(pollTimer);heartbeat(fals
             <div v-if="presence.escribiendo" class="typing-bubble">Escribiendo<span>.</span><span>.</span><span>.</span></div>
           </q-card-section>
 
+          <div v-if="showQuickReplies" class="quick-reply-bar q-px-md q-pt-sm">
+            <q-btn-dropdown flat dense no-caps color="primary" icon="quickreply" label="Respuestas rápidas">
+              <q-list style="min-width:330px;max-width:440px">
+                <q-item-label header>{{isElectrofrio?'Flujo de servicio técnico':'Flujo VITI'}}</q-item-label>
+                <q-item v-for="item in quickReplies" :key="item.label" clickable v-close-popup @click="useQuickReply(item)">
+                  <q-item-section avatar><q-icon :name="item.icon" color="primary"/></q-item-section>
+                  <q-item-section><q-item-label class="text-weight-bold">{{item.label}}</q-item-label><q-item-label caption lines="2">{{item.text}}</q-item-label></q-item-section>
+                </q-item>
+              </q-list>
+            </q-btn-dropdown>
+            <span class="text-caption text-grey-6">Inserta el texto para revisarlo antes de enviar.</span>
+          </div>
           <div v-if="attachment" class="attachment-preview q-px-md q-pt-sm">
             <img v-if="attachmentPreview" :src="attachmentPreview" alt="Vista previa"/>
             <q-avatar v-else square color="grey-2" text-color="primary" :icon="chatFileIcon(attachment)"/>
             <div class="col min-width-0"><div class="text-weight-medium ellipsis">{{attachment.name}}</div><div class="text-caption text-grey-6">{{formatFileSize(attachment.size)}} · Archivo privado para esta conversación.</div></div><q-btn flat round icon="close" :disable="sending" @click="clearAttachment"/>
           </div>
           <q-separator/>
-          <q-card-section class="composer"><input ref="fileInput" type="file" :accept="CHAT_FILE_ACCEPT" hidden @change="onAttachment"/><q-btn round flat color="primary" icon="attach_file" class="composer-action" :disable="sending" @click="chooseAttachment"><q-tooltip>Adjuntar imagen o documento</q-tooltip></q-btn><q-input v-model="reply" class="message-input" rounded outlined autogrow placeholder="Responder al cliente..." :disable="sending" @keydown.enter.exact.prevent="send"><q-tooltip>Enter envía · Shift + Enter crea una línea nueva</q-tooltip></q-input><q-btn color="primary" unelevated round icon="send" class="composer-action send-action" :loading="sending" :disable="(!reply.trim()&&!attachment)||sending" @click="send"><q-tooltip>Enviar mensaje</q-tooltip></q-btn></q-card-section>
+          <q-card-section class="composer"><input ref="fileInput" type="file" :accept="CHAT_FILE_ACCEPT" hidden @change="onAttachment"/><q-btn round flat color="primary" icon="attach_file" class="composer-action" :disable="sending" @click="chooseAttachment"><q-tooltip>Adjuntar imagen o documento</q-tooltip></q-btn><q-input v-model="reply" class="message-input" rounded outlined autogrow :placeholder="isElectrofrio?'Responder sobre el servicio...':'Responder a la empresa...'" :disable="sending" @keydown.enter.exact.prevent="send"><q-tooltip>Enter envía · Shift + Enter crea una línea nueva</q-tooltip></q-input><q-btn color="primary" unelevated round icon="send" class="composer-action send-action" :loading="sending" :disable="(!reply.trim()&&!attachment)||sending" @click="send"><q-tooltip>Enviar mensaje</q-tooltip></q-btn></q-card-section>
         </q-card>
-        <div v-else-if="!isMobile" class="empty-state">Selecciona un cliente para atenderlo.</div>
+        <div v-else-if="!isMobile" class="empty-state">Selecciona una conversación para atenderla.</div>
       </div>
     </div>
 
@@ -291,6 +336,6 @@ onBeforeUnmount(()=>{if(pollTimer)window.clearInterval(pollTimer);heartbeat(fals
 </template>
 
 <style scoped>
-.admin-chat-page{max-width:1500px}.min-width-0{min-width:0}.admin-chat-layout{display:grid;grid-template-columns:minmax(280px,390px) minmax(0,1fr);gap:18px}.contacts-card{max-height:74vh;overflow:auto}.messenger-card{overflow:hidden;display:flex;flex-direction:column}.chat-header{min-height:72px}.messages{display:flex;flex-direction:column;gap:6px;height:min(60vh,650px);min-height:430px;overflow:auto;padding:18px}.messenger-bg{background:linear-gradient(180deg,rgba(127,127,127,.035),rgba(127,127,127,.015))}.message-row{display:flex;align-items:flex-end;gap:7px}.message-row.client{justify-content:flex-start}.message-row.admin{justify-content:flex-end}.message-avatar{margin-bottom:3px}.bubble{position:relative;max-width:min(78%,620px);padding:9px 12px;border-radius:18px;box-shadow:0 1px 2px rgba(0,0,0,.07)}.bubble-client{background:var(--viti-card);color:var(--viti-text);border:1px solid var(--viti-border);border-bottom-left-radius:5px}.bubble-admin{background:#1976d2;color:#fff;border-bottom-right-radius:5px}.message-actions{position:absolute;top:1px;right:1px;opacity:0}.bubble:hover .message-actions,.message-actions:focus{opacity:.8}.message-text{white-space:pre-wrap;overflow-wrap:anywhere;padding-right:16px}.message-meta{font-size:10.5px;opacity:.74;text-align:right;margin-top:4px;display:flex;justify-content:flex-end;align-items:center}.deleted-message{font-style:italic;opacity:.72;padding-right:18px}.attachment-wrap{margin:-5px -8px 7px}.chat-image{display:block;max-width:100%;max-height:360px;border-radius:14px;object-fit:cover}.document-card{display:flex;align-items:center;gap:10px;padding:10px 12px;margin:0 0 7px;border-radius:12px;background:rgba(127,127,127,.12);color:inherit;text-decoration:none;min-width:min(320px,70vw)}.document-name{font-weight:700}.document-meta{font-size:11px;opacity:.72}.attachment-preview{display:flex;align-items:center;gap:12px}.attachment-preview img{width:64px;height:64px;border-radius:12px;object-fit:cover}.composer{display:grid;grid-template-columns:48px minmax(0,1fr) 48px;gap:8px;align-items:end;padding:10px 14px}.composer-action{width:48px;height:48px;min-width:48px;flex:none}.send-action{box-shadow:0 5px 14px rgba(25,118,210,.25)}.message-input :deep(.q-field__control){min-height:48px}.typing-bubble{align-self:flex-start;padding:8px 14px;border-radius:16px;background:var(--viti-card);border:1px solid var(--viti-border);font-size:12px;color:var(--viti-muted)}.typing-bubble span{animation:pulse 1.2s infinite}.typing-bubble span:nth-child(2){animation-delay:.2s}.typing-bubble span:nth-child(3){animation-delay:.4s}.mobile-section-title{font-size:24px;font-weight:800;margin:4px 4px 12px}@keyframes pulse{0%,60%,100%{opacity:.25}30%{opacity:1}}
-@media(max-width:1023px){.admin-chat-page{padding:0!important;max-width:none}.admin-chat-layout{display:block}.contacts-pane{padding:16px 12px}.contacts-card{max-height:none}.conversation-pane{height:calc(100dvh - 58px)}.messenger-card{height:100%;border-radius:0!important;border-left:0;border-right:0}.messages{flex:1;height:auto;min-height:0;padding:12px}.chat-header{position:sticky;top:0;z-index:5;padding:8px}.composer{position:sticky;bottom:0;z-index:5;padding:8px 10px max(8px,env(safe-area-inset-bottom))}.bubble{max-width:86%}.message-actions{opacity:.65}.document-card{min-width:0;max-width:78vw}}
+.admin-chat-page{max-width:1500px}.min-width-0{min-width:0}.admin-chat-layout{display:grid;grid-template-columns:minmax(280px,390px) minmax(0,1fr);gap:18px}.contacts-card{max-height:74vh;overflow:auto}.messenger-card{overflow:hidden;display:flex;flex-direction:column}.chat-header{min-height:72px}.messages{display:flex;flex-direction:column;gap:6px;height:min(60vh,650px);min-height:430px;overflow:auto;padding:18px}.messenger-bg{background:linear-gradient(180deg,rgba(127,127,127,.035),rgba(127,127,127,.015))}.message-row{display:flex;align-items:flex-end;gap:7px}.message-row.client{justify-content:flex-start}.message-row.admin{justify-content:flex-end}.message-avatar{margin-bottom:3px}.bubble{position:relative;max-width:min(78%,620px);padding:9px 12px;border-radius:18px;box-shadow:0 1px 2px rgba(0,0,0,.07)}.bubble-client{background:var(--viti-card);color:var(--viti-text);border:1px solid var(--viti-border);border-bottom-left-radius:5px}.bubble-admin{background:#1976d2;color:#fff;border-bottom-right-radius:5px}.message-actions{position:absolute;top:1px;right:1px;opacity:0}.bubble:hover .message-actions,.message-actions:focus{opacity:.8}.message-text{white-space:pre-wrap;overflow-wrap:anywhere;padding-right:16px}.message-meta{font-size:10.5px;opacity:.74;text-align:right;margin-top:4px;display:flex;justify-content:flex-end;align-items:center}.deleted-message{font-style:italic;opacity:.72;padding-right:18px}.attachment-wrap{margin:-5px -8px 7px}.chat-image{display:block;max-width:100%;max-height:360px;border-radius:14px;object-fit:cover}.document-card{display:flex;align-items:center;gap:10px;padding:10px 12px;margin:0 0 7px;border-radius:12px;background:rgba(127,127,127,.12);color:inherit;text-decoration:none;min-width:min(320px,70vw)}.document-name{font-weight:700}.document-meta{font-size:11px;opacity:.72}.attachment-preview{display:flex;align-items:center;gap:12px}.attachment-preview img{width:64px;height:64px;border-radius:12px;object-fit:cover}.quick-reply-bar{display:flex;align-items:center;gap:10px;flex-wrap:wrap}.composer{display:grid;grid-template-columns:48px minmax(0,1fr) 48px;gap:8px;align-items:end;padding:10px 14px}.composer-action{width:48px;height:48px;min-width:48px;flex:none}.send-action{box-shadow:0 5px 14px rgba(25,118,210,.25)}.message-input :deep(.q-field__control){min-height:48px}.typing-bubble{align-self:flex-start;padding:8px 14px;border-radius:16px;background:var(--viti-card);border:1px solid var(--viti-border);font-size:12px;color:var(--viti-muted)}.typing-bubble span{animation:pulse 1.2s infinite}.typing-bubble span:nth-child(2){animation-delay:.2s}.typing-bubble span:nth-child(3){animation-delay:.4s}.mobile-section-title{font-size:24px;font-weight:800;margin:4px 4px 12px}@keyframes pulse{0%,60%,100%{opacity:.25}30%{opacity:1}}
+@media(max-width:1023px){.admin-chat-page{padding:0!important;max-width:none}.admin-chat-layout{display:block}.contacts-pane{padding:16px 12px}.contacts-card{max-height:none}.conversation-pane{height:calc(100dvh - 58px)}.messenger-card{height:100%;border-radius:0!important;border-left:0;border-right:0}.messages{flex:1;height:auto;min-height:0;padding:12px}.chat-header{position:sticky;top:0;z-index:5;padding:8px}.quick-reply-bar{padding-bottom:4px}.composer{position:sticky;bottom:0;z-index:5;padding:8px 10px max(8px,env(safe-area-inset-bottom))}.bubble{max-width:86%}.message-actions{opacity:.65}.document-card{min-width:0;max-width:78vw}}
 </style>
