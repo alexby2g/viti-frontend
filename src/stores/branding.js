@@ -1,5 +1,4 @@
 import { defineStore } from 'pinia'
-import { colors } from 'quasar'
 import { api } from '../boot/axios'
 import { mediaUrl } from '../utils/media'
 
@@ -32,12 +31,13 @@ export const useBrandingStore = defineStore('branding', {
       this.apply()
     },
     apply() {
-      colors.setBrand('primary', this.primary_color)
-      colors.setBrand('secondary', this.secondary_color)
-      colors.setBrand('accent', this.accent_color)
-      colors.setBrand('dark', this.dark_color)
-      document.documentElement.style.setProperty('--viti-drawer-live', this.drawer_color)
-      document.documentElement.style.setProperty('--viti-primary-live', this.primary_color)
+      const root = document.documentElement
+      root.style.setProperty('--q-primary', this.primary_color)
+      root.style.setProperty('--q-secondary', this.secondary_color)
+      root.style.setProperty('--q-accent', this.accent_color)
+      root.style.setProperty('--q-dark', this.dark_color)
+      root.style.setProperty('--viti-drawer-live', this.drawer_color)
+      root.style.setProperty('--viti-primary-live', this.primary_color)
       document.title = `${this.product_name} · ${this.studio_name}`
     },
     async load(force = false) {
