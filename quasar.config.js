@@ -1,6 +1,6 @@
 import { defineConfig } from '#q-app/wrappers'
 export default defineConfig(() => ({
-  boot: ['theme', 'axios', 'offline', 'mobilePush', 'supportRoutes'],
+  boot: ['theme', 'axios', 'branding', 'offline', 'mobilePush', 'supportRoutes'],
   css: ['app.scss', 'agr-viti.scss', 'native-scroll.scss'],
   extras: ['material-icons'],
   build: { vueRouterMode: 'history', env: { API_URL: process.env.VITE_API_URL || 'http://localhost:8000/api/v1' } },
