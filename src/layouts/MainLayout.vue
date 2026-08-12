@@ -335,10 +335,28 @@ onBeforeUnmount(() => {
         <q-separator />
 
         <q-card-section class="column items-center q-py-xl">
-          <q-avatar size="132px" color="accent" text-color="white" class="profile-photo-large">
-            <img v-if="profilePhoto" :src="profilePhoto" alt="Fotografía de perfil" />
-            <span v-else class="text-h4 text-weight-bold">{{ initials || 'VT' }}</span>
-          </q-avatar>
+          <div class="profile-photo-wrap">
+            <q-avatar size="132px" color="accent" text-color="white" class="profile-photo-large">
+              <img v-if="profilePhoto" :src="profilePhoto" alt="Fotografía de perfil" />
+              <span v-else class="text-h4 text-weight-bold">{{ initials || 'VT' }}</span>
+            </q-avatar>
+            <q-btn v-if="profilePhoto" round dense unelevated color="primary" icon="zoom_in" class="profile-photo-zoom-btn" aria-label="Ampliar fotografía">
+              <q-tooltip>Ampliar foto</q-tooltip>
+              <q-menu anchor="center right" self="center left" :offset="[12, 0]" class="profile-photo-preview-menu">
+                <q-card class="profile-photo-preview-card">
+                  <q-card-section class="row items-center q-pb-sm">
+                    <div class="text-subtitle2 text-weight-bold">Fotografía de perfil</div>
+                    <q-space />
+                    <q-btn flat round dense icon="close" v-close-popup />
+                  </q-card-section>
+                  <q-separator />
+                  <q-card-section class="profile-photo-preview-body">
+                    <img :src="profilePhoto" :alt="`Fotografía ampliada de ${auth.user?.nombre || 'perfil'}`" class="profile-photo-preview-image" />
+                  </q-card-section>
+                </q-card>
+              </q-menu>
+            </q-btn>
+          </div>
           <div class="text-subtitle1 text-weight-bold q-mt-md">{{ auth.user?.nombre }} {{ auth.user?.apellido }}</div>
           <div class="text-caption text-grey-6">{{ accountRoleLabel }}</div>
           <div v-if="isClient && tenant.active?.nombre_comercial" class="text-caption text-grey-6 q-mt-xs">{{ tenant.active.nombre_comercial }}</div>
@@ -399,8 +417,8 @@ onBeforeUnmount(() => {
 .viti-toolbar{min-height:64px}
 .quick-search-card{width:620px;max-width:94vw;margin-top:9vh;border-radius:18px}
 .profile-footer{border-radius:14px;transition:background .18s ease}.profile-footer:hover{background:rgba(255,255,255,.07)}
-.profile-card{width:520px;max-width:94vw;border-radius:20px;overflow:hidden}.profile-photo-large{box-shadow:0 12px 34px rgba(5,20,40,.22);border:4px solid rgba(255,255,255,.22)}
+.profile-card{width:520px;max-width:94vw;border-radius:20px;overflow:hidden}.profile-photo-wrap{position:relative;display:inline-flex}.profile-photo-large{box-shadow:0 12px 34px rgba(5,20,40,.22);border:4px solid rgba(255,255,255,.22)}.profile-photo-zoom-btn{position:absolute;right:-14px;bottom:7px;box-shadow:0 8px 20px rgba(5,20,40,.28)}.profile-photo-preview-card{width:min(390px,82vw);border-radius:18px;overflow:hidden}.profile-photo-preview-body{padding:14px;display:flex;justify-content:center;align-items:center}.profile-photo-preview-image{display:block;max-width:100%;max-height:58vh;object-fit:contain;border-radius:14px}
 .viti-guide-float{position:fixed;z-index:2200;background:var(--viti-card);box-shadow:0 10px 28px rgba(5,20,40,.18);min-height:48px;padding:0 18px}.guide-right-center{right:18px;top:52%;transform:translateY(-50%)}.guide-right-bottom{right:20px;bottom:22px}
 @media(max-width:900px){.viti-guide-float{right:12px!important;top:auto!important;bottom:max(14px,env(safe-area-inset-bottom))!important;transform:none!important;min-width:48px;padding:0 13px}.viti-guide-float :deep(.q-btn__content .block){display:none}}
-@media(max-width:600px){.viti-toolbar{min-height:58px;padding-left:10px;padding-right:10px}.quick-search-card{margin-top:4vh}.profile-card{width:94vw}.profile-photo-large{font-size:1.1rem}}
+@media(max-width:600px){.viti-toolbar{min-height:58px;padding-left:10px;padding-right:10px}.quick-search-card{margin-top:4vh}.profile-card{width:94vw}.profile-photo-large{font-size:1.1rem}.profile-photo-preview-card{width:84vw}}
 </style>
