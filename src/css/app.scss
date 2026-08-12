@@ -24,3 +24,8 @@ body{text-size-adjust:100%;-webkit-text-size-adjust:100%}img{max-width:100%}.q-a
 .body--dark.viti-main-active .q-table thead th{color:#d8e6f4;background:#102f53}
 .body--dark.viti-main-active .q-table tbody td{color:#f3f7fc}
 .body--dark.viti-main-active .q-field__label,.body--dark.viti-main-active .q-field__native,.body--dark.viti-main-active .q-field__input,.body--dark.viti-main-active .q-field__marginal{color:#eaf2fb}
+
+/* Shell superior VITI: negro grafito sobrio sin alterar el contenido. */
+.viti-main-active .viti-header{background:#0b0b0d!important;color:#f7f7f8!important;border-color:#242428!important;box-shadow:0 1px 0 rgba(255,255,255,.04)}
+.viti-main-active .viti-header .q-btn,.viti-main-active .viti-header .q-icon,.viti-main-active .viti-header .q-toolbar__title{color:#f7f7f8!important}
+.viti-main-active .viti-header .q-btn:hover{background:rgba(255,255,255,.08)!important}
