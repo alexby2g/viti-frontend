@@ -66,7 +66,7 @@ async function submit() {
     if (photo.value) payload.append('foto', photo.value)
     await initCsrf()
     const { data } = await api.post(`/publico/registro/${route.params.token}`, payload, { headers:{'Content-Type':'multipart/form-data'} })
-    $q.notify({ type:'positive', message:'Registro completado. Ahora cuéntanos cómo debe funcionar tu sistema.' })
+    $q.notify({ type:'positive', message:'Registro completado. Ahora elige el plan VITI que mejor encaje con tu negocio.' })
     await router.replace(data.data.ruta_cuestionario)
   } catch (e) {
     $q.notify({ type:'negative', message:errorMessage(e, 'No pudimos completar tu registro.') })
@@ -89,7 +89,7 @@ onMounted(load)
 
       <div class="section-label">Bienvenido a VITI</div>
       <h1 class="page-title">Cuéntanos quién eres y qué necesitas</h1>
-      <p class="page-subtitle">No necesitas instalar ninguna aplicación. Completa tus datos desde este navegador y después responderás el cuestionario de tu sistema.</p>
+      <p class="page-subtitle">Completa una sola vez tus datos personales, los de tu negocio y una breve necesidad. Después pasarás directamente a comparar los planes VITI.</p>
 
       <q-card flat class="viti-card q-mt-lg onboarding-card">
         <q-card-section>
@@ -127,7 +127,7 @@ onMounted(load)
 
         <q-card-section v-else-if="step===2" class="q-pa-lg">
           <div class="text-h6 text-weight-bold q-mb-xs">Tu negocio o proyecto</div>
-          <div class="text-caption text-grey-6 q-mb-lg">Puede ser una microempresa, institución, emprendimiento o un proyecto personal.</div>
+          <div class="text-caption text-grey-6 q-mb-lg">Esta información se registra aquí y no volveremos a preguntártela en los pasos siguientes.</div>
           <div class="row q-col-gutter-md">
             <div class="col-12"><q-input v-model="form.empresa_nombre" outlined label="Nombre del negocio, institución o proyecto *" /></div>
             <div class="col-12"><q-input v-model="form.empresa_actividad" outlined label="¿A qué se dedica?" /></div>
@@ -135,18 +135,18 @@ onMounted(load)
             <div class="col-12 col-sm-6"><q-input v-model="form.empresa_whatsapp" outlined label="WhatsApp del negocio" inputmode="numeric" /></div>
             <div class="col-12 col-sm-5"><q-input v-model="form.empresa_ciudad" outlined label="Ciudad del negocio" /></div>
             <div class="col-12 col-sm-7"><q-input v-model="form.empresa_direccion" outlined label="Dirección del negocio" /></div>
-            <div class="col-12"><q-input v-model="form.titulo_sistema" outlined label="¿Qué sistema necesitas? *" placeholder="Ej.: Sistema para administrar mi guardería" /></div>
+            <div class="col-12"><q-input v-model="form.titulo_sistema" outlined label="¿Qué sistema necesitas? *" placeholder="Ej.: Sistema para administrar mis servicios técnicos" /></div>
             <div class="col-12"><q-input v-model="form.resumen" outlined type="textarea" autogrow label="Cuéntanos brevemente qué problema quieres resolver" /></div>
           </div>
         </q-card-section>
 
         <q-card-section v-else class="q-pa-lg">
-          <div class="text-h6 text-weight-bold q-mb-sm">Todo listo para comenzar</div>
-          <div class="text-body2 text-grey-7 q-mb-lg">Al continuar crearemos tu cuenta, tu ficha de cliente, tu negocio y una solicitud en VITI. Después pasarás al cuestionario de requerimientos.</div>
+          <div class="text-h6 text-weight-bold q-mb-sm">Todo listo para elegir tu plan</div>
+          <div class="text-body2 text-grey-7 q-mb-lg">Al continuar crearemos tu cuenta, tu ficha, tu negocio y la solicitud. La siguiente pantalla será la comparación de planes, no otro cuestionario largo.</div>
           <q-list bordered separator class="rounded-borders">
             <q-item><q-item-section avatar><q-icon name="person" color="primary"/></q-item-section><q-item-section><q-item-label>{{form.nombre}}</q-item-label><q-item-label caption>@{{form.usuario}} · {{form.telefono}} · {{form.ciudad}}</q-item-label></q-item-section></q-item>
             <q-item><q-item-section avatar><q-icon name="business" color="primary"/></q-item-section><q-item-section><q-item-label>{{form.empresa_nombre}}</q-item-label><q-item-label caption>{{form.empresa_actividad||'Actividad por completar'}}</q-item-label></q-item-section></q-item>
-            <q-item><q-item-section avatar><q-icon name="devices" color="primary"/></q-item-section><q-item-section><q-item-label>{{form.titulo_sistema}}</q-item-label><q-item-label caption>Se abrirá el cuestionario inmediatamente después del registro.</q-item-label></q-item-section></q-item>
+            <q-item><q-item-section avatar><q-icon name="workspace_premium" color="primary"/></q-item-section><q-item-section><q-item-label>{{form.titulo_sistema}}</q-item-label><q-item-label caption>Después del registro compararás VITI Inicial, Profesional, Empresa y Personalizado.</q-item-label></q-item-section></q-item>
           </q-list>
         </q-card-section>
 
@@ -156,7 +156,7 @@ onMounted(load)
           <q-space />
           <q-btn v-if="step===1" color="primary" unelevated no-caps label="Continuar" icon-right="arrow_forward" :disable="!canContinue1" @click="step=2" />
           <q-btn v-else-if="step===2" color="primary" unelevated no-caps label="Revisar datos" icon-right="arrow_forward" :disable="!canContinue2" @click="step=3" />
-          <q-btn v-else color="primary" unelevated no-caps label="Crear registro y abrir cuestionario" icon-right="assignment" :loading="saving" @click="submit" />
+          <q-btn v-else color="primary" unelevated no-caps label="Crear registro y elegir plan" icon-right="workspace_premium" :loading="saving" @click="submit" />
         </q-card-actions>
       </q-card>
 
