@@ -7,6 +7,14 @@ export const useTenantStore = defineStore('tenant', {
     active(state) { return state.businesses.find(item => Number(item.id) === Number(state.activeId)) || state.businesses[0] || null },
     role() { return this.active?.rol || null },
     canManage() { return ['propietario','administrador'].includes(this.role) },
+    features() { return this.active?.features || null },
+    modules() {
+      const modules = this.features?.modulos_efectivos ?? this.features?.modulos ?? this.active?.plan?.modulos
+      return Array.isArray(modules) ? modules : null
+    },
+    hasModule() { return module => this.modules === null || this.modules.includes(module) },
+    userUsage() { return this.features?.usuarios || null },
+    appUsage() { return this.features?.aplicaciones || null },
   },
   actions: {
     async load() {
