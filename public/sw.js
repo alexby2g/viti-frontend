@@ -1,4 +1,4 @@
-const CACHE = 'viti-shell-v20'
+const CACHE = 'viti-shell-v21'
 const APP_SHELL = ['/', '/index.html']
 
 self.addEventListener('install', event => {
@@ -30,6 +30,22 @@ self.addEventListener('fetch', event => {
           return response
         })
         .catch(async () => (await caches.match(request)) || (await caches.match('/')) || (await caches.match('/index.html')))
+    )
+    return
+  }
+
+  const networkFirstAsset = /\.(?:js|css)$/.test(url.pathname)
+  if (networkFirstAsset) {
+    event.respondWith(
+      fetch(request)
+        .then(response => {
+          if (response.ok) {
+            const clone = response.clone()
+            caches.open(CACHE).then(cache => cache.put(request, clone)).catch(() => {})
+          }
+          return response
+        })
+        .catch(async () => (await caches.match(request)) || Response.error())
     )
     return
   }

@@ -1,11 +1,12 @@
 <script setup>
 import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { useQuasar } from 'quasar'
 import { api, initCsrf } from '../boot/axios'
 import AppBrand from '../components/AppBrand.vue'
 
 const route = useRoute()
+const router = useRouter()
 const $q = useQuasar()
 const item = ref(null)
 const loading = ref(true)
@@ -13,6 +14,12 @@ const saving = ref(false)
 const sent = ref(false)
 const step = ref(1)
 const registrationDialog = ref(false)
+const online = ref(typeof navigator === 'undefined' ? true : navigator.onLine)
+const ready = ref(false)
+const localDirty = ref(false)
+const conflict = ref(false)
+const remoteRevision = ref(null)
+const pendingDraft = ref(null)
 const answers = reactive({})
 const otherAnswers = reactive({})
 const registration = reactive({
@@ -42,6 +49,17 @@ const sections = computed(() => item.value?.cuestionario?.secciones || [])
 const allQuestions = computed(() => sections.value.flatMap(section => section.preguntas || []))
 const plans = computed(() => item.value?.planes_disponibles || [])
 const draftKey = computed(() => `viti-form-short-${route.params.token}`)
+const serverRevision = computed(() => Number(item.value?.draft_revision || 0))
+const syncLabel = computed(() => {
+  if (sent.value) return 'Enviado'
+  if (conflict.value) return 'Revisar sincronización'
+  if (saving.value) return 'Guardando…'
+  if (!online.value) return 'Borrador local'
+  if (localDirty.value) return 'Pendiente de sincronizar'
+  return 'Sincronizado'
+})
+const syncColor = computed(() => sent.value ? 'positive' : conflict.value ? 'orange-9' : !online.value || localDirty.value ? 'warning' : 'positive')
+const syncIcon = computed(() => sent.value ? 'check_circle' : conflict.value ? 'sync_problem' : !online.value ? 'cloud_off' : localDirty.value ? 'cloud_upload' : 'cloud_done')
 const questionByNumber = number => allQuestions.value.find(q => Number(q.numero) === Number(number))
 const hasValue = value => Array.isArray(value) ? value.length > 0 : String(value ?? '').trim().length > 0
 const registrationValid = computed(() => {
@@ -164,27 +182,68 @@ function selectPlan(plan) {
   if (!allowed.includes(commercial.forma_pago_preferida)) commercial.forma_pago_preferida = null
 }
 
-function storeDraft() {
-  if (sent.value) return
-  try {
-    localStorage.setItem(draftKey.value, JSON.stringify({ answers:{...answers}, otherAnswers:{...otherAnswers}, declaration:{...declaration}, commercial:{...commercial}, step:step.value }))
-  } catch {}
+function draftSnapshot() {
+  return {
+    answers:{...answers},
+    otherAnswers:{...otherAnswers},
+    registration:{...registration},
+    declaration:{...declaration},
+    commercial:{...commercial},
+    step:step.value,
+    server_revision:serverRevision.value,
+    dirty:localDirty.value,
+    saved_at:new Date().toISOString(),
+  }
+}
+function readDraft() {
+  try { return JSON.parse(localStorage.getItem(draftKey.value) || 'null') } catch { return null }
+}
+function storeDraft(markDirty=false) {
+  if (!ready.value || sent.value) return
+  if (markDirty) localDirty.value = true
+  try { localStorage.setItem(draftKey.value, JSON.stringify(draftSnapshot())) } catch {}
+}
+function applyDraft(draft) {
+  Object.assign(answers, draft?.answers || {})
+  Object.assign(otherAnswers, draft?.otherAnswers || {})
+  Object.assign(registration, draft?.registration || {})
+  Object.assign(declaration, draft?.declaration || {})
+  Object.assign(commercial, draft?.commercial || {})
+  if (Number(draft?.step) >= 1 && Number(draft?.step) <= 3) step.value = Number(draft.step)
+  clearAnswersOutsidePlan(selectedKey.value)
 }
 function restoreDraft() {
   if (sent.value) return
-  try {
-    const draft = JSON.parse(localStorage.getItem(draftKey.value) || 'null')
-    if (!draft) return
-    Object.assign(answers, draft.answers || {})
-    Object.assign(otherAnswers, draft.otherAnswers || {})
-    Object.assign(declaration, draft.declaration || {})
-    Object.assign(commercial, draft.commercial || {})
+  const draft = readDraft()
+  if (!draft) return
+  const revision = draft.server_revision === undefined ? serverRevision.value : Number(draft.server_revision)
+  if (revision !== serverRevision.value && draft.dirty) {
+    pendingDraft.value = draft
+    remoteRevision.value = serverRevision.value
+    conflict.value = true
     if (Number(draft.step) >= 1 && Number(draft.step) <= 3) step.value = Number(draft.step)
-    clearAnswersOutsidePlan(selectedKey.value)
-  } catch {}
+    return
+  }
+  applyDraft(draft)
+  localDirty.value = Boolean(draft.dirty)
 }
-function clearDraft() { try { localStorage.removeItem(draftKey.value) } catch {} }
-function networkFailure(e) { return !navigator.onLine || !e?.response }
+function clearDraft() {
+  try { localStorage.removeItem(draftKey.value) } catch {}
+  localDirty.value = false
+  pendingDraft.value = null
+}
+function networkFailure(e) { return !online.value || !e?.response }
+function isDraftConflict(e) { return Number(e?.response?.status) === 409 && e?.response?.data?.current_revision !== undefined }
+function markConflict(e) {
+  localDirty.value = true
+  pendingDraft.value = draftSnapshot()
+  remoteRevision.value = Number(e?.response?.data?.current_revision ?? serverRevision.value)
+  conflict.value = true
+  storeDraft(false)
+}
+function revisionFromResponse(response) {
+  return Number(response?.data?.draft?.revision ?? response?.headers?.['x-viti-draft-revision'] ?? serverRevision.value)
+}
 
 function syncRegistrationFromServer() {
   Object.assign(registration, {
@@ -222,43 +281,74 @@ function syncItemFromRegistration() {
     item.value.resumen = registration.resumen
   }
 }
+function hydrateFromServer(data) {
+  item.value = data
+  syncRegistrationFromServer()
+  for (const q of allQuestions.value) answers[q.id] = q.tipo === 'seleccion_multiple' ? [] : ''
+  for (const key of Object.keys(otherAnswers)) delete otherAnswers[key]
+  for (const response of item.value.respuestas || []) {
+    const raw = response.respuesta_json ?? response.respuesta_texto ?? ''
+    if (Array.isArray(raw)) {
+      const custom = raw.find(value => typeof value === 'string' && value.startsWith('Otro: '))
+      answers[response.pregunta_id] = custom ? [...raw.filter(value => value !== custom), 'Otro'] : raw
+      otherAnswers[response.pregunta_id] = custom ? custom.slice(6) : ''
+    } else if (typeof raw === 'string' && raw.startsWith('Otro: ')) {
+      answers[response.pregunta_id] = 'Otro'
+      otherAnswers[response.pregunta_id] = raw.slice(6)
+    } else answers[response.pregunta_id] = raw
+  }
+  Object.assign(declaration, {
+    aceptada:Boolean(item.value.declaracion_aceptada),
+    nombre:item.value.declaracion_nombre || item.value.cliente?.nombre || '',
+    fecha:item.value.declaracion_fecha || new Date().toISOString().slice(0,10),
+  })
+  Object.assign(commercial, {
+    plan_viti_id:item.value.plan_viti_id || null,
+    forma_pago_preferida:item.value.forma_pago_preferida || null,
+    frecuencia_suscripcion_preferida:item.value.frecuencia_suscripcion_preferida || null,
+    acuerdo_comercial_aceptado:Boolean(item.value.acuerdo_comercial_aceptado),
+    acuerdo_comercial_nombre:item.value.acuerdo_comercial_nombre || item.value.cliente?.nombre || '',
+    acuerdo_comercial_fecha:item.value.acuerdo_comercial_fecha || new Date().toISOString().slice(0,10),
+  })
+  sent.value = ['en_revision','aprobada','convertida','cerrada'].includes(item.value.estado)
+}
+function validStep(value) {
+  const number = Number(value)
+  return number >= 1 && number <= 3 ? number : null
+}
+async function replaceStepInUrl(value) {
+  const target = String(value)
+  if (String(route.query.paso || '') === target) return
+  await router.replace({ query:{...route.query,paso:target} })
+}
+async function goToStep(value, push=true) {
+  const target = validStep(value)
+  if (!target || target === step.value) return
+  step.value = target
+  const location = { query:{...route.query,paso:String(target)} }
+  if (push) await router.push(location)
+  else await router.replace(location)
+}
 
-async function load() {
+async function load({ restoreLocal=true }={}) {
   loading.value = true
+  ready.value = false
   try {
-    item.value = (await api.get(`/publico/solicitudes/${route.params.token}`)).data.data
-    syncRegistrationFromServer()
-    for (const q of allQuestions.value) answers[q.id] = q.tipo === 'seleccion_multiple' ? [] : ''
-    for (const response of item.value.respuestas || []) {
-      const raw = response.respuesta_json ?? response.respuesta_texto ?? ''
-      if (Array.isArray(raw)) {
-        const custom = raw.find(value => typeof value === 'string' && value.startsWith('Otro: '))
-        answers[response.pregunta_id] = custom ? [...raw.filter(value => value !== custom), 'Otro'] : raw
-        otherAnswers[response.pregunta_id] = custom ? custom.slice(6) : ''
-      } else if (typeof raw === 'string' && raw.startsWith('Otro: ')) {
-        answers[response.pregunta_id] = 'Otro'
-        otherAnswers[response.pregunta_id] = raw.slice(6)
-      } else answers[response.pregunta_id] = raw
-    }
-    Object.assign(declaration, {
-      aceptada:Boolean(item.value.declaracion_aceptada),
-      nombre:item.value.declaracion_nombre || item.value.cliente?.nombre || '',
-      fecha:item.value.declaracion_fecha || new Date().toISOString().slice(0,10),
-    })
-    Object.assign(commercial, {
-      plan_viti_id:item.value.plan_viti_id || null,
-      forma_pago_preferida:item.value.forma_pago_preferida || null,
-      frecuencia_suscripcion_preferida:item.value.frecuencia_suscripcion_preferida || null,
-      acuerdo_comercial_aceptado:Boolean(item.value.acuerdo_comercial_aceptado),
-      acuerdo_comercial_nombre:item.value.acuerdo_comercial_nombre || item.value.cliente?.nombre || '',
-      acuerdo_comercial_fecha:item.value.acuerdo_comercial_fecha || new Date().toISOString().slice(0,10),
-    })
-    sent.value = ['en_revision','aprobada','convertida','cerrada'].includes(item.value.estado)
-    restoreDraft()
+    const data = (await api.get(`/publico/solicitudes/${route.params.token}`)).data.data
+    hydrateFromServer(data)
+    conflict.value = false
+    remoteRevision.value = null
+    localDirty.value = false
+    if (restoreLocal) restoreDraft()
+    const queryStep = validStep(route.query.paso)
+    if (queryStep) step.value = queryStep
+    if (sent.value) clearDraft()
   } catch (e) {
     $q.notify({ type:'negative', message:errorMessage(e, 'El enlace no está disponible.') })
   } finally {
+    ready.value = true
     loading.value = false
+    await replaceStepInUrl(step.value)
   }
 }
 function payload() {
@@ -266,6 +356,7 @@ function payload() {
     .filter(q => hasValue(answers[q.id]))
     .map(q => ({ pregunta_id:Number(q.id), valor:normalizedValue(q.id, answers[q.id]) }))
   return {
+    base_revision:serverRevision.value,
     respuestas:visibleAnswers,
     registro:{...registration},
     declaracion_aceptada:declaration.aceptada,
@@ -280,26 +371,84 @@ function payload() {
   }
 }
 async function save(quiet=false) {
-  storeDraft()
-  if (!navigator.onLine) {
+  storeDraft(false)
+  if (conflict.value) {
+    if (!quiet) $q.notify({ type:'warning', message:'Primero resuelve la sincronización con el otro dispositivo.' })
+    return false
+  }
+  if (!online.value) {
+    localDirty.value = true
+    storeDraft(false)
     if (!quiet) $q.notify({ type:'warning', message:'Sin Internet. El borrador quedó guardado en este dispositivo.' })
     return true
   }
   saving.value = true
   try {
     await initCsrf()
-    await api.put(`/publico/solicitudes/${route.params.token}`, payload())
+    const response = await api.put(`/publico/solicitudes/${route.params.token}`, payload())
+    if (item.value) {
+      item.value.draft_revision = revisionFromResponse(response)
+      item.value.draft_saved_at = response.data?.draft?.saved_at || item.value.draft_saved_at
+    }
     syncItemFromRegistration()
+    conflict.value = false
+    remoteRevision.value = null
     clearDraft()
-    if (!quiet) $q.notify({ type:'positive', message:'Cambios guardados.' })
+    storeDraft(false)
+    if (!quiet) $q.notify({ type:'positive', message:'Cambios guardados y sincronizados.' })
     return true
   } catch (e) {
     if (networkFailure(e)) {
-      if (!quiet) $q.notify({ type:'warning', message:'Se perdió la conexión. El borrador quedó guardado.' })
+      online.value = false
+      localDirty.value = true
+      storeDraft(false)
+      if (!quiet) $q.notify({ type:'warning', message:'Se perdió la conexión. El borrador quedó guardado en este dispositivo.' })
       return true
+    }
+    if (isDraftConflict(e)) {
+      markConflict(e)
+      $q.notify({ type:'warning', message:'Hay cambios más recientes desde otro dispositivo. Elige qué versión conservar.' })
+      return false
     }
     $q.notify({ type:'negative', message:errorMessage(e, 'No se pudo guardar.') })
     return false
+  } finally { saving.value = false }
+}
+async function useServerDraft() {
+  clearDraft()
+  conflict.value = false
+  remoteRevision.value = null
+  pendingDraft.value = null
+  await load({ restoreLocal:false })
+  $q.notify({ type:'positive', message:'Se cargó la versión más reciente guardada en VITI.' })
+}
+async function keepLocalDraft() {
+  const local = pendingDraft.value || readDraft() || draftSnapshot()
+  saving.value = true
+  try {
+    const latest = (await api.get(`/publico/solicitudes/${route.params.token}`)).data.data
+    if (['en_revision','aprobada','convertida','cerrada'].includes(latest.estado)) {
+      hydrateFromServer(latest)
+      clearDraft()
+      conflict.value = false
+      remoteRevision.value = null
+      $q.notify({ type:'warning', message:'La solicitud ya fue enviada desde otro dispositivo. Se cargó ese estado.' })
+      return
+    }
+    if (item.value) {
+      item.value.draft_revision = Number(latest.draft_revision || 0)
+      item.value.draft_saved_at = latest.draft_saved_at || null
+    }
+    ready.value = false
+    applyDraft(local)
+    ready.value = true
+    localDirty.value = true
+    conflict.value = false
+    remoteRevision.value = null
+    pendingDraft.value = null
+    await save(false)
+  } catch (e) {
+    $q.notify({ type:'negative', message:errorMessage(e, 'No se pudo resolver la sincronización.') })
   } finally { saving.value = false }
 }
 async function saveRegistration() {
@@ -308,10 +457,13 @@ async function saveRegistration() {
 }
 async function next() {
   if (step.value === 1 && !commercial.plan_viti_id) return $q.notify({ type:'warning', message:'Selecciona un plan para continuar.' })
-  if (await save(true)) step.value = Math.min(3, step.value + 1)
+  if (await save(true)) await goToStep(Math.min(3, step.value + 1), true)
+}
+async function previous() {
+  if (step.value > 1) await goToStep(step.value - 1, false)
 }
 async function skipOperation() {
-  if (await save(true)) step.value = 3
+  if (await save(true)) await goToStep(3, true)
 }
 async function submit() {
   if (!commercial.plan_viti_id) return $q.notify({ type:'warning', message:'Selecciona un plan.' })
@@ -319,34 +471,123 @@ async function submit() {
   if (selectedKey.value !== 'custom' && !commercial.frecuencia_suscripcion_preferida) return $q.notify({ type:'warning', message:'Selecciona suscripción mensual o anual.' })
   if (!declaration.aceptada) return $q.notify({ type:'warning', message:'Confirma que los datos de tu solicitud son correctos.' })
   if (!commercial.acuerdo_comercial_aceptado) return $q.notify({ type:'warning', message:'Acepta el acuerdo comercial inicial.' })
+  if (!online.value) {
+    localDirty.value = true
+    storeDraft(false)
+    return $q.notify({ type:'warning', message:'No se puede enviar sin Internet. Tu borrador está seguro y podrás enviarlo al reconectar.' })
+  }
+  if (!(await save(true))) return
   saving.value = true
   try {
     await initCsrf()
-    await api.put(`/publico/solicitudes/${route.params.token}`, payload())
-    await api.post(`/publico/solicitudes/${route.params.token}/enviar`)
+    const response = await api.post(`/publico/solicitudes/${route.params.token}/enviar`, { base_revision:serverRevision.value })
+    if (item.value) item.value.draft_revision = revisionFromResponse(response)
     sent.value = true
     clearDraft()
+    conflict.value = false
+    remoteRevision.value = null
     $q.notify({ type:'positive', message:'Solicitud enviada a revisión.' })
   } catch (e) {
+    if (isDraftConflict(e)) {
+      markConflict(e)
+      $q.notify({ type:'warning', message:'Otro dispositivo cambió la solicitud antes de enviarla. Revisa la sincronización.' })
+      return
+    }
     $q.notify({ type:'negative', message:errorMessage(e, 'No se pudo enviar la solicitud.') })
   } finally { saving.value = false }
 }
-async function syncDraft() { if (navigator.onLine && localStorage.getItem(draftKey.value) && !sent.value) await save(true) }
-watch(() => [JSON.stringify(answers), JSON.stringify(otherAnswers), JSON.stringify(declaration), JSON.stringify(commercial), step.value], storeDraft)
-onMounted(async () => { window.addEventListener('online', syncDraft); await load(); await syncDraft() })
-onBeforeUnmount(() => window.removeEventListener('online', syncDraft))
+async function syncDraft() {
+  online.value = navigator.onLine
+  const draft = readDraft()
+  if (online.value && draft?.dirty && !sent.value && !conflict.value) await save(true)
+}
+async function checkRemoteRevision() {
+  if (!ready.value || loading.value || saving.value || !online.value || sent.value) return
+  try {
+    const latest = (await api.get(`/publico/solicitudes/${route.params.token}`)).data.data
+    const latestRevision = Number(latest.draft_revision || 0)
+    if (latestRevision === serverRevision.value && latest.estado === item.value?.estado) return
+    if (localDirty.value) {
+      pendingDraft.value = draftSnapshot()
+      remoteRevision.value = latestRevision
+      conflict.value = true
+      storeDraft(false)
+      return
+    }
+    ready.value = false
+    hydrateFromServer(latest)
+    ready.value = true
+    conflict.value = false
+    remoteRevision.value = null
+    storeDraft(false)
+    $q.notify({ type:'info', message:'Se cargaron cambios guardados desde otro dispositivo.' })
+  } catch {}
+}
+function handleOnline() { online.value = true; syncDraft() }
+function handleOffline() { online.value = false; if (localDirty.value) storeDraft(false) }
+function persistDraft() { if (localDirty.value) storeDraft(false) }
+function handleVisibility() {
+  if (document.hidden) persistDraft()
+  else checkRemoteRevision()
+}
+
+watch(() => [JSON.stringify(answers), JSON.stringify(otherAnswers), JSON.stringify(registration), JSON.stringify(declaration), JSON.stringify(commercial)], () => storeDraft(true))
+watch(step, () => storeDraft(false))
+watch(() => route.query.paso, value => {
+  if (!ready.value) return
+  const target = validStep(value)
+  if (target && target !== step.value) step.value = target
+})
+onMounted(async () => {
+  window.addEventListener('online', handleOnline)
+  window.addEventListener('offline', handleOffline)
+  window.addEventListener('pagehide', persistDraft)
+  window.addEventListener('focus', checkRemoteRevision)
+  document.addEventListener('visibilitychange', handleVisibility)
+  await load()
+  await syncDraft()
+})
+onBeforeUnmount(() => {
+  persistDraft()
+  window.removeEventListener('online', handleOnline)
+  window.removeEventListener('offline', handleOffline)
+  window.removeEventListener('pagehide', persistDraft)
+  window.removeEventListener('focus', checkRemoteRevision)
+  document.removeEventListener('visibilitychange', handleVisibility)
+})
 </script>
 
 <template>
 <q-page class="public-page">
   <q-inner-loading :showing="loading" />
   <div v-if="item" class="public-shell">
-    <div class="row items-center justify-between q-mb-lg"><AppBrand/><q-badge outline color="primary">{{item.codigo}}</q-badge></div>
+    <div class="row items-center justify-between q-mb-lg q-gutter-sm">
+      <AppBrand/>
+      <div class="row items-center q-gutter-sm">
+        <q-chip dense outline :color="syncColor" :icon="syncIcon">{{syncLabel}}</q-chip>
+        <q-badge outline color="primary">{{item.codigo}}</q-badge>
+      </div>
+    </div>
+
+    <q-banner v-if="conflict" rounded class="bg-orange-1 text-orange-10 q-mb-lg sync-conflict-banner">
+      <template #avatar><q-icon name="sync_problem"/></template>
+      <div class="text-weight-bold">Hay una versión más reciente de esta solicitud.</div>
+      <div class="text-body2">Otro dispositivo o pestaña guardó cambios. VITI detuvo el guardado para no sobrescribirlos. Revisión del servidor: {{remoteRevision}}.</div>
+      <template #action>
+        <q-btn flat no-caps color="orange-10" icon="cloud_download" label="Usar versión del servidor" :loading="saving" @click="useServerDraft"/>
+        <q-btn unelevated no-caps color="orange-9" text-color="white" icon="upload" label="Conservar lo escrito aquí" :loading="saving" @click="keepLocalDraft"/>
+      </template>
+    </q-banner>
 
     <q-banner v-if="sent" rounded class="bg-green-1 text-green-9 q-mb-lg">
       <template #avatar><q-icon name="check_circle"/></template>
       Tu solicitud fue enviada. AGR Studio revisará el alcance y te responderá desde VITI.
       <template #action><q-btn flat no-caps color="green-9" icon="login" label="Ingresar a mi cuenta" to="/login?tipo=cliente"/></template>
+    </q-banner>
+
+    <q-banner v-else-if="!online" rounded class="bg-amber-1 text-amber-10 q-mb-lg">
+      <template #avatar><q-icon name="cloud_off"/></template>
+      Estás sin conexión. Puedes seguir completando la solicitud; el borrador queda guardado en este dispositivo y se sincronizará cuando vuelva Internet.
     </q-banner>
 
     <div class="section-label">Solicitud VITI</div>
@@ -392,7 +633,7 @@ onBeforeUnmount(() => window.removeEventListener('online', syncDraft))
       <q-step :name="2" title="Configuración" icon="tune" :done="step>2">
         <div class="row items-start justify-between q-gutter-md q-mb-lg">
           <div><div class="text-h6 text-weight-bold">Configuración de {{selectedPlan?.nombre}}</div><div class="text-body2 text-grey-7">Responde solo lo que tengas claro. También puedes saltar este paso y completar los detalles durante la revisión.</div></div>
-          <q-btn outline no-caps color="primary" icon="skip_next" label="Saltar configuración" :disable="sent" :loading="saving" @click="skipOperation"/>
+          <q-btn outline no-caps color="primary" icon="skip_next" label="Saltar configuración" :disable="sent||conflict" :loading="saving" @click="skipOperation"/>
         </div>
 
         <div v-for="q in operationQuestions" :key="q.id" class="question-block">
@@ -427,11 +668,11 @@ onBeforeUnmount(() => window.removeEventListener('online', syncDraft))
 
       <template #navigation>
         <q-stepper-navigation class="row items-center q-gutter-sm">
-          <q-btn v-if="step>1&&!sent" flat no-caps color="primary" icon="arrow_back" label="Anterior" @click="step--"/>
+          <q-btn v-if="step>1&&!sent" flat no-caps color="primary" icon="arrow_back" label="Anterior" @click="previous"/>
           <q-space/>
-          <q-btn v-if="!sent" outline no-caps color="primary" icon="save" label="Guardar" :loading="saving" @click="save()"/>
-          <q-btn v-if="step<3&&!sent" color="primary" unelevated no-caps icon-right="arrow_forward" label="Continuar" :loading="saving" @click="next"/>
-          <q-btn v-else-if="!sent" color="positive" unelevated no-caps icon="send" label="Enviar a revisión" :loading="saving" @click="submit"/>
+          <q-btn v-if="!sent" outline no-caps color="primary" icon="save" label="Guardar" :loading="saving" :disable="conflict" @click="save()"/>
+          <q-btn v-if="step<3&&!sent" color="primary" unelevated no-caps icon-right="arrow_forward" label="Continuar" :loading="saving" :disable="conflict" @click="next"/>
+          <q-btn v-else-if="!sent" color="positive" unelevated no-caps icon="send" label="Enviar a revisión" :loading="saving" :disable="conflict" @click="submit"/>
         </q-stepper-navigation>
       </template>
     </q-stepper>
@@ -467,7 +708,7 @@ onBeforeUnmount(() => window.removeEventListener('online', syncDraft))
         <q-separator/>
         <q-card-actions align="right" class="q-pa-md">
           <q-btn flat no-caps label="Cancelar" :disable="saving" @click="registrationDialog=false"/>
-          <q-btn color="primary" unelevated no-caps icon="save" label="Guardar correcciones" :loading="saving" :disable="!registrationValid" @click="saveRegistration"/>
+          <q-btn color="primary" unelevated no-caps icon="save" label="Guardar correcciones" :loading="saving" :disable="!registrationValid||conflict" @click="saveRegistration"/>
         </q-card-actions>
       </q-card>
     </q-dialog>
@@ -480,6 +721,7 @@ onBeforeUnmount(() => window.removeEventListener('online', syncDraft))
 .question-block:last-child{border-bottom:0}
 .macro-flow{display:flex;align-items:center;gap:7px;flex-wrap:wrap;padding:12px 16px;border:1px solid var(--viti-border);border-radius:16px;background:var(--viti-card)}
 .macro-step{display:flex;align-items:center;gap:5px;color:var(--viti-muted);font-size:13px;font-weight:700}.macro-step.done{color:#21ba45}.macro-step.active{color:var(--q-primary)}.macro-arrow{color:var(--viti-muted)}
+.sync-conflict-banner{border:1px solid rgba(245,124,0,.28)}
 .registration-summary{border-radius:16px;background:color-mix(in srgb,var(--viti-card) 94%,var(--q-primary) 6%)}
 .registration-dialog{width:min(820px,94vw);max-height:90vh}
 .plan-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px}
