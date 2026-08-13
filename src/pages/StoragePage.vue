@@ -1,11 +1,17 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue'
+import { useQuasar } from 'quasar'
 import { api } from '../boot/axios'
 import PageHeader from '../components/PageHeader.vue'
 
+const $q = useQuasar()
 const loading = ref(false)
+const backupLoading = ref(false)
+const verifyingId = ref(null)
 const storage = ref(null)
 const health = ref(null)
+const backups = ref([])
+const backupPolicy = ref(null)
 const errors = ref([])
 
 const publicStorage = computed(() => storage.value?.publico || null)
@@ -23,6 +29,7 @@ const healthyChecks = computed(() => [
   queue.value?.ok,
   migrations.value?.ok,
   audit.value?.ok,
+  backup.value?.ok,
   publicStorage.value?.ok,
   privateStorage.value?.ok,
 ].filter(value => value !== undefined && value !== null))
@@ -34,14 +41,30 @@ const overallReady = computed(() => totalCount.value > 0 && readyCount.value ===
 function statusColor(ok) { return ok ? 'positive' : 'negative' }
 function statusLabel(ok) { return ok ? 'Correcto' : 'Revisar' }
 function valueOrDash(value) { return value === null || value === undefined || value === '' ? '—' : value }
+function formatBytes(bytes) {
+  const value = Number(bytes || 0)
+  if (!value) return '—'
+  if (value < 1024) return `${value} B`
+  if (value < 1024 * 1024) return `${(value / 1024).toFixed(1)} KB`
+  return `${(value / 1024 / 1024).toFixed(2)} MB`
+}
+function backupStatusColor(status) {
+  if (status === 'verified') return 'positive'
+  if (status === 'running') return 'info'
+  return 'negative'
+}
+function backupStatusLabel(status) {
+  return ({ verified: 'Verificado', running: 'En proceso', failed: 'Falló' })[status] || status || 'Desconocido'
+}
 
 async function load() {
   loading.value = true
   errors.value = []
 
-  const [healthResult, storageResult] = await Promise.allSettled([
+  const [healthResult, storageResult, backupResult] = await Promise.allSettled([
     api.get('/system/health'),
     api.get('/almacenamiento/estado'),
+    api.get('/system/backups'),
   ])
 
   if (healthResult.status === 'fulfilled') health.value = healthResult.value.data.data
@@ -56,7 +79,52 @@ async function load() {
     errors.value.push(storageResult.reason?.response?.data?.message || 'No pudimos comprobar el almacenamiento.')
   }
 
+  if (backupResult.status === 'fulfilled') {
+    backups.value = backupResult.value.data.data || []
+    backupPolicy.value = backupResult.value.data.policy || null
+  } else {
+    backups.value = []
+    backupPolicy.value = null
+    errors.value.push(backupResult.reason?.response?.data?.message || 'No pudimos consultar el historial de respaldos.')
+  }
+
   loading.value = false
+}
+
+function createBackup() {
+  $q.dialog({
+    title: 'Crear respaldo de PostgreSQL',
+    message: 'VITI generará una copia lógica, la guardará en almacenamiento privado y comprobará su SHA-256. Puede tardar algunos minutos.',
+    cancel: { label: 'Cancelar', flat: true },
+    ok: { label: 'Crear respaldo', color: 'primary' },
+    persistent: true,
+  }).onOk(async () => {
+    backupLoading.value = true
+    try {
+      const { data } = await api.post('/system/backups', {}, { timeout: 240000 })
+      $q.notify({ type: 'positive', message: data.message || 'Respaldo creado y verificado.' })
+      await load()
+    } catch (e) {
+      $q.notify({ type: 'negative', message: e.response?.data?.message || 'No se pudo completar el respaldo.' })
+      await load()
+    } finally {
+      backupLoading.value = false
+    }
+  })
+}
+
+async function verifyBackup(item) {
+  verifyingId.value = item.id
+  try {
+    const { data } = await api.post(`/system/backups/${item.id}/verify`, {}, { timeout: 120000 })
+    $q.notify({ type: 'positive', message: data.message || 'Integridad confirmada.' })
+    await load()
+  } catch (e) {
+    $q.notify({ type: 'negative', message: e.response?.data?.message || 'El respaldo no superó la verificación.' })
+    await load()
+  } finally {
+    verifyingId.value = null
+  }
 }
 
 onMounted(load)
@@ -69,7 +137,10 @@ onMounted(load)
       title="Salud del sistema"
       subtitle="Comprueba base de datos, cola, migraciones, auditoría, respaldos y almacenamiento desde un solo lugar."
     >
-      <q-btn color="primary" unelevated no-caps icon="health_and_safety" label="Comprobar ahora" :loading="loading" @click="load" />
+      <div class="row q-gutter-sm">
+        <q-btn outline color="primary" no-caps icon="backup" label="Crear respaldo" :loading="backupLoading" @click="createBackup" />
+        <q-btn color="primary" unelevated no-caps icon="health_and_safety" label="Comprobar ahora" :loading="loading" @click="load" />
+      </div>
     </PageHeader>
 
     <q-banner v-for="message in errors" :key="message" rounded class="bg-red-1 text-negative q-mb-md">
@@ -166,16 +237,18 @@ onMounted(load)
       <div class="col-12 col-md-6 col-xl-4">
         <q-card flat class="viti-card full-height">
           <q-card-section class="row items-center q-gutter-md">
-            <q-avatar color="warning" text-color="white" icon="backup" />
-            <div><div class="text-h6 text-weight-bold">Respaldos</div><div class="text-caption text-grey-6">Protección y recuperación de PostgreSQL.</div></div>
+            <q-avatar :color="backup?.ok ? 'positive' : 'warning'" text-color="white" icon="backup" />
+            <div><div class="text-h6 text-weight-bold">Respaldos</div><div class="text-caption text-grey-6">Protección verificable de PostgreSQL.</div></div>
           </q-card-section>
           <q-separator />
           <q-card-section>
-            <div class="health-row"><span>Estado</span><q-badge color="warning">{{ backup?.configured ? 'Configurado' : 'Pendiente' }}</q-badge></div>
+            <div class="health-row"><span>Estado</span><q-badge :color="backup?.ok ? 'positive' : 'warning'">{{ backup?.status === 'verified' ? 'Verificado' : backup?.status === 'stale' ? 'Desactualizado' : 'Revisar' }}</q-badge></div>
+            <div class="health-row"><span>Copias verificadas</span><strong>{{ valueOrDash(backup?.verified_count) }}</strong></div>
+            <div class="health-row"><span>Última verificación</span><strong>{{ backup?.last_verified_at ? new Date(backup.last_verified_at).toLocaleString() : '—' }}</strong></div>
+            <div class="health-row"><span>Tamaño</span><strong>{{ formatBytes(backup?.size_bytes) }}</strong></div>
             <div class="text-body2 q-mt-md">{{ backup?.message || 'Todavía no hay información de respaldo.' }}</div>
-            <q-banner dense rounded class="bg-orange-1 text-orange-10 q-mt-md">
-              {{ backup?.recommendation || 'Configura una política de respaldo y restauración verificable.' }}
-            </q-banner>
+            <q-banner v-if="backup?.failure_reason" dense rounded class="bg-red-1 text-negative q-mt-md">{{ backup.failure_reason }}</q-banner>
+            <q-banner v-else-if="backup && !backup.ok" dense rounded class="bg-orange-1 text-orange-10 q-mt-md">Crea y verifica un respaldo para dejar este control en verde.</q-banner>
           </q-card-section>
         </q-card>
       </div>
@@ -197,6 +270,34 @@ onMounted(load)
         </q-card>
       </div>
     </div>
+
+    <q-card flat class="viti-card q-mt-xl">
+      <q-card-section class="row items-center q-col-gutter-md">
+        <div class="col">
+          <div class="text-h5 text-weight-bold">Historial de respaldos</div>
+          <div class="text-caption text-grey-6">Las copias viven en almacenamiento privado. La restauración no está disponible desde la interfaz.</div>
+        </div>
+        <div class="col-12 col-sm-auto"><q-btn color="primary" unelevated no-caps icon="backup" label="Crear respaldo ahora" :loading="backupLoading" @click="createBackup" /></div>
+      </q-card-section>
+      <q-separator />
+      <q-list v-if="backups.length" separator>
+        <q-item v-for="item in backups" :key="item.id">
+          <q-item-section avatar><q-avatar :color="backupStatusColor(item.status)" text-color="white" :icon="item.status === 'verified' ? 'verified' : item.status === 'running' ? 'hourglass_top' : 'error_outline'" /></q-item-section>
+          <q-item-section>
+            <q-item-label class="text-weight-bold">Respaldo #{{ item.id }} · {{ backupStatusLabel(item.status) }}</q-item-label>
+            <q-item-label caption>Inicio: {{ item.started_at ? new Date(item.started_at).toLocaleString() : '—' }} · Tamaño: {{ formatBytes(item.size_bytes) }}</q-item-label>
+            <q-item-label v-if="item.checksum_sha256" caption class="backup-checksum">SHA-256: {{ item.checksum_sha256 }}</q-item-label>
+            <q-item-label v-if="item.failure_reason" caption class="text-negative">{{ item.failure_reason }}</q-item-label>
+          </q-item-section>
+          <q-item-section side>
+            <q-btn v-if="item.checksum_sha256" flat dense no-caps color="primary" icon="fact_check" label="Verificar" :loading="verifyingId === item.id" @click="verifyBackup(item)" />
+          </q-item-section>
+        </q-item>
+      </q-list>
+      <q-card-section v-else class="text-center text-grey-6 q-pa-xl"><q-icon name="backup" size="36px" class="q-mb-sm" /><div>Todavía no hay respaldos registrados.</div></q-card-section>
+      <q-separator />
+      <q-card-section v-if="backupPolicy" class="text-caption text-grey-6">{{ backupPolicy.message }}</q-card-section>
+    </q-card>
 
     <div class="text-h5 text-weight-bold q-mt-xl q-mb-md">Almacenamiento de archivos</div>
     <div class="row q-col-gutter-lg">
@@ -255,5 +356,5 @@ onMounted(load)
 
 <style scoped>
 .health-row{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:9px 0;border-bottom:1px solid rgba(127,127,127,.14)}
-.health-row:last-of-type{border-bottom:0}.column-row{align-items:flex-start}.column-row strong{max-width:62%;text-align:right;overflow-wrap:anywhere}.ellipsis{max-width:68%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:right}.health-badge{font-size:12px;padding:7px 10px;letter-spacing:.05em}
+.health-row:last-of-type{border-bottom:0}.column-row{align-items:flex-start}.column-row strong{max-width:62%;text-align:right;overflow-wrap:anywhere}.ellipsis{max-width:68%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:right}.health-badge{font-size:12px;padding:7px 10px;letter-spacing:.05em}.backup-checksum{font-family:monospace;overflow-wrap:anywhere}
 </style>
