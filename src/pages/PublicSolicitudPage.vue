@@ -12,8 +12,14 @@ const loading = ref(true)
 const saving = ref(false)
 const sent = ref(false)
 const step = ref(1)
+const registrationDialog = ref(false)
 const answers = reactive({})
 const otherAnswers = reactive({})
+const registration = reactive({
+  cliente_nombre:'', cliente_whatsapp:'', cliente_ciudad:'', cliente_direccion:'',
+  empresa_nombre:'', empresa_actividad:'', empresa_telefono:'', empresa_whatsapp:'', empresa_ciudad:'', empresa_direccion:'',
+  titulo_sistema:'', resumen:'',
+})
 const declaration = reactive({ aceptada:false, nombre:'', fecha:new Date().toISOString().slice(0,10) })
 const commercial = reactive({
   plan_viti_id:null,
@@ -24,17 +30,13 @@ const commercial = reactive({
   acuerdo_comercial_fecha:new Date().toISOString().slice(0,10),
 })
 
-const moduleNames = {
-  inicio:'Inicio', agenda:'Agenda', ordenes:'Órdenes y servicios', clientes:'Clientes', equipos:'Equipos',
-  tecnicos:'Técnicos', inventario:'Inventario técnico', pagos:'Pagos y saldos', garantias:'Garantías',
-  historial:'Historial y reportes', buzon:'Mensajes',
-}
 const supportedFunctions = {
   initial:new Set(['Registro de clientes','Registro de trabajadores','Registro de servicios','Reservas o citas','Órdenes de trabajo','Historial de clientes','Agenda o calendario','Archivos y documentos','Fotografías','Otro']),
   professional:new Set(['Registro de clientes','Registro de trabajadores','Registro de servicios','Reservas o citas','Órdenes de trabajo','Control de pagos','Cuentas por cobrar','Garantías','Historial de clientes','Reportes','Agenda o calendario','Archivos y documentos','Fotografías','Otro']),
   enterprise:new Set(['Registro de clientes','Registro de trabajadores','Registro de productos','Registro de servicios','Inventario','Reservas o citas','Órdenes de trabajo','Control de pagos','Cuentas por cobrar','Garantías','Historial de clientes','Reportes','Agenda o calendario','Archivos y documentos','Fotografías','Otro']),
   custom:new Set(['Registro de clientes','Registro de trabajadores','Registro de productos','Registro de servicios','Inventario','Reservas o citas','Órdenes de trabajo','Control de pagos','Cuentas por cobrar','Garantías','Historial de clientes','Reportes','Agenda o calendario','Archivos y documentos','Fotografías','Otro']),
 }
+const allOperationNumbers = new Set([12,13,17,18,19,27,32,35,70])
 
 const sections = computed(() => item.value?.cuestionario?.secciones || [])
 const allQuestions = computed(() => sections.value.flatMap(section => section.preguntas || []))
@@ -42,6 +44,13 @@ const plans = computed(() => item.value?.planes_disponibles || [])
 const draftKey = computed(() => `viti-form-short-${route.params.token}`)
 const questionByNumber = number => allQuestions.value.find(q => Number(q.numero) === Number(number))
 const hasValue = value => Array.isArray(value) ? value.length > 0 : String(value ?? '').trim().length > 0
+const registrationValid = computed(() => {
+  const whatsapp = String(registration.cliente_whatsapp || '').trim()
+  return registration.cliente_nombre.trim().length >= 3
+    && registration.empresa_nombre.trim().length >= 2
+    && registration.titulo_sistema.trim().length >= 3
+    && (!whatsapp || /^\d{7,15}$/.test(whatsapp))
+})
 
 function planKey(plan) {
   const code = String(plan?.codigo || '').toLowerCase()
@@ -50,16 +59,24 @@ function planKey(plan) {
   if (code.includes('profesional')) return 'professional'
   return 'initial'
 }
+function operationNumbersForKey(key) {
+  const numbers = [12,13,17,18,19]
+  if (key === 'professional') numbers.push(32,35)
+  if (key === 'enterprise') numbers.push(27,32,35)
+  if (key === 'custom') numbers.push(70)
+  return numbers
+}
 const selectedPlan = computed(() => plans.value.find(plan => Number(plan.id) === Number(commercial.plan_viti_id)) || item.value?.plan_viti || null)
 const selectedKey = computed(() => planKey(selectedPlan.value))
-const operationNumbers = computed(() => {
-  const numbers = [12,13,17,18,19]
-  if (selectedKey.value === 'professional') numbers.push(32,35)
-  if (selectedKey.value === 'enterprise') numbers.push(27,32,35)
-  if (selectedKey.value === 'custom') numbers.push(70)
-  return numbers
-})
+const operationNumbers = computed(() => operationNumbersForKey(selectedKey.value))
 const operationQuestions = computed(() => operationNumbers.value.map(questionByNumber).filter(Boolean))
+const macroSteps = computed(() => [
+  {label:'Registro',done:true,active:false},
+  {label:'Plan',done:step.value>1||sent.value,active:step.value===1&&!sent.value},
+  {label:'Configuración',done:step.value>2||sent.value,active:step.value===2&&!sent.value},
+  {label:'Acuerdo',done:sent.value,active:step.value===3&&!sent.value},
+  {label:'Revisión',done:false,active:sent.value},
+])
 
 const planBenefits = key => ({
   initial:['1 aplicación VITI','Hasta 3 usuarios','Agenda, órdenes, clientes, equipos e historial'],
@@ -123,10 +140,21 @@ function paymentOptions() {
   options.push({ value:'por_definir', label:'Acordarlo con AGR Studio', description:'Se define durante la revisión de la solicitud.' })
   return options
 }
+function clearAnswersOutsidePlan(key) {
+  const allowed = new Set(operationNumbersForKey(key))
+  for (const q of allQuestions.value) {
+    const number = Number(q.numero)
+    if (!allOperationNumbers.has(number) || allowed.has(number)) continue
+    answers[q.id] = q.tipo === 'seleccion_multiple' ? [] : ''
+    otherAnswers[q.id] = ''
+  }
+}
 function selectPlan(plan) {
   if (sent.value) return
+  const key = planKey(plan)
   commercial.plan_viti_id = plan.id
-  if (planKey(plan) === 'custom') {
+  clearAnswersOutsidePlan(key)
+  if (key === 'custom') {
     commercial.frecuencia_suscripcion_preferida = null
     commercial.forma_pago_preferida = 'por_definir'
   } else if (!commercial.frecuencia_suscripcion_preferida) {
@@ -152,15 +180,54 @@ function restoreDraft() {
     Object.assign(declaration, draft.declaration || {})
     Object.assign(commercial, draft.commercial || {})
     if (Number(draft.step) >= 1 && Number(draft.step) <= 3) step.value = Number(draft.step)
+    clearAnswersOutsidePlan(selectedKey.value)
   } catch {}
 }
 function clearDraft() { try { localStorage.removeItem(draftKey.value) } catch {} }
 function networkFailure(e) { return !navigator.onLine || !e?.response }
 
+function syncRegistrationFromServer() {
+  Object.assign(registration, {
+    cliente_nombre:item.value?.cliente?.nombre || '',
+    cliente_whatsapp:item.value?.cliente?.whatsapp || '',
+    cliente_ciudad:item.value?.cliente?.ciudad || '',
+    cliente_direccion:item.value?.cliente?.direccion || '',
+    empresa_nombre:item.value?.empresa?.nombre_comercial || '',
+    empresa_actividad:item.value?.empresa?.actividad || '',
+    empresa_telefono:item.value?.empresa?.telefono || '',
+    empresa_whatsapp:item.value?.empresa?.whatsapp || '',
+    empresa_ciudad:item.value?.empresa?.ciudad || '',
+    empresa_direccion:item.value?.empresa?.direccion || '',
+    titulo_sistema:item.value?.titulo || '',
+    resumen:item.value?.resumen || '',
+  })
+}
+function syncItemFromRegistration() {
+  if (item.value?.cliente) Object.assign(item.value.cliente, {
+    nombre:registration.cliente_nombre,
+    whatsapp:registration.cliente_whatsapp,
+    ciudad:registration.cliente_ciudad,
+    direccion:registration.cliente_direccion,
+  })
+  if (item.value?.empresa) Object.assign(item.value.empresa, {
+    nombre_comercial:registration.empresa_nombre,
+    actividad:registration.empresa_actividad,
+    telefono:registration.empresa_telefono,
+    whatsapp:registration.empresa_whatsapp,
+    ciudad:registration.empresa_ciudad,
+    direccion:registration.empresa_direccion,
+  })
+  if (item.value) {
+    item.value.titulo = registration.titulo_sistema
+    item.value.resumen = registration.resumen
+  }
+}
+
 async function load() {
   loading.value = true
   try {
     item.value = (await api.get(`/publico/solicitudes/${route.params.token}`)).data.data
+    syncRegistrationFromServer()
     for (const q of allQuestions.value) answers[q.id] = q.tipo === 'seleccion_multiple' ? [] : ''
     for (const response of item.value.respuestas || []) {
       const raw = response.respuesta_json ?? response.respuesta_texto ?? ''
@@ -200,6 +267,7 @@ function payload() {
     .map(q => ({ pregunta_id:Number(q.id), valor:normalizedValue(q.id, answers[q.id]) }))
   return {
     respuestas:visibleAnswers,
+    registro:{...registration},
     declaracion_aceptada:declaration.aceptada,
     declaracion_nombre:declaration.nombre,
     declaracion_fecha:declaration.fecha,
@@ -221,6 +289,7 @@ async function save(quiet=false) {
   try {
     await initCsrf()
     await api.put(`/publico/solicitudes/${route.params.token}`, payload())
+    syncItemFromRegistration()
     clearDraft()
     if (!quiet) $q.notify({ type:'positive', message:'Cambios guardados.' })
     return true
@@ -233,13 +302,16 @@ async function save(quiet=false) {
     return false
   } finally { saving.value = false }
 }
+async function saveRegistration() {
+  if (!registrationValid.value) return $q.notify({ type:'warning', message:'Revisa nombre, WhatsApp, negocio y sistema antes de guardar.' })
+  if (await save(false)) registrationDialog.value = false
+}
 async function next() {
   if (step.value === 1 && !commercial.plan_viti_id) return $q.notify({ type:'warning', message:'Selecciona un plan para continuar.' })
   if (await save(true)) step.value = Math.min(3, step.value + 1)
 }
 async function skipOperation() {
-  await save(true)
-  step.value = 3
+  if (await save(true)) step.value = 3
 }
 async function submit() {
   if (!commercial.plan_viti_id) return $q.notify({ type:'warning', message:'Selecciona un plan.' })
@@ -281,8 +353,29 @@ onBeforeUnmount(() => window.removeEventListener('online', syncDraft))
     <h1 class="page-title">Elige el nivel que necesita tu negocio</h1>
     <div class="page-subtitle">{{item.empresa?.nombre_comercial || 'Tu empresa'}} · ya tenemos tus datos de registro. Aquí solo definimos plan y configuración básica.</div>
 
+    <div class="macro-flow q-mt-lg" aria-label="Progreso general de la solicitud">
+      <template v-for="(macro,index) in macroSteps" :key="macro.label">
+        <div :class="['macro-step',{done:macro.done,active:macro.active}]">
+          <q-icon :name="macro.done?'check_circle':macro.active?'radio_button_checked':'radio_button_unchecked'" />
+          <span>{{macro.label}}</span>
+        </div>
+        <q-icon v-if="index<macroSteps.length-1" name="chevron_right" class="macro-arrow"/>
+      </template>
+    </div>
+
     <q-stepper v-model="step" flat animated color="primary" class="viti-card q-mt-lg">
       <q-step :name="1" title="Plan" icon="workspace_premium" :done="step>1">
+        <q-card flat bordered class="registration-summary q-mb-lg">
+          <q-card-section class="row items-center q-col-gutter-md">
+            <div class="col">
+              <div class="section-label">Registro completado</div>
+              <div class="text-weight-bold">{{registration.cliente_nombre}} · {{registration.empresa_nombre}}</div>
+              <div class="text-caption text-grey-6">{{registration.titulo_sistema}} · Tel. {{item.cliente?.telefono}}</div>
+            </div>
+            <div class="col-auto"><q-btn outline no-caps color="primary" icon="edit" label="Revisar datos" :disable="sent" @click="registrationDialog=true"/></div>
+          </q-card-section>
+        </q-card>
+
         <div class="plan-grid">
           <q-card v-for="plan in plans" :key="plan.id" flat bordered :class="['plan-card',{selected:Number(commercial.plan_viti_id)===Number(plan.id)}]" @click="selectPlan(plan)">
             <q-card-section>
@@ -299,7 +392,7 @@ onBeforeUnmount(() => window.removeEventListener('online', syncDraft))
       <q-step :name="2" title="Configuración" icon="tune" :done="step>2">
         <div class="row items-start justify-between q-gutter-md q-mb-lg">
           <div><div class="text-h6 text-weight-bold">Configuración de {{selectedPlan?.nombre}}</div><div class="text-body2 text-grey-7">Responde solo lo que tengas claro. También puedes saltar este paso y completar los detalles durante la revisión.</div></div>
-          <q-btn outline no-caps color="primary" icon="skip_next" label="Saltar configuración" :disable="sent" @click="skipOperation"/>
+          <q-btn outline no-caps color="primary" icon="skip_next" label="Saltar configuración" :disable="sent" :loading="saving" @click="skipOperation"/>
         </div>
 
         <div v-for="q in operationQuestions" :key="q.id" class="question-block">
@@ -342,6 +435,42 @@ onBeforeUnmount(() => window.removeEventListener('online', syncDraft))
         </q-stepper-navigation>
       </template>
     </q-stepper>
+
+    <q-dialog v-model="registrationDialog" persistent>
+      <q-card class="registration-dialog">
+        <q-card-section class="row items-start">
+          <div><div class="section-label">Registro inicial</div><div class="text-h5 text-weight-bold">Revisar y corregir datos</div><div class="text-caption text-grey-6 q-mt-xs">No necesitas volver al enlace de invitación. Corrige aquí los datos seguros antes de enviar la solicitud.</div></div>
+          <q-space/><q-btn flat round icon="close" :disable="saving" @click="registrationDialog=false"/>
+        </q-card-section>
+        <q-separator/>
+        <q-card-section class="q-pa-lg">
+          <div class="text-subtitle1 text-weight-bold q-mb-sm">Tu información</div>
+          <div class="row q-col-gutter-md">
+            <div class="col-12 col-sm-7"><q-input v-model="registration.cliente_nombre" outlined label="Nombre completo *"/></div>
+            <div class="col-12 col-sm-5"><q-input :model-value="item.cliente?.telefono" outlined readonly label="Teléfono de acceso" hint="Por seguridad se cambia desde tu cuenta."/></div>
+            <div class="col-12 col-sm-6"><q-input v-model="registration.cliente_whatsapp" outlined label="WhatsApp" inputmode="numeric"/></div>
+            <div class="col-12 col-sm-6"><q-input v-model="registration.cliente_ciudad" outlined label="Ciudad o localidad"/></div>
+            <div class="col-12"><q-input v-model="registration.cliente_direccion" outlined label="Dirección o zona"/></div>
+          </div>
+          <div class="text-subtitle1 text-weight-bold q-mt-lg q-mb-sm">Negocio y necesidad</div>
+          <div class="row q-col-gutter-md">
+            <div class="col-12 col-sm-7"><q-input v-model="registration.empresa_nombre" outlined label="Nombre del negocio *"/></div>
+            <div class="col-12 col-sm-5"><q-input v-model="registration.empresa_actividad" outlined label="Actividad"/></div>
+            <div class="col-12 col-sm-6"><q-input v-model="registration.empresa_telefono" outlined label="Teléfono del negocio"/></div>
+            <div class="col-12 col-sm-6"><q-input v-model="registration.empresa_whatsapp" outlined label="WhatsApp del negocio"/></div>
+            <div class="col-12 col-sm-5"><q-input v-model="registration.empresa_ciudad" outlined label="Ciudad del negocio"/></div>
+            <div class="col-12 col-sm-7"><q-input v-model="registration.empresa_direccion" outlined label="Dirección del negocio"/></div>
+            <div class="col-12"><q-input v-model="registration.titulo_sistema" outlined label="¿Qué sistema necesitas? *"/></div>
+            <div class="col-12"><q-input v-model="registration.resumen" outlined type="textarea" autogrow label="Problema que quieres resolver"/></div>
+          </div>
+        </q-card-section>
+        <q-separator/>
+        <q-card-actions align="right" class="q-pa-md">
+          <q-btn flat no-caps label="Cancelar" :disable="saving" @click="registrationDialog=false"/>
+          <q-btn color="primary" unelevated no-caps icon="save" label="Guardar correcciones" :loading="saving" :disable="!registrationValid" @click="saveRegistration"/>
+        </q-card-actions>
+      </q-card>
+    </q-dialog>
   </div>
 </q-page>
 </template>
@@ -349,6 +478,10 @@ onBeforeUnmount(() => window.removeEventListener('online', syncDraft))
 <style scoped>
 .question-block{padding:18px 0;border-bottom:1px solid rgba(120,135,155,.16)}
 .question-block:last-child{border-bottom:0}
+.macro-flow{display:flex;align-items:center;gap:7px;flex-wrap:wrap;padding:12px 16px;border:1px solid var(--viti-border);border-radius:16px;background:var(--viti-card)}
+.macro-step{display:flex;align-items:center;gap:5px;color:var(--viti-muted);font-size:13px;font-weight:700}.macro-step.done{color:#21ba45}.macro-step.active{color:var(--q-primary)}.macro-arrow{color:var(--viti-muted)}
+.registration-summary{border-radius:16px;background:color-mix(in srgb,var(--viti-card) 94%,var(--q-primary) 6%)}
+.registration-dialog{width:min(820px,94vw);max-height:90vh}
 .plan-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px}
 .plan-card,.subscription-card,.payment-card{cursor:pointer;border-radius:18px;transition:.18s ease;background:var(--q-card-background,white)}
 .plan-card:hover,.subscription-card:hover,.payment-card:hover{transform:translateY(-2px);border-color:rgba(25,118,210,.45)}
@@ -361,5 +494,5 @@ onBeforeUnmount(() => window.removeEventListener('online', syncDraft))
 .subscription-price{font-size:26px;font-weight:900;color:var(--q-primary);margin:4px 0}.subscription-price span{font-size:13px;font-weight:600;color:#78869a}
 .payment-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:12px}
 .summary-plan{border-radius:18px}
-@media(max-width:700px){.subscription-grid,.price-box{grid-template-columns:1fr}.plan-grid{grid-template-columns:1fr}.public-shell{padding-left:14px;padding-right:14px}}
+@media(max-width:700px){.subscription-grid,.price-box{grid-template-columns:1fr}.plan-grid{grid-template-columns:1fr}.public-shell{padding-left:14px;padding-right:14px}.macro-flow{gap:4px}.macro-step{font-size:11px}.macro-arrow{font-size:16px}.registration-dialog{width:100vw;max-height:100vh}}
 </style>
