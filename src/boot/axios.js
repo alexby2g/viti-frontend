@@ -64,4 +64,32 @@ api.interceptors.request.use(config => {
   return config
 })
 
+api.interceptors.response.use(
+  response => {
+    lastHealthyAt = Date.now()
+    return response
+  },
+  async error => {
+    const config = error?.config
+    const method = String(config?.method || 'get').toLowerCase()
+    const safeRead = method === 'get' || method === 'head'
+    const status = Number(error?.response?.status || 0)
+    const retryableStatus = [502, 503, 504].includes(status)
+    const retryableNetwork = !error?.response || ['ECONNABORTED', 'ETIMEDOUT'].includes(error?.code)
+    const online = typeof navigator === 'undefined' || navigator.onLine
+
+    if (!config || config.__vitiWakeRetry || !safeRead || !online || (!retryableStatus && !retryableNetwork)) {
+      return Promise.reject(error)
+    }
+
+    config.__vitiWakeRetry = true
+    try {
+      await warmBackend()
+      return api.request(config)
+    } catch {
+      return Promise.reject(error)
+    }
+  },
+)
+
 export default boot(({ app }) => { app.config.globalProperties.$api = api })

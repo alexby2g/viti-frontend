@@ -28,3 +28,6 @@ jobs:
 
       - name: Chrome browser smoke
         run: bash scripts/browser-smoke.sh
+
+      - name: Chrome public flow smoke
+        run: bash scripts/browser-flow-smoke.sh
