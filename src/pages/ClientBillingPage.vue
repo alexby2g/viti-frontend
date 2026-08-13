@@ -19,8 +19,12 @@ const form=reactive({monto:0,metodo:'qr',fecha_pago:'',referencia:'',observacion
 const money=value=>`${Number(value||0).toFixed(2)} Bs`
 const pretty=value=>String(value||'').replaceAll('_',' ').replace(/\b\w/g,c=>c.toUpperCase())
 const today=()=>new Date().toISOString().slice(0,10)
-const statusColor=value=>({pagado:'positive',pendiente_saldo:'orange',pendiente_anticipo:'negative',activa:'positive',gracia:'orange',suspendida:'negative',cancelada:'grey',pendiente_revision:'orange',confirmado:'positive',rechazado:'negative'}[value]||'grey')
+const statusColor=value=>({pagado:'positive',pendiente_saldo:'orange',pendiente_anticipo:'negative',activa:'positive',al_dia:'positive',por_vencer:'amber-9',gracia:'orange',suspendida:'negative',cancelada:'grey',prueba:'positive',pendiente_revision:'orange',confirmado:'positive',rechazado:'negative'}[value]||'grey')
 const reviewLabel=value=>({pendiente_revision:'Pendiente de revisión',confirmado:'Confirmado',rechazado:'Rechazado'}[value]||pretty(value||'confirmado'))
+const subscriptionStage=value=>value?.etapa_cobro||(value?.en_prueba?'prueba':value?.estado||'al_dia')
+const subscriptionStageLabel=value=>({prueba:'Prueba gratuita',al_dia:'Al día',por_vencer:'Por vencer',gracia:'Periodo de gracia',suspendida:'Suspendida',cancelada:'Cancelada'}[subscriptionStage(value)]||pretty(subscriptionStage(value)))
+const subscriptionBannerClass=value=>({prueba:'bg-green-1 text-green-9',al_dia:'bg-blue-1 text-primary',por_vencer:'bg-amber-1 text-amber-10',gracia:'bg-orange-1 text-orange-10',suspendida:'bg-red-1 text-negative',cancelada:'bg-grey-2 text-grey-8'}[subscriptionStage(value)]||'bg-blue-1 text-primary')
+const subscriptionIcon=value=>({prueba:'verified',al_dia:'event_available',por_vencer:'schedule',gracia:'hourglass_top',suspendida:'lock_clock',cancelada:'cancel'}[subscriptionStage(value)]||'event')
 const qrSrc=computed(()=>data.value.configuracion?.qr_url&&!qrFailed.value?data.value.configuracion.qr_url:'/viti-payment-qr.png')
 const payerName=payment=>payment.pagador?`${payment.pagador.nombre||''} ${payment.pagador.apellido||''}`.trim():''
 const conceptLabel=computed(()=>{
@@ -122,9 +126,37 @@ onMounted(load)
             <q-card-section><div class="section-label">Suscripción VITI</div><div class="text-h6 text-weight-bold">Mantenimiento de la plataforma</div><div class="text-caption text-grey-6">Se maneja aparte del precio de desarrollo y empieza cuando corresponde después de la beta/prueba.</div></q-card-section>
             <q-separator/>
             <q-card-section v-if="project.suscripcion">
-              <div class="row items-center q-col-gutter-md"><div class="col"><div class="text-h6 text-weight-bold">{{project.suscripcion.plan||'Plan VITI'}}</div><div class="text-body2">{{money(project.suscripcion.monto)}} / {{project.suscripcion.frecuencia==='anual'?'año':'mes'}}</div></div><div class="col-auto"><q-badge :color="statusColor(project.suscripcion.estado)">{{project.suscripcion.en_prueba?'Prueba gratuita':pretty(project.suscripcion.estado)}}</q-badge></div></div>
-              <q-banner v-if="project.suscripcion.en_prueba" rounded class="bg-green-1 text-green-9 q-mt-md"><template #avatar><q-icon name="verified"/></template>Prueba gratuita hasta {{project.suscripcion.prueba_hasta}}. Mientras dure la prueba no debes pagar la mensualidad.</q-banner>
-              <q-banner v-else rounded class="bg-blue-1 text-primary q-mt-md"><template #avatar><q-icon name="event"/></template><div class="row items-center"><div class="col"><div class="text-weight-bold">Pago actual: {{money(project.suscripcion.importe_pendiente)}}</div><div class="text-caption" v-if="project.suscripcion.primer_cobro_monto!==null&&!project.suscripcion.primer_cobro_pagado">Primer periodo proporcional: {{project.suscripcion.primer_cobro_desde}} al {{project.suscripcion.primer_cobro_hasta}}.</div><div class="text-caption" v-else>Mensualidad correspondiente al periodo vigente.</div></div><div class="col-12 col-sm-auto q-mt-sm q-mt-sm-none"><q-btn v-if="project.suscripcion.puede_enviar_comprobante" color="primary" unelevated no-caps icon="upload_file" label="Enviar comprobante de suscripción" @click="openPayment(project,'subscription')"/><q-badge v-else-if="project.suscripcion.comprobante_pendiente_id" color="orange" label="Comprobante en revisión"/></div></div></q-banner>
+              <div class="row items-center q-col-gutter-md">
+                <div class="col"><div class="text-h6 text-weight-bold">{{project.suscripcion.plan||'Plan VITI'}}</div><div class="text-body2">{{money(project.suscripcion.monto)}} / {{project.suscripcion.frecuencia==='anual'?'año':'mes'}}</div></div>
+                <div class="col-auto"><q-badge :color="statusColor(subscriptionStage(project.suscripcion))">{{subscriptionStageLabel(project.suscripcion)}}</q-badge></div>
+              </div>
+
+              <q-banner rounded class="q-mt-md" :class="subscriptionBannerClass(project.suscripcion)">
+                <template #avatar><q-icon :name="subscriptionIcon(project.suscripcion)"/></template>
+                <div class="text-weight-bold">{{project.suscripcion.mensaje_cobro || (project.suscripcion.en_prueba?`Prueba gratuita hasta ${project.suscripcion.prueba_hasta}.`:'Estado de la suscripción actualizado.') }}</div>
+                <div v-if="project.suscripcion.en_prueba" class="text-caption">Mientras dure la prueba no debes pagar la mensualidad.</div>
+                <div v-else class="text-caption q-mt-xs">
+                  <span v-if="project.suscripcion.fecha_vencimiento">Vencimiento: <strong>{{project.suscripcion.fecha_vencimiento}}</strong>.</span>
+                  <span v-if="project.suscripcion.etapa_cobro==='por_vencer' && project.suscripcion.dias_para_vencer!==null"> Quedan {{project.suscripcion.dias_para_vencer}} día(s).</span>
+                  <span v-if="project.suscripcion.etapa_cobro==='gracia' && project.suscripcion.gracia_hasta"> Acceso de gracia hasta <strong>{{project.suscripcion.gracia_hasta}}</strong>.</span>
+                  <span v-if="project.suscripcion.dias_mora>0"> Mora: {{project.suscripcion.dias_mora}} día(s).</span>
+                </div>
+              </q-banner>
+
+              <q-card v-if="!project.suscripcion.en_prueba && project.suscripcion.estado!=='cancelada'" flat bordered class="next-payment q-mt-md">
+                <q-card-section class="row items-center q-col-gutter-md">
+                  <div class="col">
+                    <div class="text-caption text-grey-6">Pago actual</div>
+                    <div class="text-h6 text-weight-bold">{{money(project.suscripcion.importe_pendiente)}}</div>
+                    <div class="text-caption" v-if="project.suscripcion.primer_cobro_monto!==null&&!project.suscripcion.primer_cobro_pagado">Primer periodo proporcional: {{project.suscripcion.primer_cobro_desde}} al {{project.suscripcion.primer_cobro_hasta}}.</div>
+                    <div class="text-caption" v-else>Mensualidad correspondiente al periodo vigente.</div>
+                  </div>
+                  <div class="col-12 col-sm-auto">
+                    <q-btn v-if="project.suscripcion.puede_enviar_comprobante" color="primary" unelevated no-caps icon="upload_file" label="Enviar comprobante de suscripción" @click="openPayment(project,'subscription')"/>
+                    <q-badge v-else-if="project.suscripcion.comprobante_pendiente_id" color="orange" label="Comprobante en revisión"/>
+                  </div>
+                </q-card-section>
+              </q-card>
             </q-card-section>
             <q-card-section v-else class="text-grey-7"><q-icon name="schedule" class="q-mr-sm"/>La suscripción todavía no ha comenzado. Se configurará cuando la beta sea habilitada para uso.</q-card-section>
 
