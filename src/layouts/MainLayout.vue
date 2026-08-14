@@ -8,6 +8,7 @@ import { useBrandingStore } from '../stores/branding'
 import { useNotificationsStore } from '../stores/notifications'
 import { useTenantStore } from '../stores/tenant'
 import { formatDateTime } from '../utils/date'
+import { buildMainMenu } from '../navigation/mainMenu'
 import AppBrand from '../components/AppBrand.vue'
 import BrandingSettingsDialog from '../components/BrandingSettingsDialog.vue'
 import CallCenter from '../components/CallCenter.vue'
@@ -44,71 +45,14 @@ const businessOptions = computed(() => tenant.businesses.map(b => ({ label: b.no
 const guideFloatClass = computed(() => branding.guide_position === 'right-bottom' ? 'guide-right-bottom' : 'guide-right-center')
 const showGuideFloat = computed(() => branding.guide_enabled && route.path !== '/guia-viti')
 
-const menu = computed(() => {
-  const guideLabel = `Guía ${branding.product_name}`
-  if (isClient.value) {
-    const items = []
-    if (hasClientProfile.value) items.push({ label: 'Mi cuenta', icon: 'account_circle', to: '/mi-cuenta' })
-    items.push(
-      { label: 'Mi negocio', icon: 'storefront', to: '/mi-negocio' },
-      { label: 'Aplicaciones', icon: 'apps', children: [{ label: 'Instaladas', icon: 'grid_view', to: '/mi-aplicaciones' }] },
-    )
-    if (isManager.value) {
-      items.push({
-        label: 'Mi proyecto',
-        icon: 'account_tree',
-        children: [
-          { label: 'Avances y archivos', icon: 'timeline', to: '/mi-proyecto' },
-          { label: 'Pagos', icon: 'payments', to: '/mi-pagos' },
-        ],
-      })
-    }
-    if (hasClientProfile.value && isManager.value) items.push({ label: 'Nueva solicitud', icon: 'assignment_add', action: 'request' })
-    if (hasClientProfile.value) items.push({ label: 'Mi buzón', icon: 'forum', to: '/mi-buzon', badge: notifications.unreadCount })
-    items.push({ label: guideLabel, icon: 'help_center', to: '/guia-viti' })
-    return items
-  }
-
-  const operational = [
-    { label: 'Inicio', icon: 'dashboard', to: '/' },
-    { label: 'Empresas', icon: 'business', to: '/clientes' },
-    { label: 'Desarrollo', icon: 'terminal', children: [
-      { label: 'Solicitudes', icon: 'fact_check', to: '/solicitudes' },
-      { label: 'Proyectos', icon: 'account_tree', to: '/proyectos' },
-      { label: 'Aplicaciones', icon: 'apps', to: '/aplicaciones' },
-    ] },
-    { label: 'Atención', icon: 'forum', children: [
-      { label: 'Mensajes de empresas', icon: 'mark_chat_unread', to: '/buzon', badge: notifications.unreadCount },
-      { label: 'Casos de soporte', icon: 'build_circle', to: '/mantenimientos' },
-    ] },
-    { label: 'Archivos', icon: 'folder', children: [{ label: 'Archivos de empresas', icon: 'folder_shared', to: '/archivos' }] },
-    { label: 'Control', icon: 'analytics', children: [{ label: 'Reportes', icon: 'picture_as_pdf', to: '/reportes' }] },
-    { label: guideLabel, icon: 'help_center', to: '/guia-viti' },
-  ]
-
-  if (isSuperAdmin.value) {
-    operational.splice(1, 0, {
-      label: 'Planes y cobros',
-      icon: 'hub',
-      children: [
-        { label: 'Planes y módulos', icon: 'cloud_circle', to: '/saas' },
-        { label: `Pagos ${branding.product_name}`, icon: 'payments', to: '/pagos' },
-      ],
-    })
-    const files = operational.find(item => item.label === 'Archivos')
-    if (files) files.children.push({ label: 'Almacenamiento técnico', icon: 'cloud', to: '/almacenamiento' })
-    operational.push({
-      label: 'Administración',
-      icon: 'admin_panel_settings',
-      children: [
-        { label: 'Usuarios', icon: 'manage_accounts', to: '/usuarios' },
-        { label: 'Auditoría', icon: 'history', to: '/auditoria' },
-        { label: 'Marca y apariencia', icon: 'palette', action: 'branding' },
-      ],
-    })
-  }
-  return operational
-})
+const menu = computed(() => buildMainMenu({
+  isClient: isClient.value,
+  isSuperAdmin: isSuperAdmin.value,
+  hasClientProfile: hasClientProfile.value,
+  isManager: isManager.value,
+  unreadCount: notifications.unreadCount,
+  productName: branding.product_name,
+}))
 
 const quickItems = computed(() => menu.value.flatMap(item => item.children
   ? item.children.filter(child => child.to).map(child => ({ ...child, group: item.label }))
