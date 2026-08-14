@@ -41,12 +41,14 @@ function stateColor(row){ return ({vigente:'positive',por_vencer:'orange',vencid
 
 const rows = computed(() => {
   const term = normalize(search.value.trim())
-  return warranties.value.filter(row => {
-    const matchesState = state.value === 'todas' || warrantyState(row) === state.value
-    if (!matchesState) return false
-    if (!term) return true
-    return normalize([row.codigo,row.cliente_nombre,row.cliente_telefono,equipmentLabel(row),row.condiciones_garantia].filter(Boolean).join(' ')).includes(term)
-  })
+  return [...warranties.value]
+    .sort((a,b) => Number(b.id) - Number(a.id))
+    .filter(row => {
+      const matchesState = state.value === 'todas' || warrantyState(row) === state.value
+      if (!matchesState) return false
+      if (!term) return true
+      return normalize([row.codigo,row.cliente_nombre,row.cliente_telefono,equipmentLabel(row),row.condiciones_garantia].filter(Boolean).join(' ')).includes(term)
+    })
 })
 const counts = computed(() => warranties.value.reduce((acc,row) => {
   const key = warrantyState(row)
@@ -83,7 +85,7 @@ onMounted(load)
       <div class="col-12 col-md">
         <div class="text-overline text-primary text-weight-bold">Control</div>
         <h1 class="text-h4 text-weight-bold q-my-xs">Garantías</h1>
-        <div class="text-body2 text-grey-7">Seguimiento de servicios cubiertos, vencimientos próximos y garantías ya finalizadas.</div>
+        <div class="text-body2 text-grey-7">Seguimiento de servicios cubiertos. Los registros más recientes aparecen primero.</div>
       </div>
       <div class="col-12 col-md-auto"><q-btn outline color="primary" icon="refresh" label="Actualizar" no-caps :loading="loading" @click="load"/></div>
     </div>
@@ -105,7 +107,7 @@ onMounted(load)
 
     <q-card flat bordered>
       <q-table flat :rows="rows" :columns="columns" row-key="id" :loading="loading" :grid="$q.screen.lt.md" :pagination="{rowsPerPage:20}" no-data-label="No hay garantías que coincidan con este filtro.">
-        <template #body-cell-orden="props"><q-td :props="props"><div class="text-weight-bold text-primary">{{props.row.codigo}}</div><div class="text-weight-medium">{{props.row.cliente_nombre}}</div><div class="text-caption text-grey-7">{{props.row.cliente_telefono||'Sin teléfono'}}</div></q-td></template>
+        <template #body-cell-orden="props"><q-td :props="props"><div class="text-weight-bold text-primary">{{props.row.codigo}}</div><div class="text-weight-medium">{{props.row.cliente_nombre}}</div><div class="text-caption text-grey-7">Registro #{{props.row.id}} · {{props.row.cliente_telefono||'Sin teléfono'}}</div></q-td></template>
         <template #body-cell-equipo="props"><q-td :props="props"><div>{{equipmentLabel(props.row)}}</div><div class="text-caption text-grey-7">{{props.row.tipo_servicio||'Servicio técnico'}}</div></q-td></template>
         <template #body-cell-periodo="props"><q-td :props="props"><div>{{date(props.row.garantia_inicio)}} → {{date(props.row.garantia_fin)}}</div><div class="text-caption text-grey-7">{{props.row.garantia_dias}} días de garantía</div></q-td></template>
         <template #body-cell-estado="props"><q-td :props="props"><q-badge :color="stateColor(props.row)" :label="stateLabel(props.row)"/></q-td></template>
