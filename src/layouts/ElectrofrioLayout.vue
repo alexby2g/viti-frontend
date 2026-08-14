@@ -58,7 +58,8 @@ const menuGroups = computed(() => [
   {
     title: 'Personas y recursos',
     items: [
-      { module:'clientes', label:'Clientes y equipos', icon:'groups', to:`${appBase.value}/clientes` },
+      { module:'clientes', label:'Clientes', caption:'Datos y acceso del cliente', icon:'groups', to:`${appBase.value}/clientes` },
+      { module:'equipos', label:'Equipos y ficha técnica', caption:'Datos y mediciones del equipo', icon:'ac_unit', to:`${appBase.value}/equipos` },
       { module:'tecnicos', label:'Técnicos', icon:'engineering', to:`${appBase.value}/tecnicos` },
       { module:'inventario', label:'Inventario', icon:'inventory_2', to:`${appBase.value}/inventario` },
     ],
