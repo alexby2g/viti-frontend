@@ -13,7 +13,7 @@ CLIENT_BUSINESSES={"data":[
     {"id":301,"nombre_comercial":"Negocio Auth A","rol":"propietario","features":{"modulos_efectivos":["inicio","agenda","ordenes","clientes"],"usuarios":{"usados":1,"maximo":3,"restantes":2,"alcanzado":False},"aplicaciones":{"usados":1,"maximo":1,"restantes":0,"alcanzado":True}}},
     {"id":302,"nombre_comercial":"Negocio Auth B","rol":"propietario","features":{"modulos_efectivos":["inicio","agenda","ordenes"],"usuarios":{"usados":1,"maximo":3,"restantes":2,"alcanzado":False},"aplicaciones":{"usados":0,"maximo":1,"restantes":1,"alcanzado":False}}}
 ]}
-CLIENT_APPS={"data":[{"id":401,"nombre":"Electrofrío E2E","estado_servicio":"activa","estado_mensaje":"Aplicación lista para trabajar","version":"1.0","ruta":"/mi-apps/electrofrio/inicio","empresa":{"id":301,"nombre_comercial":"Negocio Auth A"},"catalogo":{"clave":"electrofrio","nombre":"Electrofrío","icono":"ac_unit"},"suscripcion":None,"es_externa":False}]}
+CLIENT_APPS={"data":[{"id":401,"nombre":"Electrofrío E2E","estado_servicio":"activa","estado_mensaje":"Aplicación lista para trabajar","version":"1.0","ruta":"/mi-apps/electrofrio/inicio","empresa":{"id":301,"nombre_comercial":"Negocio Auth A"},"catalogo":{"clave":"electrofrio","nombre":"Electrofrío E2E","icono":"ac_unit"},"suscripcion":None,"es_externa":False}]}
 ADMIN_REQUEST={"data":{"id":501,"codigo":"SOL-AUTH-E2E","empresa_id":101,"cliente_id":201,"cuestionario_id":1,"plan_viti_id":1,"titulo":"Solicitud autenticada E2E","resumen":"Prueba del panel administrativo","estado":"en_revision","prioridad":"alta","created_at":"2026-08-13T20:00:00-04:00","forma_pago_preferida":"50_50","frecuencia_suscripcion_preferida":"mensual","acuerdo_comercial_aceptado":True,"acuerdo_comercial_nombre":"Cliente Admin E2E","acuerdo_comercial_fecha":"2026-08-13","declaracion_aceptada":True,"declaracion_nombre":"Cliente Admin E2E","declaracion_fecha":"2026-08-13","workflow":{"actual":"en_revision","permitidos":["aprobada","rechazada","cerrada"],"catalogo":["borrador","en_revision","aprobada","rechazada","convertida","cerrada"]},"empresa":{"id":101,"nombre_comercial":"Empresa Auth E2E","actividad":"Servicios técnicos"},"cliente":{"id":201,"nombre":"Cliente Admin E2E","telefono":"71111111"},"plan_viti":PLAN,"cuestionario":{"id":1,"secciones":[]},"respuestas":[],"proyecto":None,"conversacion":None,"archivos":[]}}
 BRANDING={"data":{"studio_name":"AGR Studio","product_name":"VITI","product_meaning":"Visión Integral, Tecnología e Innovación","tagline":"Plataforma de proyectos y soluciones digitales","primary_color":"#1565C0","secondary_color":"#43A047","accent_color":"#FB8C00","dark_color":"#071C3B","drawer_color":"#092B55","guide_enabled":True,"guide_position":"right-center"}}
 
@@ -38,8 +38,6 @@ class Handler(BaseHTTPRequestHandler):
         if path=="/api/v1/solicitudes/501": return self.send_json(ADMIN_REQUEST)
         if path=="/api/v1/mi/negocios": return self.send_json(CLIENT_BUSINESSES)
         if path=="/api/v1/mi/aplicaciones":
-            # El smoke falla si la página dispara esta petición antes de que el router
-            # haya resuelto y persistido una empresa activa.
             if self.headers.get("X-VITI-Empresa")!="301":
                 return self.send_json({"message":"Falta contexto explícito de empresa E2E."},422)
             return self.send_json(CLIENT_APPS)
