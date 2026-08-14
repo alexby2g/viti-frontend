@@ -1,10 +1,10 @@
-import AuthLayout from '../layouts/AuthLayout.vue'
-import MainLayout from '../layouts/MainLayout.vue'
-import PeluqueriaClientLayout from '../layouts/PeluqueriaClientLayout.vue'
-import PeluqueriaAdminLayout from '../layouts/PeluqueriaAdminLayout.vue'
-import ElectrofrioLayout from '../layouts/ElectrofrioLayout.vue'
-import ElectrofrioCustomerLayout from '../layouts/ElectrofrioCustomerLayout.vue'
-import SoporteVitalLayout from '../layouts/SoporteVitalLayout.vue'
+const AuthLayout = () => import('../layouts/AuthLayout.vue')
+const MainLayout = () => import('../layouts/MainLayout.vue')
+const PeluqueriaClientLayout = () => import('../layouts/PeluqueriaClientLayout.vue')
+const PeluqueriaAdminLayout = () => import('../layouts/PeluqueriaAdminLayout.vue')
+const ElectrofrioLayout = () => import('../layouts/ElectrofrioLayout.vue')
+const ElectrofrioCustomerLayout = () => import('../layouts/ElectrofrioCustomerLayout.vue')
+const SoporteVitalLayout = () => import('../layouts/SoporteVitalLayout.vue')
 
 const hairPage = () => import('../pages/ClientPeluqueriaWorkspacePage.vue')
 const electroPage = () => import('../pages/ElectrofrioWorkspacePage.vue')
