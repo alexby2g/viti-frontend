@@ -25,7 +25,7 @@ jobs:
 
       - name: Calculate safe production lockfile patch
         run: |
-          npm audit fix --package-lock-only
+          npm audit fix --package-lock-only || true
           git diff -- package-lock.json package.json
 
       - name: Production dependency audit
