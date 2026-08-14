@@ -31,3 +31,6 @@ jobs:
 
       - name: Chrome public flow smoke
         run: bash scripts/browser-flow-smoke.sh
+
+      - name: Chrome authenticated tenant smoke
+        run: bash scripts/browser-auth-smoke.sh
