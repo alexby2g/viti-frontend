@@ -39,4 +39,11 @@ check_page admin-request "$BASE/solicitudes/501" \
   "Empresas" \
   "Salud del sistema"
 
-echo "Flow E2E OK: formulario público y ruta administrativa autenticada renderizan en Chrome headless."
+check_page client-apps "$BASE/mi-aplicaciones" \
+  "Mis aplicaciones" \
+  "Negocio Auth A" \
+  "Electrofrío E2E" \
+  "Mi negocio" \
+  "Nueva solicitud"
+
+echo "Flow E2E OK: formulario público, panel administrativo y cliente multiempresa renderizan con contexto explícito en Chrome headless."
