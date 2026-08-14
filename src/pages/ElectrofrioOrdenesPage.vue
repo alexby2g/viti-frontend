@@ -8,6 +8,7 @@ const $q = useQuasar()
 const route = useRoute()
 const loading = ref(false)
 const saving = ref(false)
+const uploading = ref(false)
 const rows = ref([])
 const clientes = ref([])
 const equipos = ref([])
@@ -17,9 +18,11 @@ const summary = ref({ total:0, cita:0, diagnostico:0, propuesta:0, servicio:0, c
 const dialog = ref(false)
 const detailDialog = ref(false)
 const finishDialog = ref(false)
+const evidenceDialog = ref(false)
 const editingId = ref(null)
 const selected = ref(null)
 const rejectionReason = ref('')
+const evidenceFile = ref(null)
 
 const clientMode = computed(() => route.path.startsWith('/mi-apps/electrofrio'))
 const base = computed(() => clientMode.value ? '/mi/apps/electrofrio' : '/apps/electrofrio')
@@ -37,6 +40,7 @@ const filters = reactive({
 
 const form = reactive(emptyOrder())
 const finishForm = reactive({ trabajo_realizado:'', recomendaciones:'', garantia_dias:0, condiciones_garantia:'' })
+const evidenceForm = reactive({ categoria:'antes', descripcion:'' })
 
 const stageOptions = [
   { label:'Todas las etapas', value:null },
@@ -52,6 +56,13 @@ const priorityOptions = [
   { label:'Normal', value:'normal' },
   { label:'Alta', value:'alta' },
   { label:'Urgente', value:'urgente' },
+]
+const evidenceCategories = [
+  { label:'Antes del trabajo', value:'antes', icon:'photo_camera' },
+  { label:'Durante el trabajo', value:'durante', icon:'engineering' },
+  { label:'Después del trabajo', value:'despues', icon:'done_all' },
+  { label:'Documento', value:'documento', icon:'description' },
+  { label:'Comprobante', value:'comprobante', icon:'receipt_long' },
 ]
 const presetTypes = [
   'Diagnóstico',
@@ -124,6 +135,24 @@ function pretty(value){ return String(value || '').replaceAll('_',' ').replace(/
 function equipmentLabel(row){ return [row.equipo_tipo || row.tipo, row.equipo_marca || row.marca, row.equipo_modelo || row.modelo].filter(Boolean).join(' · ') || 'Sin equipo' }
 function stageColor(stage){ return ({ cita:'blue', diagnostico:'purple', propuesta:'orange', servicio:'teal', cerrada:'grey-7' }[stage] || 'grey') }
 function priorityColor(priority){ return ({ baja:'grey', normal:'blue', alta:'orange', urgente:'negative' }[priority] || 'grey') }
+function evidenceCategory(item){ return evidenceCategories.find(option => option.value === item?.categoria) || { label:pretty(item?.categoria), icon:'attach_file' } }
+function evidenceIcon(item){ return item?.mime === 'application/pdf' ? 'picture_as_pdf' : evidenceCategory(item).icon }
+function formatBytes(value){
+  const bytes = Number(value || 0)
+  if (bytes < 1024) return `${bytes} B`
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
+  return `${(bytes / 1024 / 1024).toFixed(1)} MB`
+}
+function saveBlob(blob, filename){
+  const url = URL.createObjectURL(blob)
+  const anchor = document.createElement('a')
+  anchor.href = url
+  anchor.download = filename
+  document.body.appendChild(anchor)
+  anchor.click()
+  anchor.remove()
+  URL.revokeObjectURL(url)
+}
 
 async function loadLookups(){
   try{
@@ -223,9 +252,15 @@ async function saveOrder(){
   }
 }
 
-function openDetail(row){
+async function openDetail(row){
   selected.value = row
   detailDialog.value = true
+  try{
+    const response = await api.get(`${base.value}/ordenes-operativas/${row.id}`)
+    selected.value = response.data.data
+  }catch(error){
+    notifyError(error, 'No se pudo actualizar el detalle de la orden.')
+  }
 }
 
 function acceptProposal(){
@@ -288,6 +323,76 @@ async function finishOrder(){
     notifyError(error, 'No se pudo finalizar la orden.')
   }finally{
     saving.value = false
+  }
+}
+
+function openEvidenceUpload(){
+  if (!selected.value || selected.value.etapa === 'cerrada') return
+  evidenceFile.value = null
+  Object.assign(evidenceForm, { categoria:selected.value.etapa === 'servicio' ? 'durante' : 'antes', descripcion:'' })
+  evidenceDialog.value = true
+}
+
+async function uploadEvidence(){
+  if (!selected.value || !evidenceFile.value) {
+    $q.notify({ type:'warning', message:'Selecciona una fotografía o PDF.' })
+    return
+  }
+  if (Number(evidenceFile.value.size || 0) > 12 * 1024 * 1024) {
+    $q.notify({ type:'warning', message:'El archivo no puede superar 12 MB.' })
+    return
+  }
+  uploading.value = true
+  try{
+    const body = new FormData()
+    body.append('archivo', evidenceFile.value)
+    body.append('categoria', evidenceForm.categoria)
+    if (evidenceForm.descripcion.trim()) body.append('descripcion', evidenceForm.descripcion.trim())
+    await api.post(`${base.value}/ordenes/${selected.value.id}/evidencias`, body)
+    evidenceDialog.value = false
+    $q.notify({ type:'positive', message:'Evidencia guardada de forma privada.' })
+    await refreshSelected()
+  }catch(error){
+    notifyError(error, 'No se pudo subir la evidencia.')
+  }finally{
+    uploading.value = false
+  }
+}
+
+async function downloadEvidence(item){
+  try{
+    const response = await api.get(`${base.value}/evidencias/${item.id}/descargar`, { responseType:'blob' })
+    saveBlob(response.data, item.nombre_original || `evidencia-${item.id}`)
+  }catch(error){
+    notifyError(error, 'No se pudo descargar la evidencia.')
+  }
+}
+
+function deleteEvidence(item){
+  if (!selected.value || selected.value.etapa === 'cerrada') return
+  $q.dialog({
+    title:'Eliminar evidencia',
+    message:`¿Eliminar ${item.nombre_original}? Esta acción solo está permitida mientras la orden siga abierta.`,
+    cancel:true,
+    persistent:true,
+  }).onOk(async () => {
+    try{
+      await api.delete(`${base.value}/evidencias/${item.id}`)
+      $q.notify({ type:'positive', message:'Evidencia eliminada.' })
+      await refreshSelected()
+    }catch(error){
+      notifyError(error, 'No se pudo eliminar la evidencia.')
+    }
+  })
+}
+
+async function downloadPdf(){
+  if (!selected.value) return
+  try{
+    const response = await api.get(`${base.value}/ordenes/${selected.value.id}/pdf`, { responseType:'blob' })
+    saveBlob(response.data, `${selected.value.codigo}-electrofrio.pdf`)
+  }catch(error){
+    notifyError(error, 'No se pudo generar el PDF de la orden.')
   }
 }
 
@@ -418,7 +523,11 @@ onMounted(reload)
 
     <q-dialog v-model="detailDialog">
       <q-card v-if="selected" class="order-detail-dialog">
-        <q-card-section class="row items-start no-wrap"><div class="col"><div class="text-overline text-primary">Orden de servicio</div><div class="text-h5 text-weight-bold">{{selected.codigo}}</div><div class="text-caption text-grey-7">{{selected.cliente_nombre}} · {{equipmentLabel(selected)}}</div></div><q-btn flat round icon="close" v-close-popup/></q-card-section>
+        <q-card-section class="row items-start no-wrap">
+          <div class="col"><div class="text-overline text-primary">Orden de servicio</div><div class="text-h5 text-weight-bold">{{selected.codigo}}</div><div class="text-caption text-grey-7">{{selected.cliente_nombre}} · {{equipmentLabel(selected)}}</div></div>
+          <q-btn flat round icon="picture_as_pdf" color="negative" @click="downloadPdf"><q-tooltip>Descargar PDF</q-tooltip></q-btn>
+          <q-btn flat round icon="close" v-close-popup/>
+        </q-card-section>
         <q-separator/>
         <q-card-section>
           <div class="progress-line">
@@ -447,15 +556,49 @@ onMounted(reload)
           <div class="amount-box"><div><span>Mano de obra</span><strong>{{money(selected.costo_mano_obra)}}</strong></div><div><span>Materiales</span><strong>{{money(selected.costo_materiales)}}</strong></div><div><span>Descuento</span><strong>- {{money(selected.descuento)}}</strong></div><q-separator/><div class="amount-total"><span>Total</span><strong>{{money(selected.total)}}</strong></div><div><span>Pagado</span><strong class="text-positive">{{money(selected.pagado)}}</strong></div><div><span>Saldo</span><strong :class="Number(selected.saldo)>0?'text-orange':'text-positive'">{{money(selected.saldo)}}</strong></div></div>
 
           <q-banner v-if="selected.garantia_fin" rounded class="warranty-banner"><template #avatar><q-icon name="verified" color="positive"/></template><div class="text-weight-bold">Garantía hasta {{date(selected.garantia_fin)}}</div><div class="text-caption">{{selected.condiciones_garantia||`${selected.garantia_dias} días de garantía`}}</div></q-banner>
+
+          <div class="evidence-panel">
+            <div class="row items-center q-col-gutter-sm">
+              <div class="col"><div class="detail-label">Evidencias y documentos</div><div class="text-caption text-grey-7">{{selected.evidencias?.length||0}} archivo(s) privado(s) en esta orden.</div></div>
+              <div class="col-auto"><q-btn v-if="selected.etapa!=='cerrada'" outline color="primary" icon="add_photo_alternate" label="Agregar evidencia" no-caps @click="openEvidenceUpload"/></div>
+            </div>
+            <q-list v-if="selected.evidencias?.length" bordered separator class="rounded-borders q-mt-md">
+              <q-item v-for="item in selected.evidencias" :key="item.id">
+                <q-item-section avatar><q-avatar color="blue-1" text-color="primary" :icon="evidenceIcon(item)"/></q-item-section>
+                <q-item-section>
+                  <q-item-label class="text-weight-medium">{{item.nombre_original}}</q-item-label>
+                  <q-item-label caption>{{evidenceCategory(item).label}} · {{formatBytes(item.tamano)}}<span v-if="item.descripcion"> · {{item.descripcion}}</span></q-item-label>
+                </q-item-section>
+                <q-item-section side><div class="row no-wrap"><q-btn flat round dense color="primary" icon="download" @click="downloadEvidence(item)"><q-tooltip>Descargar</q-tooltip></q-btn><q-btn v-if="selected.etapa!=='cerrada'" flat round dense color="negative" icon="delete_outline" @click="deleteEvidence(item)"><q-tooltip>Eliminar</q-tooltip></q-btn></div></q-item-section>
+              </q-item>
+            </q-list>
+            <q-banner v-else rounded class="empty-evidence q-mt-md"><template #avatar><q-icon name="photo_library" color="grey-6"/></template>Todavía no hay fotografías, documentos o comprobantes adjuntos.</q-banner>
+            <div v-if="selected.etapa==='cerrada'&&selected.evidencias?.length" class="text-caption text-grey-7 q-mt-sm"><q-icon name="lock" size="15px"/> La orden está cerrada. Sus evidencias quedan protegidas como parte del historial.</div>
+          </div>
         </q-card-section>
         <q-separator/>
         <q-card-actions class="detail-actions q-pa-md">
+          <q-btn outline color="negative" icon="picture_as_pdf" label="Descargar PDF" no-caps @click="downloadPdf"/>
           <q-btn v-if="selected.etapa!=='cerrada'" outline color="primary" icon="edit" label="Editar" no-caps @click="detailDialog=false;openForm(selected)"/>
           <q-space/>
           <q-btn v-if="selected.etapa!=='cerrada'&&selected.decision_cliente==='pendiente'&&selected.diagnostico&&selected.propuesta" outline color="negative" icon="close" label="No aceptó" no-caps @click="rejectProposal"/>
           <q-btn v-if="selected.etapa!=='cerrada'&&selected.decision_cliente==='pendiente'&&selected.diagnostico&&selected.propuesta" color="positive" icon="thumb_up" label="Aceptó propuesta" no-caps @click="acceptProposal"/>
           <q-btn v-if="selected.etapa==='servicio'&&selected.decision_cliente==='aceptado'" color="primary" icon="task_alt" label="Finalizar servicio" no-caps @click="openFinish"/>
         </q-card-actions>
+      </q-card>
+    </q-dialog>
+
+    <q-dialog v-model="evidenceDialog" persistent>
+      <q-card class="evidence-dialog">
+        <q-card-section><div class="text-overline text-primary">Documentación técnica</div><div class="text-h6 text-weight-bold">Agregar evidencia a {{selected?.codigo}}</div><div class="text-caption text-grey-7">JPG, PNG, WEBP o PDF. Máximo 12 MB.</div></q-card-section>
+        <q-separator/>
+        <q-card-section class="q-gutter-md">
+          <q-select v-model="evidenceForm.categoria" outlined emit-value map-options :options="evidenceCategories" label="Categoría"/>
+          <q-file v-model="evidenceFile" outlined clearable accept=".jpg,.jpeg,.png,.webp,.pdf,image/jpeg,image/png,image/webp,application/pdf" label="Fotografía o PDF" max-file-size="12582912" @rejected="$q.notify({type:'warning',message:'Usa JPG, PNG, WEBP o PDF de hasta 12 MB.'})"><template #prepend><q-icon name="attach_file"/></template></q-file>
+          <q-input v-model="evidenceForm.descripcion" outlined type="textarea" autogrow maxlength="1000" label="Descripción opcional"/>
+        </q-card-section>
+        <q-separator/>
+        <q-card-actions align="right" class="q-pa-md"><q-btn flat label="Cancelar" no-caps v-close-popup/><q-btn color="primary" icon="cloud_upload" label="Guardar evidencia" no-caps :loading="uploading" @click="uploadEvidence"/></q-card-actions>
       </q-card>
     </q-dialog>
 
@@ -468,8 +611,9 @@ onMounted(reload)
 <style scoped>
 .orders-page{max-width:1580px;margin:0 auto}.orders-page h1{color:var(--viti-text)}.min-width-0{min-width:0}
 .summary-card,.filter-card,.mobile-order-card{border-radius:18px}.summary-card{transition:transform .15s ease,border-color .15s ease,box-shadow .15s ease}.summary-card:hover{transform:translateY(-2px)}.summary-card--active{border-color:var(--electro-primary)!important;box-shadow:0 0 0 1px var(--electro-primary)}
-.order-form-dialog,.order-detail-dialog{width:860px;max-width:96vw;max-height:94vh}.order-form-dialog .dialog-scroll{max-height:68vh;overflow:auto}.finish-dialog{width:650px;max-width:96vw}.mobile-order-card{height:100%}
+.order-form-dialog,.order-detail-dialog{width:860px;max-width:96vw;max-height:94vh}.order-form-dialog .dialog-scroll{max-height:68vh;overflow:auto}.finish-dialog{width:650px;max-width:96vw}.evidence-dialog{width:620px;max-width:96vw}.mobile-order-card{height:100%}
 .progress-line{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;position:relative}.progress-step{text-align:center;display:flex;flex-direction:column;align-items:center;gap:6px;color:var(--viti-muted);position:relative}.progress-step:after{content:'';position:absolute;height:2px;background:var(--viti-border);left:58%;right:-42%;top:16px}.progress-step:last-child:after{display:none}.progress-step--done{color:var(--viti-text)}.progress-step--done:after{background:var(--electro-primary)}
 .detail-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}.detail-grid>div{display:flex;flex-direction:column;gap:4px}.detail-grid span,.detail-label{font-size:12px;color:var(--viti-muted);font-weight:700;text-transform:uppercase;letter-spacing:.04em}.detail-grid .span-2{grid-column:1/-1}.amount-box{border:1px solid var(--viti-border);border-radius:16px;padding:14px;display:grid;gap:8px}.amount-box>div{display:flex;justify-content:space-between;gap:16px}.amount-total{font-size:18px;font-weight:800}.warranty-banner{background:color-mix(in srgb,#21ba45 10%,var(--viti-card));border:1px solid color-mix(in srgb,#21ba45 35%,transparent)}.detail-actions{gap:8px;flex-wrap:wrap}.rounded-borders{border-radius:12px}
-@media(max-width:700px){.orders-page{padding:12px}.orders-page h1{font-size:25px;line-height:1.2}.progress-line{grid-template-columns:repeat(5,minmax(56px,1fr));overflow-x:auto;padding-bottom:6px}.progress-step{min-width:58px}.detail-grid{grid-template-columns:1fr}.detail-grid .span-2{grid-column:auto}.detail-actions .q-btn{flex:1 1 auto}.order-form-dialog .dialog-scroll{max-height:72vh}}
+.evidence-panel{border:1px solid var(--viti-border);border-radius:16px;padding:14px}.empty-evidence{background:color-mix(in srgb,var(--viti-muted) 7%,var(--viti-card));color:var(--viti-muted)}
+@media(max-width:700px){.orders-page{padding:12px}.orders-page h1{font-size:25px;line-height:1.2}.progress-line{grid-template-columns:repeat(5,minmax(56px,1fr));overflow-x:auto;padding-bottom:6px}.progress-step{min-width:58px}.detail-grid{grid-template-columns:1fr}.detail-grid .span-2{grid-column:auto}.detail-actions .q-btn{flex:1 1 auto}.order-form-dialog .dialog-scroll{max-height:72vh}.evidence-panel{padding:12px}}
 </style>
