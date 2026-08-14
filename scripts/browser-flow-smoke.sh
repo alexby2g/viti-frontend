@@ -58,7 +58,7 @@ check_page admin-request "$BASE/solicitudes/501" \
 check_page client-apps "$BASE/mi-aplicaciones" \
   "Mis aplicaciones" \
   "Negocio Auth A" \
-  "Electrofrío E2E" \
+  "Electrofrío" \
   "Mi negocio" \
   "Nueva solicitud"
 
