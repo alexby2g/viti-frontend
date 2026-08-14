@@ -12,6 +12,7 @@ const electroEquipmentPage = () => import('../pages/ElectrofrioEquiposPage.vue')
 const electroOrdersPage = () => import('../pages/ElectrofrioOrdenesPage.vue')
 const electroPaymentsPage = () => import('../pages/ElectrofrioPagosPage.vue')
 const electroWarrantiesPage = () => import('../pages/ElectrofrioGarantiasPage.vue')
+const electroHistoryPage = () => import('../pages/ElectrofrioHistorialEquiposPage.vue')
 const supportPage = () => import('../pages/SoporteVitalWorkspacePage.vue')
 
 function supportChildren(client=false) {
@@ -74,7 +75,7 @@ export default [
       {path:'inventario',name:'electro-client-inventory',component:electroPage,meta:{requiresAuth:true,clientOnly:true,appShell:'electrofrio',electroSection:'inventario'}},
       {path:'pagos',name:'electro-client-payments',component:electroPaymentsPage,meta:{requiresAuth:true,clientOnly:true,appShell:'electrofrio',electroSection:'pagos'}},
       {path:'garantias',name:'electro-client-warranties',component:electroWarrantiesPage,meta:{requiresAuth:true,clientOnly:true,appShell:'electrofrio',electroSection:'garantias'}},
-      {path:'historial',name:'electro-client-history',component:electroPage,meta:{requiresAuth:true,clientOnly:true,appShell:'electrofrio',electroSection:'historial'}},
+      {path:'historial',name:'electro-client-history',component:electroHistoryPage,meta:{requiresAuth:true,clientOnly:true,appShell:'electrofrio',electroSection:'historial'}},
       {path:'buzon',name:'electro-client-inbox',component:()=>import('../pages/BuzonPage.vue'),meta:{requiresAuth:true,clientOnly:true,appShell:'electrofrio',chatContext:'electrofrio'}},
     ],
   },
@@ -91,7 +92,7 @@ export default [
       {path:'inventario',name:'electro-inventory',component:electroPage,meta:{requiresAuth:true,adminOnly:true,appShell:'electrofrio',electroSection:'inventario'}},
       {path:'pagos',name:'electro-payments',component:electroPaymentsPage,meta:{requiresAuth:true,adminOnly:true,appShell:'electrofrio',electroSection:'pagos'}},
       {path:'garantias',name:'electro-warranties',component:electroWarrantiesPage,meta:{requiresAuth:true,adminOnly:true,appShell:'electrofrio',electroSection:'garantias'}},
-      {path:'historial',name:'electro-history',component:electroPage,meta:{requiresAuth:true,adminOnly:true,appShell:'electrofrio',electroSection:'historial'}},
+      {path:'historial',name:'electro-history',component:electroHistoryPage,meta:{requiresAuth:true,adminOnly:true,appShell:'electrofrio',electroSection:'historial'}},
       {path:'buzon',name:'electro-inbox',component:()=>import('../pages/BuzonPage.vue'),meta:{requiresAuth:true,adminOnly:true,appShell:'electrofrio',chatContext:'electrofrio'}},
     ],
   },
