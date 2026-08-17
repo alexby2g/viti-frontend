@@ -35,6 +35,21 @@ print(f"titulo={html.unescape(title.group(1)).strip() if title else 'sin-titulo'
 PY
 }
 
+console_summary(){
+  local file="$1"
+  python3 - "$file" <<'PY'
+import re, sys
+text=open(sys.argv[1], encoding='utf-8', errors='ignore').read()
+lines=[]
+for raw in text.splitlines():
+    line=re.sub(r'\s+', ' ', raw).strip()
+    low=line.lower()
+    if any(token in low for token in ('error','uncaught','failed','exception','referenceerror','typeerror')):
+        lines.append(line)
+print(' | '.join(lines[-4:])[:700] or 'sin-error-de-consola-capturado')
+PY
+}
+
 for _ in $(seq 1 30); do
   if curl --fail --silent "$BASE/api/health" >/dev/null; then break; fi
   sleep 0.5
@@ -45,18 +60,22 @@ check_page(){
   local name="$1"; shift
   local url="$1"; shift
   local file="$TMP/viti-flow-${name}.html"
+  local console="$TMP/viti-flow-${name}-chrome.log"
   echo "Comprobando $name → $url"
-  "$CHROME_BIN" --headless=new --no-sandbox --disable-gpu --disable-dev-shm-usage --virtual-time-budget=11000 --dump-dom "$url" >"$file" || fail_smoke "Chrome no pudo abrir $name ($url)"
+  "$CHROME_BIN" --headless=new --no-sandbox --disable-gpu --disable-dev-shm-usage --enable-logging=stderr --v=1 --virtual-time-budget=11000 --dump-dom "$url" >"$file" 2>"$console" || fail_smoke "Chrome no pudo abrir $name ($url) | $(console_summary "$console")"
   for text in "$@"; do
     if ! grep -Fq "$text" "$file"; then
-      local summary
+      local summary chrome_summary
       summary="$(page_summary "$file")"
+      chrome_summary="$(console_summary "$console")"
       echo "--- DOM final de $name ---" >&2
       tail -n 120 "$file" >&2 || true
-      fail_smoke "$name no contiene: $text | $summary"
+      echo "--- Consola Chrome de $name ---" >&2
+      tail -n 80 "$console" >&2 || true
+      fail_smoke "$name no contiene: $text | $summary | consola=$chrome_summary"
     fi
   done
-  if grep -Fq '<div id="q-app"></div>' "$file"; then fail_smoke "Vue no renderizó $name | $(page_summary "$file")"; fi
+  if grep -Fq '<div id="q-app"></div>' "$file"; then fail_smoke "Vue no renderizó $name | $(page_summary "$file") | consola=$(console_summary "$console")"; fi
 }
 
 check_page viti-landing "$BASE/viti" \
