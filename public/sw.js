@@ -1,4 +1,4 @@
-const CACHE = 'viti-shell-v21'
+const CACHE = 'viti-shell-v22'
 const APP_SHELL = ['/', '/index.html']
 
 self.addEventListener('install', event => {
@@ -24,12 +24,19 @@ self.addEventListener('fetch', event => {
   if (request.mode === 'navigate') {
     event.respondWith(
       fetch(request)
-        .then(response => {
-          const clone = response.clone()
-          caches.open(CACHE).then(cache => cache.put('/', clone)).catch(() => {})
+        .then(async response => {
+          if (response.ok) {
+            const clone = response.clone()
+            const cache = await caches.open(CACHE)
+            await cache.put(request, clone).catch(() => {})
+            await cache.put('/', response.clone()).catch(() => {})
+          }
           return response
         })
-        .catch(async () => (await caches.match(request)) || (await caches.match('/')) || (await caches.match('/index.html')))
+        .catch(async () => {
+          const cachedRoute = await caches.match(request)
+          return cachedRoute || caches.match('/') || caches.match('/index.html')
+        })
     )
     return
   }
