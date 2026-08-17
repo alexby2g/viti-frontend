@@ -44,9 +44,9 @@ lines=[]
 for raw in text.splitlines():
     line=re.sub(r'\s+', ' ', raw).strip()
     low=line.lower()
-    if any(token in low for token in ('error','uncaught','failed','exception','referenceerror','typeerror')):
+    if any(token in low for token in ('error','uncaught','failed','exception','referenceerror','typeerror','qpage')):
         lines.append(line)
-print(' | '.join(lines[-4:])[:700] or 'sin-error-de-consola-capturado')
+print(' | '.join(lines[-6:])[:900] or 'sin-error-de-consola-capturado')
 PY
 }
 
@@ -76,6 +76,9 @@ check_page(){
     fi
   done
   if grep -Fq '<div id="q-app"></div>' "$file"; then fail_smoke "Vue no renderizó $name | $(page_summary "$file") | consola=$(console_summary "$console")"; fi
+  if grep -Eiq 'QPage needs to be a deep child of QLayout|Uncaught.*(TypeError|ReferenceError)|Failed to fetch' "$console"; then
+    fail_smoke "$name reportó un error crítico de renderizado o red | $(console_summary "$console")"
+  fi
 }
 
 check_page viti-landing "$BASE/viti" \
@@ -84,6 +87,21 @@ check_page viti-landing "$BASE/viti" \
   "Cómo funciona" \
   "Guía rápida" \
   "Ingresar a VITI"
+
+check_page viti-plans "$BASE/viti/planes" \
+  "Planes VITI" \
+  "VITI Inicial" \
+  "VITI Profesional" \
+  "VITI Empresa" \
+  "Cotización personalizada" \
+  "Elegir plan"
+
+check_page viti-access "$BASE/viti/acceso" \
+  "¿Es tu primera vez en VITI?" \
+  "Tengo un código" \
+  "Necesito acceso" \
+  "Solicitar acceso" \
+  "Ya tengo una cuenta"
 
 check_page public-1 "$BASE/solicitar/e2e-token-viti?paso=1" "Solicitud VITI" "VITI Inicial" "Continuar" "Registro completado"
 check_page public-2 "$BASE/solicitar/e2e-token-viti?paso=2" "Configuración de VITI Inicial" "Saltar configuración" "¿Cuántas personas usarán el sistema?"
@@ -106,4 +124,4 @@ check_page client-apps "$BASE/mi-aplicaciones" \
   "Mi negocio" \
   "Nueva solicitud"
 
-echo "Flow E2E OK: presentación VITI, formulario público, panel administrativo y cliente multiempresa renderizan con contexto explícito en Chrome headless."
+echo "Flow E2E OK: presentación VITI, planes, primer acceso, formulario público, panel administrativo y cliente multiempresa renderizan con contexto explícito en Chrome headless." 
