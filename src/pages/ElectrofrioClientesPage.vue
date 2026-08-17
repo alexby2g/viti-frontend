@@ -3,6 +3,7 @@ import { computed, inject, onMounted, reactive, ref } from 'vue'
 import { useQuasar } from 'quasar'
 import { useRoute, useRouter } from 'vue-router'
 import { api } from '../boot/axios'
+import { useFormErrors } from '../composables/useFormErrors'
 
 const $q = useQuasar()
 const route = useRoute()
@@ -10,6 +11,7 @@ const router = useRouter()
 const canManageSource = inject('electrofrioCanManage', ref(false))
 const modules = inject('electrofrioModules', ref([]))
 const airConfig = inject('airSystemConfig', ref(null))
+const fieldErrors = useFormErrors()
 
 const loading = ref(false)
 const detailLoading = ref(false)
@@ -77,9 +79,14 @@ function currentState(row){
   return ({cita:'cita_programada',diagnostico:'diagnostico_realizado',propuesta:'esperando_aprobacion',servicio:'servicio_en_proceso',cerrada:'finalizado'})[row?.etapa]||'cita_programada'
 }
 function stateColor(row){ return ({cita_programada:'blue',en_visita:'indigo',diagnostico_realizado:'purple',propuesta_enviada:'deep-orange',esperando_aprobacion:'orange',aprobado:'positive',no_aprobado:'negative',servicio_en_proceso:'teal',servicio_terminado:'cyan-8',pendiente_pago:'amber-9',finalizado:'positive',cancelado:'grey-7'})[currentState(row)]||'grey-7' }
-function notifyError(error,fallback){ const errors=error.response?.data?.errors;const first=errors?Object.values(errors).flat()[0]:null;$q.notify({type:'negative',message:first||error.response?.data?.message||fallback}) }
+function notifyError(error,fallback,inline=false){
+  const message=inline?fieldErrors.fromResponse(error,fallback):(error.response?.data?.message||fallback)
+  if(inline)fieldErrors.scrollToFirst()
+  $q.notify({type:'negative',message})
+}
+function clearField(field){fieldErrors.clear(field)}
 
-function resetForm(){ editingId.value=null;Object.assign(form,{nombre:'',telefono:'',direccion:'',referencia:'',observaciones:'',activo:true}) }
+function resetForm(){ editingId.value=null;fieldErrors.clear();Object.assign(form,{nombre:'',telefono:'',direccion:'',referencia:'',observaciones:'',activo:true}) }
 function openForm(row=null){ resetForm();if(row){editingId.value=row.id;Object.assign(form,{nombre:row.nombre||'',telefono:row.telefono||'',direccion:row.direccion||'',referencia:row.referencia||'',observaciones:row.observaciones||'',activo:Boolean(row.activo)})}dialog.value=true }
 
 async function load(){
@@ -90,7 +97,9 @@ async function load(){
 }
 
 async function save(){
-  if(!form.nombre.trim()){$q.notify({type:'warning',message:'Ingresa el nombre del cliente.'});return}
+  fieldErrors.clear()
+  if(!form.nombre.trim())fieldErrors.set('nombre','Ingresa el nombre del cliente.')
+  if(fieldErrors.has('nombre')){fieldErrors.scrollToFirst();return}
   const wasNew=!editingId.value
   saving.value=true
   try{
@@ -102,7 +111,7 @@ async function save(){
     $q.notify({type:'positive',message:wasNew?'Cliente registrado. Ahora agrega su equipo y agenda la visita.':'Cliente actualizado.'})
     if(wasNew&&savedClient)await openClient(savedClient)
     else if(selected.value&&savedClient&&Number(selected.value.id)===savedId)selected.value=savedClient
-  }catch(error){notifyError(error,'No se pudo guardar el cliente.')}finally{saving.value=false}
+  }catch(error){notifyError(error,'No se pudo guardar el cliente. Revisa los campos marcados.',true)}finally{saving.value=false}
 }
 
 function remove(row){$q.dialog({title:'Eliminar cliente',message:`¿Eliminar a ${row.nombre}? Si tiene equipos u órdenes, el sistema protegerá su historial.`,cancel:true,persistent:true}).onOk(async()=>{try{await api.delete(`${base.value}/clientes/${row.id}`);await load();$q.notify({type:'positive',message:'Cliente eliminado.'})}catch(error){notifyError(error,'No se pudo eliminar el cliente.')}})}
@@ -123,13 +132,16 @@ async function loadClientContext(){
 
 function openEquipment(row=null,schedule=false){
   if(!selected.value)return
+  fieldErrors.clear()
   editingEquipmentId.value=row?.id||null;scheduleAfterEquipmentSave.value=Boolean(schedule)
   Object.assign(equipmentForm,emptyEquipment(),{tipo:equipmentTypes.value[0]||'Aire acondicionado Split'})
   if(row)Object.assign(equipmentForm,{tipo:row.tipo||equipmentTypes.value[0]||'Aire acondicionado Split',marca:row.marca||'',modelo:row.modelo||'',serie:row.serie||'',capacidad:row.capacidad||'',ubicacion:row.ubicacion||'',observaciones:row.observaciones||'',activo:Boolean(row.activo)})
   equipmentDialog.value=true
 }
 async function saveEquipment(forceSchedule=false){
-  if(!selected.value||!String(equipmentForm.tipo||'').trim()){$q.notify({type:'warning',message:'Indica el tipo de equipo.'});return}
+  fieldErrors.clear()
+  if(!selected.value||!String(equipmentForm.tipo||'').trim())fieldErrors.set('tipo','Selecciona o escribe el tipo de equipo.')
+  if(fieldErrors.has('tipo')){fieldErrors.scrollToFirst();return}
   saving.value=true
   try{
     const payload=clean({...equipmentForm,cliente_id:selected.value.id})
@@ -140,12 +152,13 @@ async function saveEquipment(forceSchedule=false){
     await loadClientContext()
     $q.notify({type:'positive',message:editingEquipmentId.value?'Equipo actualizado.':'Equipo registrado dentro de la ficha del cliente.'})
     if(shouldSchedule&&equipmentId>0)scheduleAppointment(equipmentId)
-  }catch(error){notifyError(error,'No se pudo guardar el equipo.')}finally{saving.value=false;scheduleAfterEquipmentSave.value=false}
+  }catch(error){notifyError(error,'No se pudo guardar el equipo. Revisa los campos marcados.',true)}finally{saving.value=false;scheduleAfterEquipmentSave.value=false}
 }
 
 function scheduleAppointment(equipmentId=null){
   if(!selected.value||!hasModule('ordenes'))return
   if(!equipmentId&&hasModule('equipos')&&clientEquipment.value.length===0){openEquipment(null,true);return}
+  fieldErrors.clear()
   const resolvedEquipment=equipmentId||(clientEquipment.value.filter(item=>item.activo).length===1?clientEquipment.value.find(item=>item.activo)?.id:null)
   Object.assign(appointmentForm,emptyAppointment(),{
     equipo_id:resolvedEquipment||null,
@@ -156,9 +169,11 @@ function scheduleAppointment(equipmentId=null){
   appointmentDialog.value=true
 }
 async function saveAppointment(){
-  if(!selected.value||!appointmentForm.fecha_cita||!String(appointmentForm.direccion_servicio||'').trim()||!String(appointmentForm.problema_reportado||'').trim()){
-    $q.notify({type:'warning',message:'Completa fecha, dirección y problema reportado.'});return
-  }
+  fieldErrors.clear()
+  if(!appointmentForm.fecha_cita)fieldErrors.set('fecha_cita','Selecciona la fecha de la visita.')
+  if(!String(appointmentForm.direccion_servicio||'').trim())fieldErrors.set('direccion_servicio','Indica la dirección donde se realizará la visita.')
+  if(!String(appointmentForm.problema_reportado||'').trim())fieldErrors.set('problema_reportado','Describe brevemente el problema reportado por el cliente.')
+  if(Object.keys(fieldErrors.errors).length){fieldErrors.scrollToFirst();return}
   saving.value=true
   try{
     const response=await api.post(`${base.value}/ordenes-operativas`,clean({
@@ -171,12 +186,22 @@ async function saveAppointment(){
     await loadClientContext()
     const created=response.data?.data
     $q.notify({type:'positive',message:'Cita registrada. Ya aparece en Agenda y en la ficha del cliente.',timeout:4500,actions:created?.id?[{label:'Abrir servicio',color:'white',handler:()=>openService(created)}]:[]})
-  }catch(error){notifyError(error,'No se pudo agendar la cita.')}finally{saving.value=false}
+  }catch(error){notifyError(error,'No se pudo agendar la cita. Revisa los campos marcados.',true)}finally{saving.value=false}
 }
 function openService(row){detailDialog.value=false;router.push({path:`${appBase.value}/ordenes`,query:{servicio:String(row.id)}})}
 
-function openAccess(row){selected.value=row;Object.assign(accessForm,{usuario:row.acceso_usuario||'',documento:row.acceso_documento||'',telefono:row.acceso_telefono||row.telefono||'',password:'',password_confirmation:''});accessDialog.value=true}
-async function saveAccess(){if(!selected.value)return;saving.value=true;try{await api.post(`${base.value}/clientes/${selected.value.id}/acceso`,{...accessForm});accessDialog.value=false;$q.notify({type:'positive',message:'Acceso del cliente guardado.'});await load()}catch(error){notifyError(error,'No se pudo guardar el acceso del cliente.')}finally{saving.value=false}}
+function openAccess(row){fieldErrors.clear();selected.value=row;Object.assign(accessForm,{usuario:row.acceso_usuario||'',documento:row.acceso_documento||'',telefono:row.acceso_telefono||row.telefono||'',password:'',password_confirmation:''});accessDialog.value=true}
+async function saveAccess(){
+  if(!selected.value)return
+  fieldErrors.clear()
+  if(!String(accessForm.usuario||'').trim())fieldErrors.set('usuario','Ingresa el usuario que utilizará el cliente.')
+  if(!selected.value?.acceso_usuario_id&&!accessForm.password)fieldErrors.set('password','Crea una contraseña para habilitar el acceso.')
+  if(accessForm.password&&accessForm.password!==accessForm.password_confirmation)fieldErrors.set('password_confirmation','Las contraseñas no coinciden.')
+  if(Object.keys(fieldErrors.errors).length){fieldErrors.scrollToFirst();return}
+  saving.value=true
+  try{await api.post(`${base.value}/clientes/${selected.value.id}/acceso`,{...accessForm});accessDialog.value=false;$q.notify({type:'positive',message:'Acceso del cliente guardado.'});await load()}
+  catch(error){notifyError(error,'No se pudo guardar el acceso. Revisa los campos marcados.',true)}finally{saving.value=false}
+}
 function revokeAccess(row){$q.dialog({title:'Revocar acceso',message:`${row.nombre} ya no podrá entrar al portal, pero su historial se conservará.`,cancel:true,persistent:true}).onOk(async()=>{try{await api.delete(`${base.value}/clientes/${row.id}/acceso`);await load();$q.notify({type:'positive',message:'Acceso revocado.'})}catch(error){notifyError(error,'No se pudo revocar el acceso.')}})}
 
 onMounted(load)
@@ -225,17 +250,17 @@ onMounted(load)
       </q-card>
     </q-dialog>
 
-    <q-dialog v-model="equipmentDialog" persistent><q-card class="equipment-dialog"><q-card-section class="row items-start"><div><div class="text-overline text-primary">{{selected?.nombre}}</div><div class="text-h5 text-weight-bold">{{editingEquipmentId?'Editar equipo':'Registrar equipo'}}</div><div class="text-caption text-grey-7">Quedará vinculado automáticamente a este cliente.</div></div><q-space/><q-btn flat round icon="close" v-close-popup/></q-card-section><q-separator/><q-card-section class="row q-col-gutter-md q-gutter-y-md"><div class="col-12 col-sm-6"><q-select v-model="equipmentForm.tipo" outlined use-input fill-input hide-selected new-value-mode="add-unique" :options="equipmentTypes" label="Tipo de equipo *"/></div><div class="col-12 col-sm-6"><q-input v-model="equipmentForm.marca" outlined label="Marca"/></div><div class="col-12 col-sm-6"><q-input v-model="equipmentForm.modelo" outlined label="Modelo"/></div><div class="col-12 col-sm-6"><q-input v-model="equipmentForm.serie" outlined label="Serie"/></div><div class="col-12 col-sm-6"><q-input v-model="equipmentForm.capacidad" outlined label="Capacidad"/></div><div class="col-12 col-sm-6"><q-input v-model="equipmentForm.ubicacion" outlined label="Ubicación dentro del inmueble"/></div><div class="col-12"><q-input v-model="equipmentForm.observaciones" type="textarea" autogrow outlined label="Observaciones"/></div><div class="col-12"><q-toggle v-model="equipmentForm.activo" label="Equipo activo"/></div></q-card-section><q-separator/><q-card-actions align="right" class="q-pa-md"><q-btn flat label="Cancelar" no-caps v-close-popup/><q-btn v-if="!editingEquipmentId&&hasModule('ordenes')" outline color="primary" icon="event_available" label="Guardar y agendar" no-caps :loading="saving" @click="saveEquipment(true)"/><q-btn color="primary" icon="save" :label="editingEquipmentId?'Guardar cambios':'Guardar equipo'" no-caps :loading="saving" @click="saveEquipment(false)"/></q-card-actions></q-card></q-dialog>
+    <q-dialog v-model="equipmentDialog" persistent><q-card class="equipment-dialog"><q-card-section class="row items-start"><div><div class="text-overline text-primary">{{selected?.nombre}}</div><div class="text-h5 text-weight-bold">{{editingEquipmentId?'Editar equipo':'Registrar equipo'}}</div><div class="text-caption text-grey-7">Quedará vinculado automáticamente a este cliente.</div></div><q-space/><q-btn flat round icon="close" v-close-popup/></q-card-section><q-separator/><q-card-section class="row q-col-gutter-md q-gutter-y-md"><div class="col-12 col-sm-6" data-error-field="tipo"><q-select v-model="equipmentForm.tipo" outlined use-input fill-input hide-selected new-value-mode="add-unique" :options="equipmentTypes" label="Tipo de equipo *" :error="fieldErrors.has('tipo')" :error-message="fieldErrors.message('tipo')" @update:model-value="clearField('tipo')"/></div><div class="col-12 col-sm-6" data-error-field="marca"><q-input v-model="equipmentForm.marca" outlined label="Marca" :error="fieldErrors.has('marca')" :error-message="fieldErrors.message('marca')" @update:model-value="clearField('marca')"/></div><div class="col-12 col-sm-6" data-error-field="modelo"><q-input v-model="equipmentForm.modelo" outlined label="Modelo" :error="fieldErrors.has('modelo')" :error-message="fieldErrors.message('modelo')" @update:model-value="clearField('modelo')"/></div><div class="col-12 col-sm-6" data-error-field="serie"><q-input v-model="equipmentForm.serie" outlined label="Serie" :error="fieldErrors.has('serie')" :error-message="fieldErrors.message('serie')" @update:model-value="clearField('serie')"/></div><div class="col-12 col-sm-6" data-error-field="capacidad"><q-input v-model="equipmentForm.capacidad" outlined label="Capacidad" :error="fieldErrors.has('capacidad')" :error-message="fieldErrors.message('capacidad')" @update:model-value="clearField('capacidad')"/></div><div class="col-12 col-sm-6" data-error-field="ubicacion"><q-input v-model="equipmentForm.ubicacion" outlined label="Ubicación dentro del inmueble" :error="fieldErrors.has('ubicacion')" :error-message="fieldErrors.message('ubicacion')" @update:model-value="clearField('ubicacion')"/></div><div class="col-12" data-error-field="observaciones"><q-input v-model="equipmentForm.observaciones" type="textarea" autogrow outlined label="Observaciones" :error="fieldErrors.has('observaciones')" :error-message="fieldErrors.message('observaciones')" @update:model-value="clearField('observaciones')"/></div><div class="col-12"><q-toggle v-model="equipmentForm.activo" label="Equipo activo"/></div></q-card-section><q-separator/><q-card-actions align="right" class="q-pa-md"><q-btn flat label="Cancelar" no-caps v-close-popup/><q-btn v-if="!editingEquipmentId&&hasModule('ordenes')" outline color="primary" icon="event_available" label="Guardar y agendar" no-caps :loading="saving" @click="saveEquipment(true)"/><q-btn color="primary" icon="save" :label="editingEquipmentId?'Guardar cambios':'Guardar equipo'" no-caps :loading="saving" @click="saveEquipment(false)"/></q-card-actions></q-card></q-dialog>
 
-    <q-dialog v-model="appointmentDialog" persistent><q-card class="appointment-dialog"><q-card-section class="row items-start"><div><div class="text-overline text-primary">{{selected?.nombre}}</div><div class="text-h5 text-weight-bold">Agendar cita</div><div class="text-caption text-grey-7">La cita se convertirá en la ficha de servicio donde después se registra diagnóstico, propuesta, trabajo, pagos y garantía.</div></div><q-space/><q-btn flat round icon="close" v-close-popup/></q-card-section><q-separator/><q-card-section class="row q-col-gutter-md q-gutter-y-md"><div v-if="hasModule('equipos')" class="col-12"><q-select v-model="appointmentForm.equipo_id" outlined clearable emit-value map-options :options="equipmentOptions" label="Equipo" hint="Puedes elegir otro equipo del mismo cliente."/></div><div class="col-12 col-md-6"><q-select v-model="appointmentForm.tipo_servicio" outlined use-input fill-input new-value-mode="add-unique" :options="serviceTypes" label="Tipo de servicio"/></div><div class="col-6 col-md-3"><q-input v-model="appointmentForm.fecha_cita" outlined type="date" stack-label label="Fecha *" :min="todayValue()"/></div><div class="col-6 col-md-3"><q-input v-model="appointmentForm.hora_cita" outlined type="time" stack-label label="Hora"/></div><div class="col-12 col-md-4"><q-select v-model="appointmentForm.prioridad" outlined :options="['baja','normal','alta','urgente']" label="Prioridad"/></div><div class="col-12 col-md-8"><q-input v-model="appointmentForm.direccion_servicio" outlined label="Dirección de la visita *"/></div><div class="col-12"><q-input v-model="appointmentForm.referencia_ubicacion" outlined label="Referencia de ubicación"/></div><div class="col-12"><q-input v-model="appointmentForm.problema_reportado" outlined type="textarea" autogrow label="¿Qué problema reporta el cliente? *"/></div></q-card-section><q-separator/><q-card-actions align="right" class="q-pa-md"><q-btn flat label="Cancelar" no-caps v-close-popup/><q-btn color="primary" icon="event_available" label="Guardar cita" no-caps :loading="saving" @click="saveAppointment"/></q-card-actions></q-card></q-dialog>
+    <q-dialog v-model="appointmentDialog" persistent><q-card class="appointment-dialog"><q-card-section class="row items-start"><div><div class="text-overline text-primary">{{selected?.nombre}}</div><div class="text-h5 text-weight-bold">Agendar cita</div><div class="text-caption text-grey-7">La cita se convertirá en la ficha de servicio donde después se registra diagnóstico, propuesta, trabajo, pagos y garantía.</div></div><q-space/><q-btn flat round icon="close" v-close-popup/></q-card-section><q-separator/><q-card-section class="row q-col-gutter-md q-gutter-y-md"><div v-if="hasModule('equipos')" class="col-12" data-error-field="equipo_id"><q-select v-model="appointmentForm.equipo_id" outlined clearable emit-value map-options :options="equipmentOptions" label="Equipo" hint="Puedes elegir otro equipo del mismo cliente." :error="fieldErrors.has('equipo_id')" :error-message="fieldErrors.message('equipo_id')" @update:model-value="clearField('equipo_id')"/></div><div class="col-12 col-md-6" data-error-field="tipo_servicio"><q-select v-model="appointmentForm.tipo_servicio" outlined use-input fill-input new-value-mode="add-unique" :options="serviceTypes" label="Tipo de servicio" :error="fieldErrors.has('tipo_servicio')" :error-message="fieldErrors.message('tipo_servicio')" @update:model-value="clearField('tipo_servicio')"/></div><div class="col-6 col-md-3" data-error-field="fecha_cita"><q-input v-model="appointmentForm.fecha_cita" outlined type="date" stack-label label="Fecha *" :min="todayValue()" :error="fieldErrors.has('fecha_cita')" :error-message="fieldErrors.message('fecha_cita')" @update:model-value="clearField('fecha_cita')"/></div><div class="col-6 col-md-3" data-error-field="hora_cita"><q-input v-model="appointmentForm.hora_cita" outlined type="time" stack-label label="Hora" :error="fieldErrors.has('hora_cita')" :error-message="fieldErrors.message('hora_cita')" @update:model-value="clearField('hora_cita')"/></div><div class="col-12 col-md-4" data-error-field="prioridad"><q-select v-model="appointmentForm.prioridad" outlined :options="['baja','normal','alta','urgente']" label="Prioridad" :error="fieldErrors.has('prioridad')" :error-message="fieldErrors.message('prioridad')" @update:model-value="clearField('prioridad')"/></div><div class="col-12 col-md-8" data-error-field="direccion_servicio"><q-input v-model="appointmentForm.direccion_servicio" outlined label="Dirección de la visita *" :error="fieldErrors.has('direccion_servicio')" :error-message="fieldErrors.message('direccion_servicio')" @update:model-value="clearField('direccion_servicio')"/></div><div class="col-12" data-error-field="referencia_ubicacion"><q-input v-model="appointmentForm.referencia_ubicacion" outlined label="Referencia de ubicación" :error="fieldErrors.has('referencia_ubicacion')" :error-message="fieldErrors.message('referencia_ubicacion')" @update:model-value="clearField('referencia_ubicacion')"/></div><div class="col-12" data-error-field="problema_reportado"><q-input v-model="appointmentForm.problema_reportado" outlined type="textarea" autogrow label="¿Qué problema reporta el cliente? *" :error="fieldErrors.has('problema_reportado')" :error-message="fieldErrors.message('problema_reportado')" @update:model-value="clearField('problema_reportado')"/></div></q-card-section><q-separator/><q-card-actions align="right" class="q-pa-md"><q-btn flat label="Cancelar" no-caps v-close-popup/><q-btn color="primary" icon="event_available" label="Guardar cita" no-caps :loading="saving" @click="saveAppointment"/></q-card-actions></q-card></q-dialog>
 
-    <q-dialog v-model="dialog" persistent><q-card style="width:720px;max-width:96vw"><q-card-section class="row items-center"><div class="text-h6 text-weight-bold">{{editingId?'Editar cliente':'Nuevo cliente'}}</div><q-space/><q-btn flat round icon="close" v-close-popup/></q-card-section><q-separator/><q-card-section class="row q-col-gutter-md"><div class="col-12 col-sm-6"><q-input v-model="form.nombre" outlined label="Nombre *"/></div><div class="col-12 col-sm-6"><q-input v-model="form.telefono" outlined label="Teléfono"/></div><div class="col-12"><q-input v-model="form.direccion" outlined label="Dirección"/></div><div class="col-12"><q-input v-model="form.referencia" outlined label="Referencia"/></div><div class="col-12"><q-input v-model="form.observaciones" type="textarea" autogrow outlined label="Observaciones"/></div><div class="col-12"><q-toggle v-model="form.activo" label="Cliente activo"/></div></q-card-section><q-card-actions align="right" class="q-pa-md"><q-btn flat label="Cancelar" no-caps v-close-popup/><q-btn color="primary" icon="save" label="Guardar" no-caps :loading="saving" @click="save"/></q-card-actions></q-card></q-dialog>
+    <q-dialog v-model="dialog" persistent><q-card style="width:720px;max-width:96vw"><q-card-section class="row items-center"><div><div class="text-h6 text-weight-bold">{{editingId?'Editar cliente':'Nuevo cliente'}}</div><div class="text-caption text-grey-7">Los campos con * son obligatorios. Si algún dato no es válido, VITI marcará exactamente dónde corregirlo.</div></div><q-space/><q-btn flat round icon="close" v-close-popup/></q-card-section><q-separator/><q-card-section class="row q-col-gutter-md"><div class="col-12 col-sm-6" data-error-field="nombre"><q-input v-model="form.nombre" outlined label="Nombre *" :error="fieldErrors.has('nombre')" :error-message="fieldErrors.message('nombre')" @update:model-value="clearField('nombre')"/></div><div class="col-12 col-sm-6" data-error-field="telefono"><q-input v-model="form.telefono" outlined label="Teléfono" :error="fieldErrors.has('telefono')" :error-message="fieldErrors.message('telefono')" @update:model-value="clearField('telefono')"/></div><div class="col-12" data-error-field="direccion"><q-input v-model="form.direccion" outlined label="Dirección" :error="fieldErrors.has('direccion')" :error-message="fieldErrors.message('direccion')" @update:model-value="clearField('direccion')"/></div><div class="col-12" data-error-field="referencia"><q-input v-model="form.referencia" outlined label="Referencia" :error="fieldErrors.has('referencia')" :error-message="fieldErrors.message('referencia')" @update:model-value="clearField('referencia')"/></div><div class="col-12" data-error-field="observaciones"><q-input v-model="form.observaciones" type="textarea" autogrow outlined label="Observaciones" :error="fieldErrors.has('observaciones')" :error-message="fieldErrors.message('observaciones')" @update:model-value="clearField('observaciones')"/></div><div v-if="editingId" class="col-12"><q-toggle v-model="form.activo" label="Cliente activo"/></div></q-card-section><q-card-actions align="right" class="q-pa-md"><q-btn flat label="Cancelar" no-caps v-close-popup/><q-btn color="primary" icon="save" :label="editingId?'Guardar cambios':'Guardar y continuar'" no-caps :loading="saving" @click="save"/></q-card-actions></q-card></q-dialog>
 
-    <q-dialog v-model="accessDialog" persistent><q-card style="width:650px;max-width:96vw"><q-card-section class="row items-center"><div><div class="text-h6 text-weight-bold">Acceso al portal</div><div class="text-caption text-grey-7">{{selected?.nombre}}</div></div><q-space/><q-btn flat round icon="close" v-close-popup/></q-card-section><q-separator/><q-card-section class="row q-col-gutter-md"><div class="col-12 col-sm-6"><q-input v-model="accessForm.usuario" outlined label="Usuario *"/></div><div class="col-12 col-sm-6"><q-input v-model="accessForm.documento" outlined label="CI / documento"/></div><div class="col-12"><q-input v-model="accessForm.telefono" outlined label="Teléfono"/></div><div class="col-12 col-sm-6"><q-input v-model="accessForm.password" type="password" outlined :label="selected?.acceso_usuario_id?'Nueva contraseña (opcional)':'Contraseña *'"/></div><div class="col-12 col-sm-6"><q-input v-model="accessForm.password_confirmation" type="password" outlined label="Confirmar contraseña"/></div></q-card-section><q-card-actions align="right" class="q-pa-md"><q-btn flat label="Cancelar" no-caps v-close-popup/><q-btn color="primary" icon="save" label="Guardar acceso" no-caps :loading="saving" @click="saveAccess"/></q-card-actions></q-card></q-dialog>
+    <q-dialog v-model="accessDialog" persistent><q-card style="width:650px;max-width:96vw"><q-card-section class="row items-center"><div><div class="text-h6 text-weight-bold">Acceso al portal</div><div class="text-caption text-grey-7">{{selected?.nombre}}</div></div><q-space/><q-btn flat round icon="close" v-close-popup/></q-card-section><q-separator/><q-card-section class="row q-col-gutter-md"><div class="col-12 col-sm-6" data-error-field="usuario"><q-input v-model="accessForm.usuario" outlined label="Usuario *" :error="fieldErrors.has('usuario')" :error-message="fieldErrors.message('usuario')" @update:model-value="clearField('usuario')"/></div><div class="col-12 col-sm-6" data-error-field="documento"><q-input v-model="accessForm.documento" outlined label="CI / documento" :error="fieldErrors.has('documento')" :error-message="fieldErrors.message('documento')" @update:model-value="clearField('documento')"/></div><div class="col-12" data-error-field="telefono"><q-input v-model="accessForm.telefono" outlined label="Teléfono" :error="fieldErrors.has('telefono')" :error-message="fieldErrors.message('telefono')" @update:model-value="clearField('telefono')"/></div><div class="col-12 col-sm-6" data-error-field="password"><q-input v-model="accessForm.password" type="password" outlined :label="selected?.acceso_usuario_id?'Nueva contraseña (opcional)':'Contraseña *'" :error="fieldErrors.has('password')" :error-message="fieldErrors.message('password')" @update:model-value="clearField('password')"/></div><div class="col-12 col-sm-6" data-error-field="password_confirmation"><q-input v-model="accessForm.password_confirmation" type="password" outlined label="Confirmar contraseña" :error="fieldErrors.has('password_confirmation')" :error-message="fieldErrors.message('password_confirmation')" @update:model-value="clearField('password_confirmation')"/></div></q-card-section><q-card-actions align="right" class="q-pa-md"><q-btn flat label="Cancelar" no-caps v-close-popup/><q-btn color="primary" icon="save" label="Guardar acceso" no-caps :loading="saving" @click="saveAccess"/></q-card-actions></q-card></q-dialog>
   </q-page>
 </template>
 
 <style scoped>
-.clients-page{max-width:1500px;margin:0 auto}.clients-page h1{color:var(--viti-text)}.client-card,.summary-card,.equipment-card{height:100%;border-radius:16px}.q-card{border-color:var(--viti-border)}.flow-banner,.empty-banner{background:color-mix(in srgb,var(--electro-primary) 7%,white);border:1px solid color-mix(in srgb,var(--electro-primary) 18%,white)}.client-detail-card{width:min(1050px,97vw);max-width:97vw;border-radius:22px;overflow:hidden}.client-detail-header{background:linear-gradient(135deg,var(--electro-primary),color-mix(in srgb,var(--electro-primary) 72%,black));color:white}.summary-card{text-align:center}.equipment-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.equipment-dialog,.appointment-dialog{width:min(760px,96vw);border-radius:20px}.detail-section{scroll-margin-top:20px}
+.clients-page{max-width:1500px;margin:0 auto}.clients-page h1{color:var(--viti-text)}.client-card,.summary-card,.equipment-card{height:100%;border-radius:16px}.q-card{border-color:var(--viti-border)}.flow-banner,.empty-banner{background:color-mix(in srgb,var(--electro-primary) 7%,var(--viti-card));border:1px solid color-mix(in srgb,var(--electro-primary) 20%,var(--viti-border));color:var(--viti-text)}.client-detail-card{width:min(1050px,97vw);max-width:97vw;border-radius:22px;overflow:hidden}.client-detail-header{background:linear-gradient(135deg,var(--electro-primary),color-mix(in srgb,var(--electro-primary) 72%,black));color:white}.summary-card{text-align:center}.equipment-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.equipment-dialog,.appointment-dialog{width:min(760px,96vw);border-radius:20px}.detail-section{scroll-margin-top:20px}
 @media(max-width:700px){.clients-page{padding:12px}.clients-page h1{font-size:25px;line-height:1.2}.client-detail-card{width:100%;max-width:100%;border-radius:0}.equipment-grid{grid-template-columns:1fr}.summary-card .q-card__section{padding:12px 6px}.summary-card .text-h5{font-size:20px}.client-detail-header{padding-top:18px}}
 </style>
