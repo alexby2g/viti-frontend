@@ -94,7 +94,7 @@ check_page viti-plans "$BASE/viti/planes" \
   "VITI Profesional" \
   "VITI Empresa" \
   "Cotización personalizada" \
-  "Elegir plan"
+  "Solicitar este plan"
 
 check_page viti-access "$BASE/viti/acceso" \
   "¿Es tu primera vez en VITI?" \
@@ -124,4 +124,4 @@ check_page client-apps "$BASE/mi-aplicaciones" \
   "Mi negocio" \
   "Nueva solicitud"
 
-echo "Flow E2E OK: presentación VITI, planes, primer acceso, formulario público, panel administrativo y cliente multiempresa renderizan con contexto explícito en Chrome headless." 
+echo "Flow E2E OK: presentación VITI, planes, primer acceso, formulario público, panel administrativo y cliente multiempresa renderizan con contexto explícito en Chrome headless."
