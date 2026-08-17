@@ -16,13 +16,8 @@ const plans = ref([])
 const selectedPlanCode = ref(typeof route.query.plan === 'string' ? route.query.plan.trim() : '')
 const selectedBilling = ref(route.query.modalidad === 'anual' ? 'anual' : 'mensual')
 
-const selectedPlan = computed(() => {
-  if (!selectedPlanCode.value) return null
-  return plans.value.find(plan => plan.codigo === selectedPlanCode.value) || {
-    codigo: selectedPlanCode.value,
-    nombre: selectedPlanCode.value,
-  }
-})
+const selectedPlan = computed(() => plans.value.find(plan => plan.codigo === selectedPlanCode.value) || null)
+const selectedPlanUnavailable = computed(() => Boolean(selectedPlanCode.value) && !plansLoading.value && !selectedPlan.value)
 
 const codeForm = reactive({ codigo: '' })
 const requestForm = reactive({
@@ -47,6 +42,8 @@ async function loadPlans() {
     plans.value = Array.isArray(response.data?.data) ? response.data.data : []
 
     if (selectedPlanCode.value && !plans.value.some(plan => plan.codigo === selectedPlanCode.value)) {
+      requestForm.plan_codigo = null
+      requestForm.modalidad = null
       $q.notify({
         type: 'warning',
         message: 'El plan seleccionado ya no está disponible. Puedes enviar la solicitud sin una preferencia de plan.',
@@ -140,7 +137,7 @@ onMounted(async () => {
         </div>
       </q-banner>
 
-      <q-banner v-if="selectedPlanCode && !selectedPlan?.codigo" rounded class="info-banner q-mb-lg">
+      <q-banner v-if="selectedPlanUnavailable" rounded class="info-banner q-mb-lg">
         <template #avatar><q-icon name="info" color="primary" /></template>
         El plan indicado en el enlace no está disponible actualmente. Puedes continuar con una solicitud general.
       </q-banner>
@@ -219,7 +216,7 @@ onMounted(async () => {
               Enviar esta solicitud no crea una cuenta ni da acceso al sistema. Primero se revisa y, si corresponde, se genera una invitación personal.
             </q-banner>
 
-            <q-btn color="primary" unelevated no-caps size="lg" class="full-width q-mt-lg" icon="send" label="Solicitar acceso" :loading="loading" :disable="plansLoading" type="submit" />
+            <q-btn color="primary" unelevated no-caps size="lg" class="full-width q-mt-lg" icon="send" label="Solicitar acceso" :loading="loading" type="submit" />
           </q-form>
         </q-card-section>
       </q-card>
