@@ -21,6 +21,20 @@ fail_smoke(){
   return 1
 }
 
+page_summary(){
+  local file="$1"
+  python3 - "$file" <<'PY'
+import html, re, sys
+text=open(sys.argv[1], encoding='utf-8', errors='ignore').read()
+title=re.search(r'<title[^>]*>(.*?)</title>', text, re.I|re.S)
+body=re.search(r'<body[^>]*>(.*?)</body>', text, re.I|re.S)
+body_text=re.sub(r'<script\b[^>]*>.*?</script>|<style\b[^>]*>.*?</style>', ' ', body.group(1) if body else '', flags=re.I|re.S)
+body_text=re.sub(r'<[^>]+>', ' ', body_text)
+body_text=html.unescape(re.sub(r'\s+', ' ', body_text)).strip()
+print(f"titulo={html.unescape(title.group(1)).strip() if title else 'sin-titulo'}; contenido={body_text[:260] or 'sin-contenido-visible'}")
+PY
+}
+
 for _ in $(seq 1 30); do
   if curl --fail --silent "$BASE/api/health" >/dev/null; then break; fi
   sleep 0.5
@@ -35,12 +49,14 @@ check_page(){
   "$CHROME_BIN" --headless=new --no-sandbox --disable-gpu --disable-dev-shm-usage --virtual-time-budget=11000 --dump-dom "$url" >"$file" || fail_smoke "Chrome no pudo abrir $name ($url)"
   for text in "$@"; do
     if ! grep -Fq "$text" "$file"; then
+      local summary
+      summary="$(page_summary "$file")"
       echo "--- DOM final de $name ---" >&2
       tail -n 120 "$file" >&2 || true
-      fail_smoke "$name no contiene el texto esperado: $text"
+      fail_smoke "$name no contiene: $text | $summary"
     fi
   done
-  if grep -Fq '<div id="q-app"></div>' "$file"; then fail_smoke "Vue no renderizó $name"; fi
+  if grep -Fq '<div id="q-app"></div>' "$file"; then fail_smoke "Vue no renderizó $name | $(page_summary "$file")"; fi
 }
 
 check_page viti-landing "$BASE/viti" \
