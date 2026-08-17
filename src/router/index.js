@@ -18,9 +18,9 @@ export default defineRouter(({ store }) => {
   const adminAccessRoute = {
     path:'/accesos',
     component:MainLayout,
-    meta:{ requiresAuth:true, adminOnly:true },
+    meta:{ requiresAuth:true, superAdminOnly:true },
     children:[
-      { path:'', name:'viti-access-requests', component:() => import('../pages/AccesosVitiPage.vue'), meta:{ requiresAuth:true, adminOnly:true } },
+      { path:'', name:'viti-access-requests', component:() => import('../pages/AccesosVitiPage.vue'), meta:{ requiresAuth:true, superAdminOnly:true } },
     ],
   }
 
