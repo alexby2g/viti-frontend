@@ -5,17 +5,17 @@ import { useAuthStore } from '../stores/auth'
 import { useTenantStore } from '../stores/tenant'
 
 export default defineRouter(({ store }) => {
-  const router = createRouter({ history: createWebHistory(), routes })
+  const publicRoutes = [
+    { path:'/viti', name:'viti-landing', component:() => import('../pages/VitiLandingPage.vue') },
+    { path:'/presentacion', redirect:'/viti' },
+  ]
+  const router = createRouter({ history: createWebHistory(), routes:[...publicRoutes, ...routes] })
 
   const redirectAlias = (to, targetBase, fallback='inicio') => {
     const raw = to.params.pathMatch
     const tail = Array.isArray(raw) ? raw.join('/') : String(raw || fallback)
     return { path:`${targetBase}/${tail || fallback}`, query:to.query, hash:to.hash }
   }
-
-  // Presentación pública compartible de VITI. No exige cuenta ni sesión.
-  router.addRoute({ path:'/viti', name:'viti-landing', component:() => import('../pages/VitiLandingPage.vue') })
-  router.addRoute({ path:'/presentacion', redirect:'/viti' })
 
   // URLs comerciales limpias. Las rutas técnicas `electrofrio` siguen siendo las canónicas
   // por compatibilidad con clientes existentes, Flutter y enlaces ya emitidos.
