@@ -7,6 +7,8 @@ import { useTenantStore } from '../stores/tenant'
 export default defineRouter(({ store }) => {
   const publicRoutes = [
     { path:'/viti', name:'viti-landing', component:() => import('../pages/VitiLandingPage.vue'), meta:{publicLanding:true} },
+    { path:'/viti/planes', name:'viti-plans', component:() => import('../pages/VitiPlansPage.vue'), meta:{publicLanding:true} },
+    { path:'/planes', redirect:'/viti/planes', meta:{publicLanding:true} },
     { path:'/presentacion', redirect:'/viti', meta:{publicLanding:true} },
   ]
   const router = createRouter({ history: createWebHistory(), routes:[...publicRoutes, ...routes] })
@@ -32,9 +34,9 @@ export default defineRouter(({ store }) => {
   }
 
   router.beforeEach(async (to, from) => {
-    // La presentación debe abrir incluso si el API está dormido, en mantenimiento o
-    // todavía no fue configurado. Es una página pública de producto, no parte del panel.
-    if (to.meta.publicLanding || to.name === 'viti-landing') return true
+    // La presentación y los planes deben abrir incluso si el API está dormido, en mantenimiento o
+    // todavía no fue configurado. Son páginas públicas de producto, no parte del panel.
+    if (to.meta.publicLanding || to.name === 'viti-landing' || to.name === 'viti-plans') return true
 
     const auth = useAuthStore(store)
     if (auth.setupRequired === null) await auth.checkSetup()
