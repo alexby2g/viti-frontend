@@ -14,18 +14,26 @@ const notifications = useNotificationsStore()
 const drawer = ref(false)
 const loading = ref(true)
 const appInfo = ref(null)
+const airSystemConfig = ref(null)
 const theme = ref('light')
 const allModules = ['inicio','agenda','ordenes','clientes','equipos','tecnicos','inventario','pagos','garantias','historial','buzon']
 
-const businessName = computed(() => appInfo.value?.empresa?.nombre_comercial || 'Electrofrío')
 const clientMode = computed(() => route.path.startsWith('/mi-apps/electrofrio'))
 const appBase = computed(() => clientMode.value ? '/mi-apps/electrofrio' : '/apps/electrofrio')
 const apiBase = computed(() => clientMode.value ? '/mi/apps/electrofrio' : '/apps/electrofrio')
 const homePath = computed(() => clientMode.value ? '/mi-aplicaciones' : '/aplicaciones')
-const roleLabel = computed(() => clientMode.value ? ({propietario:'Propietario',administrador:'Administrador',empleado:'Técnico / empleado'}[appInfo.value?.rol]||'Equipo de Electrofrío') : (auth.user?.rol==='superadmin'?'Superadministración VITI':'Administración VITI'))
+const businessName = computed(() => airSystemConfig.value?.empresa?.nombre_comercial || appInfo.value?.empresa?.nombre_comercial || 'Mi empresa')
+const systemName = computed(() => airSystemConfig.value?.nombre_corto || 'Aires Acondicionados')
+const fullSystemName = computed(() => airSystemConfig.value?.nombre_sistema || 'Sistema de Gestión de Servicios de Aire Acondicionado')
+const brandLogo = computed(() => airSystemConfig.value?.logo_url || null)
+const roleLabel = computed(() => clientMode.value ? ({propietario:'Propietario',administrador:'Administrador',empleado:'Técnico / empleado'}[appInfo.value?.rol]||'Equipo técnico') : (auth.user?.rol==='superadmin'?'Superadministración VITI':'Administración VITI'))
 const electroUnreadCount = computed(() => notifications.items.filter(item => item.contexto === 'electrofrio').length)
 const unread = computed(() => electroUnreadCount.value > 99 ? '99+' : String(electroUnreadCount.value || ''))
 const themeIcon = computed(() => theme.value === 'dark' ? 'light_mode' : 'dark_mode')
+const brandStyle = computed(() => ({
+  '--electro-primary': airSystemConfig.value?.color_primario || '#0B5F7A',
+  '--electro-secondary': airSystemConfig.value?.color_secundario || '#12B8C8',
+}))
 const drawerThemeStyle = computed(() => theme.value === 'dark'
   ? {
       background: 'linear-gradient(180deg,#102a43 0%,#091e31 100%)',
@@ -46,11 +54,13 @@ const hasModule = module => enabledModules.value.includes(module)
 const canManage = computed(() => !clientMode.value || ['propietario','administrador'].includes(appInfo.value?.rol))
 provide('electrofrioModules', enabledModules)
 provide('electrofrioCanManage', canManage)
+provide('airSystemConfig', airSystemConfig)
+
 const menuGroups = computed(() => [
   {
     title: 'Gestión diaria',
     items: [
-      { module:'inicio', label:'Inicio', caption:'Resumen del negocio', icon:'space_dashboard', to:`${appBase.value}/inicio` },
+      { module:'inicio', label:'Inicio', caption:'Qué requiere atención hoy', icon:'space_dashboard', to:`${appBase.value}/inicio` },
       { module:'agenda', label:'Agenda', caption:'Visitas programadas', icon:'event_available', to:`${appBase.value}/agenda` },
       { module:'ordenes', label:'Órdenes', caption:'Diagnóstico y servicio', icon:'assignment', to:`${appBase.value}/ordenes` },
     ],
@@ -59,7 +69,7 @@ const menuGroups = computed(() => [
     title: 'Personas y recursos',
     items: [
       { module:'clientes', label:'Clientes', caption:'Datos y acceso del cliente', icon:'groups', to:`${appBase.value}/clientes` },
-      { module:'equipos', label:'Equipos y ficha técnica', caption:'Datos y mediciones del equipo', icon:'ac_unit', to:`${appBase.value}/equipos` },
+      { module:'equipos', label:'Equipos y ficha técnica', caption:'Datos, mediciones e historial', icon:'ac_unit', to:`${appBase.value}/equipos` },
       { module:'tecnicos', label:'Técnicos', icon:'engineering', to:`${appBase.value}/tecnicos` },
       { module:'inventario', label:'Inventario', icon:'inventory_2', to:`${appBase.value}/inventario` },
     ],
@@ -69,11 +79,20 @@ const menuGroups = computed(() => [
     items: [
       { module:'pagos', label:'Pagos', icon:'payments', to:`${appBase.value}/pagos` },
       { module:'garantias', label:'Garantías', icon:'verified', to:`${appBase.value}/garantias` },
-      { module:'historial', label:'Historial y reportes', icon:'history', to:`${appBase.value}/historial` },
-      { module:'buzon', label:'Mensajes Electrofrío', icon:'forum', to:`${appBase.value}/buzon`, badge:true },
+      { module:'historial', label:'Historial técnico', icon:'history', to:`${appBase.value}/historial` },
+      { module:'buzon', label:'Mensajes', icon:'forum', to:`${appBase.value}/buzon`, badge:true },
     ],
   },
-].map(group => ({...group, items:group.items.filter(item => hasModule(item.module))})).filter(group => group.items.length))
+  {
+    title: 'Configuración',
+    items: [
+      { module:'inicio', label:'Mi sistema', caption:'Identidad y preferencias', icon:'tune', to:`${appBase.value}/configuracion`, manageOnly:true },
+    ],
+  },
+].map(group => ({
+  ...group,
+  items:group.items.filter(item => hasModule(item.module) && (!item.manageOnly || canManage.value)),
+})).filter(group => group.items.length))
 
 function leaveTo(path){
   if(!String(path).startsWith(appBase.value))sessionStorage.setItem('viti-app-explicit-exit','1')
@@ -82,11 +101,16 @@ function leaveTo(path){
 async function loadState(){
   loading.value=true
   try{
-    appInfo.value=(await api.get(clientMode.value?`${apiBase.value}/estado`:`${apiBase.value}/resumen`)).data.data
+    const [stateResponse, configResponse] = await Promise.all([
+      api.get(clientMode.value?`${apiBase.value}/estado`:`${apiBase.value}/resumen`),
+      api.get(`${apiBase.value}/configuracion`),
+    ])
+    appInfo.value=stateResponse.data.data
+    airSystemConfig.value=configResponse.data.data
     ensureAllowedRoute()
   }
   catch(e){
-    $q.notify({type:'negative',message:e.response?.data?.message||'No se pudo abrir Electrofrío dentro de VITI.'})
+    $q.notify({type:'negative',message:e.response?.data?.message||'No se pudo abrir el sistema de gestión de aires acondicionados dentro de VITI.'})
     sessionStorage.setItem('viti-app-explicit-exit','1')
     router.replace(homePath.value)
   }finally{loading.value=false;ensureAllowedRoute()}
@@ -125,16 +149,17 @@ watch(()=>route.fullPath,ensureAllowedRoute)
 </script>
 
 <template>
-  <q-layout view="hHh LpR fFf" class="electro-app-shell" :class="{'electro-dark':theme==='dark'}">
+  <q-layout view="hHh LpR fFf" class="electro-app-shell" :class="{'electro-dark':theme==='dark'}" :style="brandStyle">
     <q-header class="electro-header">
       <q-toolbar class="q-px-md q-px-lg-xl">
         <q-btn flat round dense icon="menu" color="white" aria-label="Abrir menú" @click="drawer=!drawer"/>
         <q-avatar size="42px" class="electro-brand-avatar q-ml-sm">
-          <q-icon name="ac_unit" size="26px"/>
+          <img v-if="brandLogo" :src="brandLogo" alt="Logo del negocio"/>
+          <q-icon v-else name="ac_unit" size="26px"/>
         </q-avatar>
-        <div class="q-ml-md electro-brand-copy">
-          <div class="text-weight-bold text-h6">Electrofrío</div>
-          <div class="text-caption">{{businessName}} · aplicación de VITI</div>
+        <div class="q-ml-md electro-brand-copy min-width-0">
+          <div class="text-weight-bold text-h6 ellipsis">{{systemName}}</div>
+          <div class="text-caption ellipsis">{{businessName}} · gestionado mediante VITI</div>
         </div>
         <q-space/>
         <q-btn flat round :icon="themeIcon" color="white" aria-label="Cambiar apariencia" @click="toggleTheme">
@@ -160,16 +185,18 @@ watch(()=>route.fullPath,ensureAllowedRoute)
       <div class="electro-drawer-brand q-pa-lg">
         <div class="row items-center no-wrap">
           <q-avatar size="54px" class="electro-brand-avatar">
-            <q-icon name="ac_unit" size="32px"/>
+            <img v-if="brandLogo" :src="brandLogo" alt="Logo del negocio"/>
+            <q-icon v-else name="ac_unit" size="32px"/>
           </q-avatar>
           <div class="q-ml-md min-width-0">
-            <div class="text-overline">VITI App</div>
+            <div class="text-overline">VITI · Solución configurable</div>
             <div class="text-h6 text-weight-bold ellipsis">{{businessName}}</div>
+            <div class="text-caption ellipsis">{{systemName}}</div>
             <div class="text-caption">{{planName}}{{planPrice?` · ${planPrice.toFixed(0)} Bs`:''}}</div>
           </div>
         </div>
       </div>
-      <q-scroll-area style="height:calc(100% - 175px)">
+      <q-scroll-area style="height:calc(100% - 190px)">
         <q-list padding class="electro-menu">
           <template v-for="group in menuGroups" :key="group.title">
             <q-item-label header class="electro-menu-title">{{group.title}}</q-item-label>
@@ -196,7 +223,7 @@ watch(()=>route.fullPath,ensureAllowedRoute)
     </q-drawer>
 
     <q-page-container>
-      <q-inner-loading :showing="loading" label="Preparando Electrofrío..."/>
+      <q-inner-loading :showing="loading" :label="`Preparando ${fullSystemName}...`"/>
       <router-view v-if="!loading"/>
     </q-page-container>
   </q-layout>
@@ -204,7 +231,7 @@ watch(()=>route.fullPath,ensureAllowedRoute)
 
 <style scoped>
 .electro-app-shell{--electro-primary:#0b5f7a;--electro-secondary:#12b8c8;--electro-accent:#ff8a3d;--viti-bg:#eef5fb;--viti-card:#fff;--viti-text:#123047;--viti-muted:#63798a;--viti-border:rgba(15,76,129,.11);background:var(--viti-bg);color:var(--viti-text);min-height:100vh}
-.electro-app-shell.electro-dark{--electro-primary:#57d6e1;--viti-bg:#071827;--viti-card:#102a43;--viti-text:#f4fbff;--viti-muted:#bed0dc;--viti-border:rgba(146,211,229,.28)}
+.electro-app-shell.electro-dark{--viti-bg:#071827;--viti-card:#102a43;--viti-text:#f4fbff;--viti-muted:#bed0dc;--viti-border:rgba(146,211,229,.28)}
 .electro-app-shell :deep(.q-page-container),.electro-app-shell :deep(.q-page){background:var(--viti-bg);color:var(--viti-text)}
 .electro-app-shell :deep(.q-card),.electro-app-shell :deep(.q-table),.electro-app-shell :deep(.viti-card),.electro-app-shell :deep(.viti-table){background:var(--viti-card);color:var(--viti-text);border-color:var(--viti-border)}
 .electro-app-shell :deep(.text-grey-6),.electro-app-shell :deep(.text-grey-7){color:var(--viti-muted)!important}
@@ -213,36 +240,34 @@ watch(()=>route.fullPath,ensureAllowedRoute)
 .electro-dark :deep(.q-field__label),.electro-dark :deep(.q-field__native),.electro-dark :deep(.q-field__input),.electro-dark :deep(.q-field__marginal),.electro-dark :deep(.q-item__label),.electro-dark :deep(.q-table th),.electro-dark :deep(.q-table td){color:var(--viti-text)}
 .electro-dark :deep(.q-field--outlined .q-field__control:before){border-color:#52758d}
 .electro-dark :deep(.q-separator){background:rgba(174,217,230,.24)}
-.electro-header{background:linear-gradient(135deg,#0b3d68,#0f6fa4 55%,#00a6b6);color:#fff!important;box-shadow:0 8px 24px rgba(8,44,74,.2)}
+.electro-header{background:linear-gradient(135deg,var(--electro-primary),color-mix(in srgb,var(--electro-primary) 72%,var(--electro-secondary)) 55%,var(--electro-secondary));color:#fff!important;box-shadow:0 8px 24px rgba(8,44,74,.2)}
 .electro-header :deep(.q-toolbar){min-height:64px}.electro-header .text-caption{color:rgba(255,255,255,.78)}
-.electro-brand-avatar{color:#0f5d7b;background:rgba(255,255,255,.94);box-shadow:0 8px 20px rgba(7,38,61,.2)}
+.electro-brand-avatar{color:var(--electro-primary);background:rgba(255,255,255,.94);box-shadow:0 8px 20px rgba(7,38,61,.2);overflow:hidden}.electro-brand-avatar img{width:100%;height:100%;object-fit:cover}
 .electro-brand-copy{line-height:1.15}.electro-back-btn{border-color:rgba(255,255,255,.66)}
 .electro-drawer{transition:background .18s ease,color .18s ease,border-color .18s ease}
 .electro-drawer--light{background:linear-gradient(180deg,#fff 0%,#f3f8fc 100%)!important;color:#244256!important}
 .electro-drawer--dark{background:linear-gradient(180deg,#102a43 0%,#091e31 100%)!important;color:#f4fbff!important;border-right-color:rgba(146,211,229,.22)!important}
-.electro-drawer-brand{color:#fff;background:linear-gradient(135deg,#0b3d68,#0f4c81 58%,#127f9c);box-shadow:0 10px 28px rgba(8,44,74,.2)}
-.electro-drawer-brand .text-overline{color:#9debf0}.electro-drawer-brand .text-caption{color:rgba(255,255,255,.76)}
+.electro-drawer-brand{color:#fff;background:linear-gradient(135deg,var(--electro-primary),color-mix(in srgb,var(--electro-primary) 70%,var(--electro-secondary)) 58%,var(--electro-secondary));box-shadow:0 10px 28px rgba(8,44,74,.2)}
+.electro-drawer-brand .text-overline{color:rgba(255,255,255,.82)}.electro-drawer-brand .text-caption{color:rgba(255,255,255,.8)}
 .electro-menu{padding:12px 10px 90px}.electro-menu-title{padding:14px 10px 6px;color:#6b7d8c;font-size:11px;font-weight:800;letter-spacing:.08em;text-transform:uppercase}
 .electro-menu-item{min-height:50px;margin:4px 0;border-radius:14px;color:inherit}.electro-menu-item :deep(.q-icon){font-size:23px}.electro-menu-item :deep(.q-item__label--caption){color:var(--viti-muted)}
-.electro-active{color:#0b4f83!important;background:linear-gradient(135deg,rgba(25,118,210,.14),rgba(0,172,193,.11))!important;font-weight:800;box-shadow:inset 3px 0 0 #1976d2}
+.electro-active{color:var(--electro-primary)!important;background:color-mix(in srgb,var(--electro-primary) 12%,transparent)!important;font-weight:800;box-shadow:inset 3px 0 0 var(--electro-primary)}
 .electro-session{border-top:1px solid var(--viti-border);background:color-mix(in srgb,var(--viti-card) 92%,transparent);backdrop-filter:blur(12px);color:var(--viti-text)}
-
 .electro-drawer--dark .electro-menu-title{color:#a9c4d4!important}
 .electro-drawer--dark .electro-menu-item{color:#edf8ff!important}
 .electro-drawer--dark .electro-menu-item :deep(.q-icon){color:#9fdde8!important}
 .electro-drawer--dark .electro-menu-item :deep(.q-item__label--caption){color:#a9c7d7!important}
-.electro-drawer--dark .electro-menu-item.electro-active{color:#9af1f2!important;background:linear-gradient(135deg,rgba(35,124,201,.3),rgba(0,178,194,.2))!important;box-shadow:inset 3px 0 0 #44d1dc!important}
+.electro-drawer--dark .electro-menu-item.electro-active{color:#9af1f2!important;background:color-mix(in srgb,var(--electro-primary) 25%,transparent)!important;box-shadow:inset 3px 0 0 var(--electro-secondary)!important}
 .electro-drawer--dark .electro-session{background:#0b2237!important;color:#f4fbff!important;border-top-color:#284b63!important}
 .electro-drawer--dark .electro-session .text-caption{color:#d9edf7!important}
 .electro-drawer--light .electro-menu-item{color:#244256}
 .electro-drawer--light .electro-menu-item :deep(.q-item__label--caption){color:#63798a}
 .electro-drawer--light .electro-session{background:rgba(255,255,255,.94);color:#123047;border-top-color:rgba(15,76,129,.11)}
-
 :global(body.electrofrio-local-dark) .q-dialog__inner .q-card,:global(body.electrofrio-local-dark) .q-menu{background:#102a43;color:#f4fbff}
 :global(body.electrofrio-local-dark) .q-dialog__inner .text-grey-6,:global(body.electrofrio-local-dark) .q-dialog__inner .text-grey-7{color:#bed0dc!important}
 :global(body.electrofrio-local-dark) .q-dialog__inner .q-field__label,:global(body.electrofrio-local-dark) .q-dialog__inner .q-field__native,:global(body.electrofrio-local-dark) .q-dialog__inner .q-field__input,:global(body.electrofrio-local-dark) .q-dialog__inner .q-field__marginal{color:#f4fbff}
 :global(body.electrofrio-local-dark) .q-dialog__inner .q-field--outlined .q-field__control:before{border-color:#52758d}
 :global(body.electrofrio-local-light) .q-dialog__inner .q-card,:global(body.electrofrio-local-light) .q-menu{background:#fff;color:#123047}
 .rounded-borders{border-radius:12px}.min-width-0{min-width:0}
-@media(max-width:600px){.electro-header :deep(.q-toolbar){min-height:58px;padding-left:8px;padding-right:8px}.electro-brand-avatar{margin-left:4px}.electro-brand-copy{margin-left:9px}.electro-brand-copy .text-h6{font-size:17px}.electro-brand-copy .text-caption{font-size:10px}.electro-back-btn{margin-left:2px}}
+@media(max-width:600px){.electro-header :deep(.q-toolbar){min-height:58px;padding-left:8px;padding-right:8px}.electro-brand-avatar{margin-left:4px}.electro-brand-copy{margin-left:9px;max-width:180px}.electro-brand-copy .text-h6{font-size:17px}.electro-brand-copy .text-caption{font-size:10px}.electro-back-btn{margin-left:2px}}
 </style>
