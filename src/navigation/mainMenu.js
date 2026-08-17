@@ -64,6 +64,7 @@ export function buildMainMenu({
       icon: 'admin_panel_settings',
       children: [
         { label: 'Usuarios', icon: 'manage_accounts', to: '/usuarios' },
+        { label: 'Solicitudes de acceso', icon: 'person_add_alt_1', to: '/accesos' },
         { label: 'Auditoría', icon: 'history', to: '/auditoria' },
         { label: 'Marca y apariencia', icon: 'palette', action: 'branding' },
       ],
