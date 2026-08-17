@@ -42,6 +42,11 @@ const moduleLabels = {
   tecnicos: 'Técnicos', inventario: 'Inventario', pagos: 'Pagos', garantias: 'Garantías', historial: 'Historial', buzon: 'Buzón y soporte',
 }
 
+function requestPath(plan) {
+  const params = new URLSearchParams({ plan: plan.codigo, modalidad: billingMode.value })
+  return `/viti/acceso?${params.toString()}`
+}
+
 async function load() {
   loading.value = true
   try {
@@ -120,18 +125,27 @@ onMounted(load)
             </q-list>
 
             <div class="plan-capacity q-mt-md">
-              <q-chip dense color="blue-1" text-color="primary" icon="apps">{{ plan.max_aplicaciones ? `${plan.max_aplicaciones} aplicación${plan.max_aplicaciones > 1 ? 'es' : ''}` : 'Aplicaciones según alcance' }}</q-chip>
+              <q-chip dense color="blue-1" text-color="primary" icon="apps">{{ plan.max_aplicaciones ? `${plan.max_aplicaciones} ${plan.max_aplicaciones > 1 ? 'aplicaciones' : 'aplicación'}` : 'Aplicaciones según alcance' }}</q-chip>
               <q-chip dense color="grey-2" text-color="grey-8" icon="support_agent">Soporte VITI</q-chip>
             </div>
 
-            <q-btn color="primary" :outline="plan.codigo === 'personalizado'" unelevated no-caps size="lg" class="full-width q-mt-lg" :label="plan.codigo === 'personalizado' ? 'Solicitar cotización' : 'Elegir plan'" to="/viti" />
+            <q-btn
+              color="primary"
+              :outline="plan.codigo === 'personalizado'"
+              unelevated
+              no-caps
+              size="lg"
+              class="full-width q-mt-lg"
+              :label="plan.codigo === 'personalizado' ? 'Solicitar cotización' : 'Solicitar este plan'"
+              :to="requestPath(plan)"
+            />
           </q-card-section>
         </q-card>
       </section>
 
       <q-banner rounded class="commercial-note q-mt-xl">
         <template #avatar><q-icon name="info" color="primary" /></template>
-        Los precios del catálogo corresponden a la configuración comercial vigente de VITI. La contratación final se valida durante el análisis de la necesidad y la definición del alcance del sistema.
+        Seleccionar un plan solo registra tu preferencia comercial. La contratación final se valida durante el análisis de la necesidad y la definición del alcance del sistema.
       </q-banner>
 
       <section class="comparison q-mt-xl">

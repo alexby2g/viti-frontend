@@ -13,6 +13,7 @@ export function buildMainMenu({
     if (hasClientProfile) items.push({ label: 'Mi cuenta', icon: 'account_circle', to: '/mi-cuenta' })
     items.push(
       { label: 'Mi negocio', icon: 'storefront', to: '/mi-negocio' },
+      { label: 'Mi plan', icon: 'workspace_premium', to: '/mi-plan' },
       { label: 'Aplicaciones', icon: 'apps', children: [{ label: 'Instaladas', icon: 'grid_view', to: '/mi-aplicaciones' }] },
     )
     if (isManager) {
@@ -64,6 +65,7 @@ export function buildMainMenu({
       icon: 'admin_panel_settings',
       children: [
         { label: 'Usuarios', icon: 'manage_accounts', to: '/usuarios' },
+        { label: 'Solicitudes de acceso', icon: 'person_add_alt_1', to: '/accesos' },
         { label: 'Auditoría', icon: 'history', to: '/auditoria' },
         { label: 'Marca y apariencia', icon: 'palette', action: 'branding' },
       ],

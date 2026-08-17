@@ -4,14 +4,44 @@ import routes from './routes'
 import { useAuthStore } from '../stores/auth'
 import { useTenantStore } from '../stores/tenant'
 
+const AuthLayout = () => import('../layouts/AuthLayout.vue')
+const MainLayout = () => import('../layouts/MainLayout.vue')
+
 export default defineRouter(({ store }) => {
   const publicRoutes = [
-    { path:'/viti', name:'viti-landing', component:() => import('../pages/VitiLandingPage.vue'), meta:{publicLanding:true} },
-    { path:'/viti/planes', name:'viti-plans', component:() => import('../pages/VitiPlansPage.vue'), meta:{publicLanding:true} },
+    {
+      path:'/viti',
+      component:AuthLayout,
+      children:[{ path:'', name:'viti-landing', component:() => import('../pages/VitiLandingPage.vue'), meta:{publicLanding:true} }],
+      meta:{publicLanding:true},
+    },
+    {
+      path:'/viti/planes',
+      component:AuthLayout,
+      children:[{ path:'', name:'viti-plans', component:() => import('../pages/VitiPlansPage.vue'), meta:{publicLanding:true} }],
+      meta:{publicLanding:true},
+    },
+    {
+      path:'/viti/acceso',
+      component:AuthLayout,
+      children:[{ path:'', name:'viti-access', component:() => import('../pages/VitiAccessPage.vue'), meta:{publicLanding:true} }],
+      meta:{publicLanding:true},
+    },
     { path:'/planes', redirect:'/viti/planes', meta:{publicLanding:true} },
+    { path:'/acceso', redirect:'/viti/acceso', meta:{publicLanding:true} },
     { path:'/presentacion', redirect:'/viti', meta:{publicLanding:true} },
   ]
-  const router = createRouter({ history: createWebHistory(), routes:[...publicRoutes, ...routes] })
+
+  const adminAccessRoute = {
+    path:'/accesos',
+    component:MainLayout,
+    meta:{ requiresAuth:true, superAdminOnly:true },
+    children:[
+      { path:'', name:'viti-access-requests', component:() => import('../pages/AccesosVitiPage.vue'), meta:{ requiresAuth:true, superAdminOnly:true } },
+    ],
+  }
+
+  const router = createRouter({ history: createWebHistory(), routes:[...publicRoutes, adminAccessRoute, ...routes] })
 
   const redirectAlias = (to, targetBase, fallback='inicio') => {
     const raw = to.params.pathMatch
@@ -19,8 +49,18 @@ export default defineRouter(({ store }) => {
     return { path:`${targetBase}/${tail || fallback}`, query:to.query, hash:to.hash }
   }
 
-  // URLs comerciales limpias. Las rutas técnicas `electrofrio` siguen siendo las canónicas
-  // por compatibilidad con clientes existentes, Flutter y enlaces ya emitidos.
+  router.addRoute({
+    path:'/mi-plan',
+    component:MainLayout,
+    meta:{ requiresAuth:true, clientOnly:true },
+    children:[{
+      path:'',
+      name:'client-plan',
+      component:() => import('../pages/ClientPlanPage.vue'),
+      meta:{ requiresAuth:true, clientOnly:true },
+    }],
+  })
+
   router.addRoute({ path:'/apps/aires/:pathMatch(.*)*', redirect:to => redirectAlias(to, '/apps/electrofrio') })
   router.addRoute({ path:'/mi-apps/aires/:pathMatch(.*)*', redirect:to => redirectAlias(to, '/mi-apps/electrofrio') })
   router.addRoute({ path:'/portal/aires/:pathMatch(.*)*', redirect:to => redirectAlias(to, '/portal/electrofrio') })
@@ -34,9 +74,7 @@ export default defineRouter(({ store }) => {
   }
 
   router.beforeEach(async (to, from) => {
-    // La presentación y los planes deben abrir incluso si el API está dormido, en mantenimiento o
-    // todavía no fue configurado. Son páginas públicas de producto, no parte del panel.
-    if (to.meta.publicLanding || to.name === 'viti-landing' || to.name === 'viti-plans') return true
+    if (to.meta.publicLanding || ['viti-landing','viti-plans','viti-access'].includes(to.name)) return true
 
     const auth = useAuthStore(store)
     if (auth.setupRequired === null) await auth.checkSetup()
@@ -53,9 +91,6 @@ export default defineRouter(({ store }) => {
       if (to.meta.clientOnly && auth.user?.rol !== 'cliente') return homeFor(auth.user)
       if (to.meta.electroCustomerOnly && auth.user?.rol !== 'cliente_negocio') return homeFor(auth.user)
 
-      // Para cuentas cliente resolvemos la empresa activa antes de montar la página.
-      // Así cualquier petición del componente ya lleva X-VITI-Empresa y el backend
-      // nunca tiene que adivinar entre dos negocios del mismo usuario.
       if (auth.user?.rol === 'cliente') {
         const tenant = useTenantStore(store)
         if (!tenant.loaded) {
@@ -63,7 +98,6 @@ export default defineRouter(({ store }) => {
         }
       }
 
-      // Cada tipo de cuenta permanece dentro de su propio espacio autenticado.
       if (auth.user?.rol === 'soporte' && !to.meta.supportOnly) return { name:'support-internal-home' }
       if (!to.meta.electroCustomerOnly && auth.user?.rol === 'cliente_negocio') return { name:'electro-customer-home' }
     }
