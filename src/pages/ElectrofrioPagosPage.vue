@@ -7,6 +7,7 @@ import { api } from '../boot/axios'
 const $q = useQuasar()
 const route = useRoute()
 const canManage = inject('electrofrioCanManage', computed(() => false))
+const airConfig = inject('airSystemConfig', ref(null))
 const loading = ref(false)
 const saving = ref(false)
 const dialog = ref(false)
@@ -24,13 +25,14 @@ const typeOptions = [
   { label:'Abono', value:'abono', caption:'Pago parcial durante el servicio' },
   { label:'Saldo', value:'saldo', caption:'Cancela exactamente lo pendiente' },
 ]
-const methodOptions = [
-  { label:'Efectivo', value:'efectivo' },
-  { label:'QR', value:'qr' },
-  { label:'Transferencia', value:'transferencia' },
-  { label:'Tarjeta', value:'tarjeta' },
-  { label:'Otro', value:'otro' },
-]
+const defaultMethods = ['efectivo','qr','transferencia','tarjeta','otro']
+const methodOptions = computed(() => {
+  const methods = Array.isArray(airConfig.value?.metodos_pago) && airConfig.value.metodos_pago.length
+    ? airConfig.value.metodos_pago
+    : defaultMethods
+  return methods.map(value => ({ label:pretty(value), value:String(value).toLowerCase() }))
+})
+const currency = computed(() => String(airConfig.value?.moneda || 'BOB').toUpperCase())
 const stateOptions = [{label:'Pagados',value:'pagado'},{label:'Anulados',value:'anulado'}]
 const selectedReference = computed(() => references.value.find(item => Number(item.id) === Number(form.orden_id)) || null)
 const pendingReferences = computed(() => references.value.filter(item => Number(item.saldo) > 0.001))
@@ -50,7 +52,7 @@ const columns = [
   { name:'acciones', label:'', field:'id', align:'right' },
 ]
 
-function money(value){ return `${Number(value || 0).toFixed(2)} Bs` }
+function money(value){ return currency.value === 'BOB' ? `${Number(value || 0).toFixed(2)} Bs` : `${Number(value || 0).toFixed(2)} ${currency.value}` }
 function pretty(value){ return String(value || '').replaceAll('_',' ').replace(/\b\w/g, char => char.toUpperCase()) }
 function dateTime(value){ return value ? new Date(value).toLocaleString('es-BO',{dateStyle:'short',timeStyle:'short'}) : '—' }
 function paymentKey(){ return globalThis.crypto?.randomUUID?.() || `viti-${Date.now()}-${Math.random().toString(36).slice(2,14)}` }
@@ -63,7 +65,7 @@ async function loadPayments(){
     const response = await api.get(`${base.value}/pagos-operativos`, { params })
     payments.value = response.data.data || []
     summary.value = response.data.meta?.resumen || summary.value
-  }catch(error){ notifyError(error,'No se pudieron cargar los pagos de Electrofrío.') }
+  }catch(error){ notifyError(error,'No se pudieron cargar los pagos del sistema.') }
   finally{ loading.value = false }
 }
 
@@ -82,7 +84,8 @@ function clearFilters(){
 }
 
 function openPayment(){
-  Object.assign(form,{orden_id:null,tipo:'abono',monto:null,metodo:'efectivo',referencia:'',notas:'',idempotency_key:paymentKey()})
+  const defaultMethod = methodOptions.value[0]?.value || 'efectivo'
+  Object.assign(form,{orden_id:null,tipo:'abono',monto:null,metodo:defaultMethod,referencia:'',notas:'',idempotency_key:paymentKey()})
   dialog.value = true
 }
 
@@ -200,7 +203,7 @@ onMounted(reload)
         <q-card-section class="q-gutter-md">
           <q-select v-model="form.orden_id" outlined emit-value map-options :options="pendingReferences.map(item=>({label:orderLabel(item),value:item.id}))" label="Orden con saldo pendiente *" @update:model-value="onOrderChange"/>
           <q-banner v-if="selectedReference" rounded class="balance-banner"><div class="row q-col-gutter-md"><div class="col-4"><div class="text-caption">Total</div><div class="text-weight-bold">{{money(selectedReference.total)}}</div></div><div class="col-4"><div class="text-caption">Pagado</div><div class="text-weight-bold text-positive">{{money(selectedReference.pagado)}}</div></div><div class="col-4"><div class="text-caption">Saldo</div><div class="text-weight-bold text-orange">{{money(selectedReference.saldo)}}</div></div></div></q-banner>
-          <div class="row q-col-gutter-md"><div class="col-12 col-sm-6"><q-select v-model="form.tipo" outlined emit-value map-options :options="availableTypes" label="Tipo de pago *" @update:model-value="onTypeChange"/></div><div class="col-12 col-sm-6"><q-input v-model.number="form.monto" type="number" min="0.01" step="0.5" outlined label="Monto (Bs) *" :readonly="form.tipo==='saldo'"/></div></div>
+          <div class="row q-col-gutter-md"><div class="col-12 col-sm-6"><q-select v-model="form.tipo" outlined emit-value map-options :options="availableTypes" label="Tipo de pago *" @update:model-value="onTypeChange"/></div><div class="col-12 col-sm-6"><q-input v-model.number="form.monto" type="number" min="0.01" step="0.5" outlined :label="`Monto (${currency==='BOB'?'Bs':currency}) *`" :readonly="form.tipo==='saldo'"/></div></div>
           <q-select v-model="form.metodo" outlined emit-value map-options :options="methodOptions" label="Método de pago *"/>
           <q-input v-model="form.referencia" outlined maxlength="120" label="Referencia / número de comprobante"/>
           <q-input v-model="form.notas" outlined type="textarea" autogrow maxlength="2000" label="Notas"/>

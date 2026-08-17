@@ -7,6 +7,7 @@ import { api } from '../boot/axios'
 const $q = useQuasar()
 const route = useRoute()
 const canManageSource = inject('electrofrioCanManage', ref(false))
+const airConfig = inject('airSystemConfig', ref(null))
 const loading = ref(false)
 const saving = ref(false)
 const sheetDialog = ref(false)
@@ -24,6 +25,8 @@ const clientMode = computed(() => route.path.startsWith('/mi-apps/electrofrio'))
 const apiBase = computed(() => clientMode.value ? '/mi/apps/electrofrio' : '/apps/electrofrio')
 const canManage = computed(() => Boolean(canManageSource?.value ?? canManageSource))
 const activeClients = computed(() => [...clientes.value].filter(item=>item.activo).sort((a,b)=>Number(b.id)-Number(a.id)))
+const defaultEquipmentTypes = ['Aire acondicionado Split','Aire acondicionado Piso Techo','Aire acondicionado Cassette','Aire acondicionado Ventana','Aire acondicionado Portátil','Sistema VRF / VRV','Chiller','Otro']
+const equipmentTypes = computed(() => Array.isArray(airConfig.value?.tipos_equipo) && airConfig.value.tipos_equipo.length ? airConfig.value.tipos_equipo : defaultEquipmentTypes)
 
 const columns = [
   { name:'equipo', label:'Equipo', field:'tipo', align:'left', sortable:true },
@@ -49,7 +52,7 @@ const rows = computed(() => {
 })
 
 function emptySheet(){ return {gas_refrigerante:'',voltaje:'',amperaje_nominal:null,presion_succion_psi:null,presion_descarga_psi:null,observaciones_tecnicas:''} }
-function emptyEquipment(){ return {cliente_id:null,tipo:'Aire acondicionado',marca:'',modelo:'',serie:'',capacidad:'',ubicacion:'',observaciones:'',activo:true} }
+function emptyEquipment(){ return {cliente_id:null,tipo:'Aire acondicionado Split',marca:'',modelo:'',serie:'',capacidad:'',ubicacion:'',observaciones:'',activo:true} }
 function clean(source){ return Object.fromEntries(Object.entries(source).map(([key,value])=>[key,value===''?null:value])) }
 function notifyError(error,fallback){
   const errors = error.response?.data?.errors
@@ -60,8 +63,8 @@ function equipmentLabel(row){ return [row.tipo,row.marca,row.modelo].filter(Bool
 
 function openEquipment(row=null){
   editingId.value = row?.id || null
-  Object.assign(equipmentForm,emptyEquipment())
-  if(row) Object.assign(equipmentForm,{cliente_id:row.cliente_id,tipo:row.tipo||'Aire acondicionado',marca:row.marca||'',modelo:row.modelo||'',serie:row.serie||'',capacidad:row.capacidad||'',ubicacion:row.ubicacion||'',observaciones:row.observaciones||'',activo:Boolean(row.activo)})
+  Object.assign(equipmentForm,emptyEquipment(),{tipo:equipmentTypes.value[0] || 'Aire acondicionado Split'})
+  if(row) Object.assign(equipmentForm,{cliente_id:row.cliente_id,tipo:row.tipo||equipmentTypes.value[0]||'Aire acondicionado Split',marca:row.marca||'',modelo:row.modelo||'',serie:row.serie||'',capacidad:row.capacidad||'',ubicacion:row.ubicacion||'',observaciones:row.observaciones||'',activo:Boolean(row.activo)})
   equipmentDialog.value = true
 }
 
@@ -78,9 +81,7 @@ async function saveEquipment(){
     equipmentDialog.value = false
     $q.notify({type:'positive',message:editingId.value?'Equipo actualizado.':'Equipo registrado.'})
     await load()
-    if(!editingId.value && response.data?.data?.id){
-      equipos.value.sort((a,b)=>Number(b.id)-Number(a.id))
-    }
+    if(!editingId.value && response.data?.data?.id){ equipos.value.sort((a,b)=>Number(b.id)-Number(a.id)) }
   }catch(error){notifyError(error,'No se pudo guardar el equipo.')}
   finally{saving.value = false}
 }
@@ -114,7 +115,7 @@ async function load(){
     equipos.value = (equipmentResponse.data.data || []).sort((a,b)=>Number(b.id)-Number(a.id))
     fichas.value = sheetsResponse.data.data || []
     clientes.value = clientsResponse.data.data || []
-  }catch(error){notifyError(error,'No se pudieron cargar los equipos de Electrofrío.')}
+  }catch(error){notifyError(error,'No se pudieron cargar los equipos del sistema.')}
   finally{loading.value = false}
 }
 
@@ -155,7 +156,7 @@ onMounted(load)
       </q-table>
     </q-card>
 
-    <q-dialog v-model="equipmentDialog" persistent><q-card style="width:760px;max-width:96vw"><q-card-section class="row items-center"><div class="text-h6 text-weight-bold">{{editingId?'Editar equipo':'Nuevo equipo'}}</div><q-space/><q-btn flat round icon="close" v-close-popup/></q-card-section><q-separator/><q-card-section class="row q-col-gutter-md"><div class="col-12"><q-select v-model="equipmentForm.cliente_id" outlined emit-value map-options :options="activeClients.map(item=>({label:item.nombre,value:item.id}))" label="Cliente *"/></div><div class="col-12 col-sm-6"><q-input v-model="equipmentForm.tipo" outlined label="Tipo de equipo *"/></div><div class="col-12 col-sm-6"><q-input v-model="equipmentForm.marca" outlined label="Marca"/></div><div class="col-12 col-sm-6"><q-input v-model="equipmentForm.modelo" outlined label="Modelo"/></div><div class="col-12 col-sm-6"><q-input v-model="equipmentForm.serie" outlined label="Serie"/></div><div class="col-12 col-sm-6"><q-input v-model="equipmentForm.capacidad" outlined label="Capacidad"/></div><div class="col-12 col-sm-6"><q-input v-model="equipmentForm.ubicacion" outlined label="Ubicación"/></div><div class="col-12"><q-input v-model="equipmentForm.observaciones" type="textarea" autogrow outlined label="Observaciones"/></div><div class="col-12"><q-toggle v-model="equipmentForm.activo" label="Equipo activo"/></div></q-card-section><q-card-actions align="right" class="q-pa-md"><q-btn flat label="Cancelar" no-caps v-close-popup/><q-btn color="primary" icon="save" label="Guardar equipo" no-caps :loading="saving" @click="saveEquipment"/></q-card-actions></q-card></q-dialog>
+    <q-dialog v-model="equipmentDialog" persistent><q-card style="width:760px;max-width:96vw"><q-card-section class="row items-center"><div class="text-h6 text-weight-bold">{{editingId?'Editar equipo':'Nuevo equipo'}}</div><q-space/><q-btn flat round icon="close" v-close-popup/></q-card-section><q-separator/><q-card-section class="row q-col-gutter-md"><div class="col-12"><q-select v-model="equipmentForm.cliente_id" outlined emit-value map-options :options="activeClients.map(item=>({label:item.nombre,value:item.id}))" label="Cliente *"/></div><div class="col-12 col-sm-6"><q-select v-model="equipmentForm.tipo" outlined use-input fill-input hide-selected new-value-mode="add-unique" :options="equipmentTypes" label="Tipo de equipo *" hint="Opciones definidas en Configuración → Mi sistema"/></div><div class="col-12 col-sm-6"><q-input v-model="equipmentForm.marca" outlined label="Marca"/></div><div class="col-12 col-sm-6"><q-input v-model="equipmentForm.modelo" outlined label="Modelo"/></div><div class="col-12 col-sm-6"><q-input v-model="equipmentForm.serie" outlined label="Serie"/></div><div class="col-12 col-sm-6"><q-input v-model="equipmentForm.capacidad" outlined label="Capacidad"/></div><div class="col-12 col-sm-6"><q-input v-model="equipmentForm.ubicacion" outlined label="Ubicación"/></div><div class="col-12"><q-input v-model="equipmentForm.observaciones" type="textarea" autogrow outlined label="Observaciones"/></div><div class="col-12"><q-toggle v-model="equipmentForm.activo" label="Equipo activo"/></div></q-card-section><q-card-actions align="right" class="q-pa-md"><q-btn flat label="Cancelar" no-caps v-close-popup/><q-btn color="primary" icon="save" label="Guardar equipo" no-caps :loading="saving" @click="saveEquipment"/></q-card-actions></q-card></q-dialog>
 
     <q-dialog v-model="sheetDialog" persistent><q-card style="width:760px;max-width:96vw"><q-card-section class="row items-start justify-between"><div><div class="text-h6 text-weight-bold">Ficha técnica</div><div class="text-caption text-grey-7">{{selected?equipmentLabel(selected):''}} · {{selected?.cliente_nombre}}</div></div><q-btn flat round dense icon="close" v-close-popup/></q-card-section><q-separator/><q-card-section class="q-gutter-md"><div class="row q-col-gutter-md"><div class="col-12 col-sm-6"><q-input v-model="sheetForm.gas_refrigerante" outlined label="Gas refrigerante" hint="Ej.: R410A, R32, R22" :readonly="!canManage"/></div><div class="col-12 col-sm-6"><q-input v-model="sheetForm.voltaje" outlined label="Voltaje" hint="Ej.: 220V" :readonly="!canManage"/></div><div class="col-12 col-sm-4"><q-input v-model.number="sheetForm.amperaje_nominal" type="number" step="0.01" outlined label="Amperaje nominal (A)" :readonly="!canManage"/></div><div class="col-12 col-sm-4"><q-input v-model.number="sheetForm.presion_succion_psi" type="number" step="0.01" outlined label="Presión succión (PSI)" :readonly="!canManage"/></div><div class="col-12 col-sm-4"><q-input v-model.number="sheetForm.presion_descarga_psi" type="number" step="0.01" outlined label="Presión descarga (PSI)" :readonly="!canManage"/></div><div class="col-12"><q-input v-model="sheetForm.observaciones_tecnicas" type="textarea" autogrow outlined label="Observaciones técnicas" :readonly="!canManage"/></div></div><q-banner v-if="!canManage" rounded class="bg-grey-2 text-grey-8">Tu rol puede consultar la ficha técnica, pero solo un propietario o administrador puede modificarla.</q-banner></q-card-section><q-card-actions align="right" class="q-pa-md"><q-btn flat label="Cerrar" no-caps v-close-popup/><q-btn v-if="canManage" color="primary" icon="save" label="Guardar ficha" no-caps :loading="saving" @click="saveSheet"/></q-card-actions></q-card></q-dialog>
   </q-page>
