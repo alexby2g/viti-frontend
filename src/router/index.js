@@ -3,8 +3,9 @@ import { createRouter, createWebHistory } from 'vue-router'
 import routes from './routes'
 import { useAuthStore } from '../stores/auth'
 import { useTenantStore } from '../stores/tenant'
-import MainLayout from '../layouts/MainLayout.vue'
-import AuthLayout from '../layouts/AuthLayout.vue'
+
+const AuthLayout = () => import('../layouts/AuthLayout.vue')
+const MainLayout = () => import('../layouts/MainLayout.vue')
 
 export default defineRouter(({ store }) => {
   const publicRoutes = [
@@ -48,8 +49,6 @@ export default defineRouter(({ store }) => {
     return { path:`${targetBase}/${tail || fallback}`, query:to.query, hash:to.hash }
   }
 
-  // Página dedicada para que las cuentas cliente puedan consultar su plan sin mezclarla
-  // con la vista de pagos. El backend ya expone /mi/plan dentro del espacio cliente.
   router.addRoute({
     path:'/mi-plan',
     component:MainLayout,
@@ -62,8 +61,6 @@ export default defineRouter(({ store }) => {
     }],
   })
 
-  // URLs comerciales limpias. Las rutas técnicas `electrofrio` siguen siendo las canónicas
-  // por compatibilidad con clientes existentes, Flutter y enlaces ya emitidos.
   router.addRoute({ path:'/apps/aires/:pathMatch(.*)*', redirect:to => redirectAlias(to, '/apps/electrofrio') })
   router.addRoute({ path:'/mi-apps/aires/:pathMatch(.*)*', redirect:to => redirectAlias(to, '/mi-apps/electrofrio') })
   router.addRoute({ path:'/portal/aires/:pathMatch(.*)*', redirect:to => redirectAlias(to, '/portal/electrofrio') })
@@ -77,8 +74,6 @@ export default defineRouter(({ store }) => {
   }
 
   router.beforeEach(async (to, from) => {
-    // La presentación, los planes y el primer acceso deben abrir incluso si el API está dormido,
-    // en mantenimiento o todavía no fue configurado. Son páginas públicas de producto.
     if (to.meta.publicLanding || ['viti-landing','viti-plans','viti-access'].includes(to.name)) return true
 
     const auth = useAuthStore(store)
@@ -96,9 +91,6 @@ export default defineRouter(({ store }) => {
       if (to.meta.clientOnly && auth.user?.rol !== 'cliente') return homeFor(auth.user)
       if (to.meta.electroCustomerOnly && auth.user?.rol !== 'cliente_negocio') return homeFor(auth.user)
 
-      // Para cuentas cliente resolvemos la empresa activa antes de montar la página.
-      // Así cualquier petición del componente ya lleva X-VITI-Empresa y el backend
-      // nunca tiene que adivinar entre dos negocios del mismo usuario.
       if (auth.user?.rol === 'cliente') {
         const tenant = useTenantStore(store)
         if (!tenant.loaded) {
@@ -106,7 +98,6 @@ export default defineRouter(({ store }) => {
         }
       }
 
-      // Cada tipo de cuenta permanece dentro de su propio espacio autenticado.
       if (auth.user?.rol === 'soporte' && !to.meta.supportOnly) return { name:'support-internal-home' }
       if (!to.meta.electroCustomerOnly && auth.user?.rol === 'cliente_negocio') return { name:'electro-customer-home' }
     }
