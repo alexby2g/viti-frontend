@@ -13,6 +13,10 @@ export default defineRouter(({ store }) => {
     return { path:`${targetBase}/${tail || fallback}`, query:to.query, hash:to.hash }
   }
 
+  // Presentación pública compartible de VITI. No exige cuenta ni sesión.
+  router.addRoute({ path:'/viti', name:'viti-landing', component:() => import('../pages/VitiLandingPage.vue') })
+  router.addRoute({ path:'/presentacion', redirect:'/viti' })
+
   // URLs comerciales limpias. Las rutas técnicas `electrofrio` siguen siendo las canónicas
   // por compatibilidad con clientes existentes, Flutter y enlaces ya emitidos.
   router.addRoute({ path:'/apps/aires/:pathMatch(.*)*', redirect:to => redirectAlias(to, '/apps/electrofrio') })
