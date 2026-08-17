@@ -29,5 +29,6 @@ check_page(){
 
 check_page "/mi-negocio" "Mi negocio" "Taller E2E" "VITI Inicial" "2 de 3 usados" "1 de 1 usados" "Equipo del negocio"
 check_page "/mi-aplicaciones" "Mis aplicaciones" "Electrofrío" "Taller E2E" "Aplicación activa"
+check_page "/mi-apps/electrofrio/clientes" "Clientes y atención" "Flujo rápido:" "Cliente E2E Aires"
 
-echo "Auth E2E OK: sesión, empresa activa, Feature Gate y aplicaciones renderizan en Chrome headless."
+echo "Auth E2E OK: sesión, empresa activa, Feature Gate, aplicaciones y Clientes del sistema de aires renderizan en Chrome headless."
