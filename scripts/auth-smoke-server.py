@@ -30,6 +30,27 @@ APP = {
     "suscripcion":{"estado":"activa","monto":89,"frecuencia":"mensual","fecha_vencimiento":"2026-09-13"},
     "ruta":"/mi-apps/electrofrio/inicio","es_externa":False,"url_externa":None,
 }
+AIR_STATE = {
+    "rol":"propietario",
+    "empresa":{"id":10,"nombre_comercial":"Taller E2E"},
+    "plan":{"id":1,"codigo":"basico-1800","nombre":"VITI Inicial","precio_proyecto":1800,"modulos":FEATURES["modulos"]},
+}
+AIR_CONFIG = {
+    "empresa":{"id":10,"nombre_comercial":"Taller E2E"},
+    "nombre_sistema":"Sistema de Gestión de Servicios de Aire Acondicionado",
+    "nombre_corto":"Aires Acondicionados",
+    "logo_url":None,
+    "color_primario":"#0B5F7A",
+    "color_secundario":"#12B8C8",
+    "moneda":"BOB",
+    "garantia_dias_default":30,
+    "tipos_servicio":["Diagnóstico","Mantenimiento preventivo","Reparación"],
+    "tipos_equipo":["Aire acondicionado Split","Aire acondicionado Cassette"],
+    "metodos_pago":["qr","efectivo"],
+}
+AIR_CLIENTS = [
+    {"id":501,"empresa_id":10,"nombre":"Cliente E2E Aires","telefono":"70000001","direccion":"Av. E2E 123","referencia":"Frente a la plaza","observaciones":"Cliente de prueba","activo":True,"acceso_usuario_id":None,"acceso_estado":None},
+]
 
 class Handler(BaseHTTPRequestHandler):
     def log_message(self,*args): pass
@@ -54,6 +75,9 @@ class Handler(BaseHTTPRequestHandler):
         if path=="/api/v1/mi/negocio": return self.send_json({"data":{"empresa":BUSINESS,"rol":"propietario","puede_administrar":True,"features":FEATURES}})
         if path=="/api/v1/mi/negocio/equipo": return self.send_json({"data":[{"id":77,"nombre":"Cliente E2E","apellido":"VITI","usuario":"cliente_e2e","documento":"12345678","estado":"activo","rol_negocio":"propietario","permisos":[],"activo":True}]})
         if path=="/api/v1/mi/aplicaciones": return self.send_json({"data":[APP],"negocio":{"id":10,"nombre_comercial":"Taller E2E"}})
+        if path=="/api/v1/mi/apps/electrofrio/estado": return self.send_json({"data":AIR_STATE})
+        if path=="/api/v1/mi/apps/electrofrio/configuracion": return self.send_json({"data":AIR_CONFIG})
+        if path=="/api/v1/mi/apps/electrofrio/clientes": return self.send_json({"data":AIR_CLIENTS})
         if path=="/api/v1/notificaciones/buzon": return self.send_json({"data":[],"no_leidas":0})
         if path.startswith("/assets/"):
             file=ROOT/path.lstrip("/")

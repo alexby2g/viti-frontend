@@ -65,7 +65,7 @@ const columns = [
 ]
 
 function emptyEquipment(){ return {tipo:'Aire acondicionado Split',marca:'',modelo:'',serie:'',capacidad:'',ubicacion:'',observaciones:'',activo:true} }
-function emptyAppointment(){ return {equipo_id:null,tipo_servicio:'Diagnóstico',fecha_cita:todayValue(),hora_cita:'09:00',direccion_servicio:'',referencia_ubicacion:'',problema_reportado:'',prioridad:'normal'} }
+function emptyAppointment(){ return {equipo_id:null,tipo_servicio:'Diagnóstico',fecha_cita:new Date().toISOString().slice(0,10),hora_cita:'09:00',direccion_servicio:'',referencia_ubicacion:'',problema_reportado:'',prioridad:'normal'} }
 function clean(source){ return Object.fromEntries(Object.entries(source).map(([key,value])=>[key,value===''?null:value])) }
 function equipmentLabel(row){ return [row.tipo||row.equipo_tipo,row.marca||row.equipo_marca,row.modelo||row.equipo_modelo].filter(Boolean).join(' · ') || 'Equipo' }
 function date(value){ return value ? new Date(`${String(value).slice(0,10)}T12:00:00`).toLocaleDateString('es-BO') : '—' }
