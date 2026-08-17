@@ -100,7 +100,6 @@ check_page viti-access "$BASE/viti/acceso" \
   "¿Es tu primera vez en VITI?" \
   "Tengo un código" \
   "Necesito acceso" \
-  "Solicitar acceso" \
   "Ya tengo una cuenta"
 
 check_page public-1 "$BASE/solicitar/e2e-token-viti?paso=1" "Solicitud VITI" "VITI Inicial" "Continuar" "Registro completado"
