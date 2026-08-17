@@ -9,6 +9,8 @@ const route = useRoute()
 const canManageSource = inject('electrofrioCanManage', ref(false))
 const loading = ref(false)
 const saving = ref(false)
+const uploadingLogo = ref(false)
+const logoFile = ref(null)
 const config = inject('airSystemConfig', ref(null))
 const canManage = computed(() => Boolean(canManageSource?.value ?? canManageSource))
 const clientMode = computed(() => route.path.startsWith('/mi-apps/electrofrio'))
@@ -53,6 +55,34 @@ async function load(){
 }
 
 function cleanList(values){ return [...new Set((values || []).map(v => String(v || '').trim()).filter(Boolean))] }
+function notifyError(error, fallback){
+  const errors = error.response?.data?.errors
+  const first = errors ? Object.values(errors).flat()[0] : null
+  $q.notify({type:'negative',message:first || error.response?.data?.message || fallback})
+}
+
+async function uploadLogo(){
+  if (!canManage.value || !logoFile.value) {
+    $q.notify({type:'warning',message:'Selecciona una imagen para el logotipo.'})
+    return
+  }
+  if (Number(logoFile.value.size || 0) > 3 * 1024 * 1024) {
+    $q.notify({type:'warning',message:'El logotipo no puede superar 3 MB.'})
+    return
+  }
+  uploadingLogo.value = true
+  try{
+    const body = new FormData()
+    body.append('logo', logoFile.value)
+    const response = await api.post(`${base.value}/configuracion/logo`, body)
+    config.value = response.data.data
+    apply(config.value)
+    logoFile.value = null
+    $q.notify({type:'positive',message:response.data.message || 'Logotipo actualizado.'})
+  }catch(error){
+    notifyError(error,'No se pudo subir el logotipo.')
+  }finally{ uploadingLogo.value = false }
+}
 
 async function save(){
   if (!canManage.value) return
@@ -81,9 +111,7 @@ async function save(){
     apply(config.value)
     $q.notify({type:'positive',message:response.data.message || 'Configuración guardada.'})
   }catch(error){
-    const errors = error.response?.data?.errors
-    const first = errors ? Object.values(errors).flat()[0] : null
-    $q.notify({type:'negative',message:first || error.response?.data?.message || 'No se pudo guardar la configuración.'})
+    notifyError(error,'No se pudo guardar la configuración.')
   }finally{ saving.value = false }
 }
 
@@ -122,7 +150,14 @@ onMounted(load)
           <q-card-section class="row q-col-gutter-md">
             <div class="col-12"><q-input v-model="form.nombre_sistema" outlined label="Nombre completo del sistema" :readonly="!canManage"/></div>
             <div class="col-12 col-md-6"><q-input v-model="form.nombre_corto" outlined label="Nombre corto" :readonly="!canManage"/></div>
-            <div class="col-12 col-md-6"><q-input v-model="form.logo_url" outlined label="URL del logo" hint="Opcional. Puede ser una imagen HTTPS." :readonly="!canManage"/></div>
+            <div class="col-12 col-md-6">
+              <q-file v-model="logoFile" outlined accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp" label="Subir logotipo" :disable="!canManage" clearable>
+                <template #prepend><q-icon name="image"/></template>
+                <template #append><q-btn v-if="logoFile&&canManage" flat dense round color="primary" icon="cloud_upload" :loading="uploadingLogo" @click.stop="uploadLogo"><q-tooltip>Subir logotipo</q-tooltip></q-btn></template>
+              </q-file>
+              <div class="text-caption text-grey-7 q-mt-xs">JPG, PNG o WEBP · máximo 3 MB. Reemplaza automáticamente el logo anterior.</div>
+            </div>
+            <div class="col-12"><q-input v-model="form.logo_url" outlined label="URL alternativa del logo" hint="Opcional. Úsala solo si el logo está alojado externamente." :readonly="!canManage"/></div>
             <div class="col-12 col-md-4"><q-input v-model="form.telefono" outlined label="Teléfono" :readonly="!canManage"/></div>
             <div class="col-12 col-md-8"><q-input v-model="form.correo" outlined type="email" label="Correo" :readonly="!canManage"/></div>
             <div class="col-12"><q-input v-model="form.direccion" outlined label="Dirección" :readonly="!canManage"/></div>
@@ -133,7 +168,7 @@ onMounted(load)
         </q-card>
 
         <q-card flat bordered class="config-card">
-          <q-card-section class="row items-center"><div><div class="text-h6 text-weight-bold">Configuración operativa</div><div class="text-caption text-grey-7">Estas listas alimentarán los formularios del sistema.</div></div><q-space/><q-btn v-if="canManage" flat color="primary" icon="restart_alt" label="Restaurar listas base" no-caps @click="resetLists"/></q-card-section>
+          <q-card-section class="row items-center"><div><div class="text-h6 text-weight-bold">Configuración operativa</div><div class="text-caption text-grey-7">Estas listas alimentan los formularios del sistema.</div></div><q-space/><q-btn v-if="canManage" flat color="primary" icon="restart_alt" label="Restaurar listas base" no-caps @click="resetLists"/></q-card-section>
           <q-separator/>
           <q-card-section class="q-gutter-lg">
             <q-select v-model="form.tipos_servicio" outlined multiple use-input use-chips new-value-mode="add-unique" hide-dropdown-icon label="Tipos de servicio" hint="Escribe un servicio y presiona Enter" :readonly="!canManage"/>
