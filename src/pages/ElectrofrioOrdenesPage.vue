@@ -1,11 +1,12 @@
 <script setup>
-import { computed, inject, onMounted, reactive, ref } from 'vue'
+import { computed, inject, onMounted, reactive, ref, watch } from 'vue'
 import { useQuasar } from 'quasar'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { api } from '../boot/axios'
 
 const $q = useQuasar()
 const route = useRoute()
+const router = useRouter()
 const modules = inject('electrofrioModules', ref([]))
 const airConfig = inject('airSystemConfig', ref(null))
 
@@ -28,6 +29,7 @@ const correctionDialog = ref(false)
 const activeTab = ref('resumen')
 const editingId = ref(null)
 const evidenceFile = ref(null)
+const focusStates = ref([])
 
 const clientMode = computed(() => route.path.startsWith('/mi-apps/'))
 const base = computed(() => clientMode.value ? '/mi/apps/electrofrio' : '/apps/electrofrio')
@@ -59,7 +61,9 @@ const stateOptions = computed(() => stateCatalog.value.map(item => ({label:item.
 const visibleRows = computed(() => {
   const term = filters.buscar.trim().toLowerCase()
   return rows.value.filter(row => {
-    if (filters.estado && currentState(row) !== filters.estado) return false
+    const state = currentState(row)
+    if (focusStates.value.length && !focusStates.value.includes(state)) return false
+    if (filters.estado && state !== filters.estado) return false
     if (!term) return true
     return [row.codigo,row.cliente_nombre,row.cliente_telefono,row.tipo_servicio,row.equipo_tipo,row.equipo_marca,row.equipo_modelo,row.tecnico_nombre,row.problema_reportado]
       .filter(Boolean).join(' ').toLowerCase().includes(term)
@@ -77,6 +81,13 @@ const selectedMaterials = computed(() => selected.value?.materiales || [])
 const selectedPayments = computed(() => selected.value?.pagos || [])
 const selectedEvidence = computed(() => selected.value?.evidencias || [])
 const isClosed = computed(() => ['finalizado','no_aprobado','cancelado'].includes(currentState(selected.value || {})))
+const nextActions = computed(() => (flowMeta.value.siguientes || []).filter(next => {
+  const balance = Number(flowMeta.value.saldo || 0)
+  if (next.value === 'pendiente_pago') return balance > 0.001
+  if (next.value === 'finalizado' && hasModule('pagos')) return balance <= 0.001
+  return true
+}))
+const focusLabel = computed(() => focusStates.value.map(value => stateMeta(value).label).join(' · '))
 
 function emptyOrder(){
   return {
@@ -144,8 +155,12 @@ async function saveForm(){
   }catch(error){notifyError(error,'No se pudo guardar el servicio.')}finally{saving.value=false}
 }
 
-async function openService(row){
+async function openService(row,syncUrl=true){
+  if(!row?.id)return
   serviceDialog.value=true; activeTab.value='resumen'; selected.value=row
+  if(syncUrl && String(route.query.servicio||'')!==String(row.id)){
+    await router.replace({query:{...route.query,servicio:String(row.id)}})
+  }
   await refreshService(row.id)
 }
 async function refreshService(id=selected.value?.id){
@@ -217,15 +232,16 @@ async function removeMaterial(item){
 }
 function openPayment(){
   const remaining=Number(flowMeta.value.saldo??selected.value?.saldo??0)
-  Object.assign(paymentForm,{tipo:selectedPayments.value.length?'abono':'anticipo',monto:remaining>0?remaining:null,metodo:paymentMethods.value[0]||'efectivo',referencia:'',notas:''});paymentDialog.value=true
+  const fullBalance=remaining>0?remaining:null
+  Object.assign(paymentForm,{tipo:selectedPayments.value.length?'saldo':'anticipo',monto:fullBalance,metodo:paymentMethods.value[0]||'efectivo',referencia:'',notas:''});paymentDialog.value=true
 }
 async function savePayment(){
   if(!selected.value||Number(paymentForm.monto)<=0)return
   saving.value=true
   try{
     const key=globalThis.crypto?.randomUUID?.()||`${Date.now()}-${Math.random().toString(36).slice(2)}-viti-payment`
-    await api.post(`${base.value}/ordenes/${selected.value.id}/pagos-operativos`,{...paymentForm,monto:Number(paymentForm.monto),idempotency_key:key})
-    paymentDialog.value=false;await refreshService();$q.notify({type:'positive',message:'Pago registrado.'})
+    const response=await api.post(`${base.value}/ordenes/${selected.value.id}/pagos-operativos`,{...paymentForm,monto:Number(paymentForm.monto),idempotency_key:key})
+    paymentDialog.value=false;await refreshService();await loadAll();$q.notify({type:'positive',message:response.data?.message||'Pago registrado.'})
   }catch(error){notifyError(error,'No se pudo registrar el pago.')}finally{saving.value=false}
 }
 function openEvidence(){ evidenceFile.value=null;Object.assign(evidenceForm,{categoria:currentState(selected.value)==='servicio_en_proceso'?'durante':'antes',descripcion:''});evidenceDialog.value=true }
@@ -245,8 +261,35 @@ async function downloadPdf(){
   try{const response=await api.get(`${base.value}/ordenes/${selected.value.id}/pdf`,{responseType:'blob'});saveBlob(response.data,`${selected.value.codigo}-servicio.pdf`)}catch(error){notifyError(error,'No se pudo generar el PDF.')}
 }
 function saveBlob(blob,filename){const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=filename;document.body.appendChild(a);a.click();a.remove();URL.revokeObjectURL(url)}
+async function copyServiceLink(){
+  try{await navigator.clipboard.writeText(window.location.href);$q.notify({type:'positive',message:'Enlace del servicio copiado.'})}catch{$q.notify({type:'warning',message:'No se pudo copiar el enlace automáticamente.'})}
+}
+function clearFocus(){
+  focusStates.value=[]
+  const query={...route.query};delete query.estados
+  router.replace({query})
+}
+function selectState(value){focusStates.value=[];filters.estado=filters.estado===value?null:value}
+function applyRouteContext(){
+  const valid=new Set(stateCatalog.value.map(item=>item.value))
+  const raw=String(route.query.estados||'')
+  focusStates.value=raw.split(',').map(item=>item.trim()).filter(item=>valid.has(item))
+  const single=String(route.query.estado||'')
+  if(single&&valid.has(single))filters.estado=single
+  const id=Number(route.query.servicio||0)
+  if(id>0&&(!serviceDialog.value||Number(selected.value?.id)!==id)){
+    const row=rows.value.find(item=>Number(item.id)===id)
+    if(row)openService(row,false)
+  }
+}
+function clearServiceFromUrl(){
+  if(!route.query.servicio)return
+  const query={...route.query};delete query.servicio
+  router.replace({query})
+}
 
-onMounted(loadAll)
+onMounted(async()=>{await loadAll();applyRouteContext()})
+watch(()=>route.query,()=>{if(!loading.value)applyRouteContext()},{deep:true})
 </script>
 
 <template>
@@ -263,8 +306,14 @@ onMounted(loadAll)
       </div>
     </div>
 
+    <q-banner v-if="focusStates.length" rounded class="focus-banner q-mb-md">
+      <template #avatar><q-icon name="filter_alt" color="primary"/></template>
+      Vista enfocada en: <strong>{{focusLabel}}</strong>
+      <template #action><q-btn flat color="primary" label="Ver todos" no-caps @click="clearFocus"/></template>
+    </q-banner>
+
     <div class="status-strip q-mb-lg">
-      <q-chip v-for="state in stateCatalog.filter(s=>(stateSummary[s.value]||0)>0)" :key="state.value" clickable :color="filters.estado===state.value?state.color:'grey-2'" :text-color="filters.estado===state.value?'white':'grey-8'" :icon="state.icon" @click="filters.estado=filters.estado===state.value?null:state.value">
+      <q-chip v-for="state in stateCatalog.filter(s=>(stateSummary[s.value]||0)>0)" :key="state.value" clickable :color="filters.estado===state.value?state.color:'grey-2'" :text-color="filters.estado===state.value?'white':'grey-8'" :icon="state.icon" @click="selectState(state.value)">
         {{state.label}} · {{stateSummary[state.value]||0}}
       </q-chip>
     </div>
@@ -272,7 +321,7 @@ onMounted(loadAll)
     <q-card flat bordered class="filters-card q-mb-lg">
       <q-card-section class="row q-col-gutter-md items-center">
         <div class="col-12 col-md"><q-input v-model="filters.buscar" outlined dense clearable label="Buscar cliente, equipo, técnico o servicio"><template #prepend><q-icon name="search"/></template></q-input></div>
-        <div class="col-12 col-md-4"><q-select v-model="filters.estado" outlined dense clearable emit-value map-options :options="stateOptions" label="Estado actual"/></div>
+        <div class="col-12 col-md-4"><q-select v-model="filters.estado" outlined dense clearable emit-value map-options :options="stateOptions" label="Estado actual" @update:model-value="focusStates=[]"/></div>
         <div class="col-auto"><q-badge color="primary" :label="`${visibleRows.length} servicio(s)`"/></div>
       </q-card-section>
     </q-card>
@@ -316,19 +365,19 @@ onMounted(loadAll)
       </q-card>
     </q-dialog>
 
-    <q-dialog v-model="serviceDialog" :maximized="$q.screen.lt.md">
+    <q-dialog v-model="serviceDialog" :maximized="$q.screen.lt.md" @hide="clearServiceFromUrl">
       <q-card v-if="selected" class="service-dialog">
         <q-card-section class="service-header">
           <div class="row items-start q-col-gutter-md">
             <div class="col"><div class="text-overline">{{selected.codigo}}</div><div class="text-h5 text-weight-bold">{{selected.cliente_nombre}}</div><div class="text-caption">{{equipmentLabel(selected)}} · {{selected.tipo_servicio||'Servicio técnico'}}</div></div>
             <div class="col-auto text-right"><q-badge :color="stateMeta(currentState(selected)).color" :label="stateMeta(currentState(selected)).label" class="text-body2 q-pa-sm"/><div class="text-caption q-mt-xs">Actualizado {{dateTime(selected.estado_actualizado_at||selected.updated_at)}}</div></div>
-            <div class="col-auto"><q-btn flat round icon="close" color="white" v-close-popup/></div>
+            <div class="col-auto row q-gutter-xs"><q-btn flat round icon="link" color="white" @click="copyServiceLink"><q-tooltip>Copiar enlace</q-tooltip></q-btn><q-btn flat round icon="close" color="white" v-close-popup/></div>
           </div>
         </q-card-section>
 
         <q-card-section class="next-actions">
           <div class="row items-center q-col-gutter-sm">
-            <div class="col-12 col-md"><div class="text-caption text-grey-7">Siguiente paso</div><div class="row q-gutter-sm q-mt-xs"><q-btn v-for="next in flowMeta.siguientes||[]" :key="next.value" :color="next.color" :icon="next.icon" :label="next.label" no-caps :loading="saving" @click="changeState(next.value)"/></div><div v-if="!(flowMeta.siguientes||[]).length" class="text-weight-medium q-mt-xs">Este flujo ya no tiene pasos pendientes.</div></div>
+            <div class="col-12 col-md"><div class="text-caption text-grey-7">Siguiente paso</div><div class="row q-gutter-sm q-mt-xs"><q-btn v-for="next in nextActions" :key="next.value" :color="next.color" :icon="next.icon" :label="next.label" no-caps :loading="saving" @click="changeState(next.value)"/></div><div v-if="!nextActions.length" class="text-weight-medium q-mt-xs">Este flujo ya no tiene pasos pendientes.</div></div>
             <div class="col-auto row q-gutter-xs"><q-btn outline color="primary" icon="edit" label="Datos" no-caps :disable="isClosed" @click="openEdit"/><q-btn outline color="negative" icon="picture_as_pdf" label="PDF" no-caps @click="downloadPdf"/><q-btn v-if="flowMeta.puede_corregir" flat color="grey-7" icon="history" label="Corregir estado" no-caps @click="openCorrection"/></div>
           </div>
         </q-card-section>
@@ -359,11 +408,11 @@ onMounted(loadAll)
 
           <div v-else-if="activeTab==='materiales'" class="section-editor"><div class="row items-center"><div><div class="text-h6 text-weight-bold">Materiales utilizados</div><div class="text-caption text-grey-7">El stock se descuenta automáticamente.</div></div></div><div v-if="!isClosed" class="row q-col-gutter-md"><div class="col-12 col-md-7"><q-select v-model="materialForm.material_id" outlined emit-value map-options :options="materiales.filter(x=>x.activo).map(x=>({label:`${x.nombre} · stock ${x.stock} ${x.unidad}`,value:x.id}))" label="Material"/></div><div class="col-6 col-md-3"><q-input v-model.number="materialForm.cantidad" outlined type="number" min="0.01" step="0.01" label="Cantidad"/></div><div class="col-6 col-md-2"><q-btn color="primary" label="Agregar" no-caps class="full-width full-height" :loading="saving" @click="addMaterial"/></div></div><q-list v-if="selectedMaterials.length" bordered separator class="rounded-borders"><q-item v-for="item in selectedMaterials" :key="item.id"><q-item-section><q-item-label>{{item.material_nombre}}</q-item-label><q-item-label caption>{{item.cantidad}} {{item.material_unidad}} · {{money(item.subtotal)}}</q-item-label></q-item-section><q-item-section v-if="!isClosed" side><q-btn flat round dense color="negative" icon="delete_outline" @click="removeMaterial(item)"/></q-item-section></q-item></q-list><q-banner v-else rounded class="bg-grey-2 text-grey-7">No se registraron materiales en este servicio.</q-banner></div>
 
-          <div v-else-if="activeTab==='pagos'" class="section-editor"><div class="row items-center"><div><div class="text-h6 text-weight-bold">Pagos</div><div class="text-caption text-grey-7">Anticipo, abonos y saldo vinculados a esta atención.</div></div><q-space/><q-btn v-if="Number(selected.saldo)>0&&!isClosed" color="primary" icon="add" label="Registrar pago" no-caps @click="openPayment"/></div><q-list v-if="selectedPayments.length" bordered separator class="rounded-borders"><q-item v-for="item in selectedPayments" :key="item.id"><q-item-section avatar><q-avatar color="green-1" text-color="positive" icon="payments"/></q-item-section><q-item-section><q-item-label class="text-weight-bold">{{money(item.monto)}} · {{pretty(item.tipo)}}</q-item-label><q-item-label caption>{{pretty(item.metodo)}} · {{dateTime(item.pagado_at)}}<span v-if="item.referencia"> · Ref. {{item.referencia}}</span></q-item-label></q-item-section></q-item></q-list><q-banner v-else rounded class="bg-grey-2 text-grey-7">Todavía no hay pagos registrados.</q-banner></div>
+          <div v-else-if="activeTab==='pagos'" class="section-editor"><div class="row items-center"><div><div class="text-h6 text-weight-bold">Pagos</div><div class="text-caption text-grey-7">Anticipo, abonos y saldo vinculados a esta atención. Si el servicio terminó y el saldo llega a cero, se finaliza automáticamente.</div></div><q-space/><q-btn v-if="Number(selected.saldo)>0&&!isClosed" color="primary" icon="add" label="Registrar pago" no-caps @click="openPayment"/></div><q-list v-if="selectedPayments.length" bordered separator class="rounded-borders"><q-item v-for="item in selectedPayments" :key="item.id"><q-item-section avatar><q-avatar color="green-1" text-color="positive" icon="payments"/></q-item-section><q-item-section><q-item-label class="text-weight-bold">{{money(item.monto)}} · {{pretty(item.tipo)}}</q-item-label><q-item-label caption>{{pretty(item.metodo)}} · {{dateTime(item.pagado_at)}}<span v-if="item.referencia"> · Ref. {{item.referencia}}</span></q-item-label></q-item-section></q-item></q-list><q-banner v-else rounded class="bg-grey-2 text-grey-7">Todavía no hay pagos registrados.</q-banner></div>
 
           <div v-else-if="activeTab==='evidencias'" class="section-editor"><div class="row items-center"><div><div class="text-h6 text-weight-bold">Evidencias y documentos</div><div class="text-caption text-grey-7">Fotos antes, durante y después; documentos y comprobantes.</div></div><q-space/><q-btn v-if="!isClosed" color="primary" outline icon="add_photo_alternate" label="Agregar" no-caps @click="openEvidence"/></div><div class="evidence-grid"><q-card v-for="item in selectedEvidence" :key="item.id" flat bordered class="evidence-card"><q-card-section><q-icon :name="item.mime==='application/pdf'?'picture_as_pdf':'image'" color="primary" size="28px"/><div class="text-weight-bold ellipsis q-mt-sm">{{item.nombre_original}}</div><div class="text-caption text-grey-7">{{pretty(item.categoria)}}</div></q-card-section><q-card-actions><q-btn flat color="primary" icon="download" label="Descargar" no-caps @click="downloadEvidence(item)"/></q-card-actions></q-card></div><q-banner v-if="!selectedEvidence.length" rounded class="bg-grey-2 text-grey-7">No hay evidencias adjuntas.</q-banner></div>
 
-          <div v-else-if="activeTab==='historial'" class="history-panel"><div class="text-h6 text-weight-bold">Historial de estados</div><div class="text-caption text-grey-7 q-mb-lg">Nada se borra: cada avance o corrección conserva fecha, usuario y observación.</div><q-timeline color="primary" layout="comfortable"><q-timeline-entry v-for="item in history" :key="item.id" :title="item.estado_label" :subtitle="dateTime(item.cambiado_at)" :icon="stateMeta(item.estado).icon" :color="item.tipo_cambio==='correccion'?'orange':stateMeta(item.estado).color"><div><span v-if="item.estado_anterior_label" class="text-caption text-grey-7">Desde {{item.estado_anterior_label}}</span><div v-if="item.observacion" class="q-mt-xs">{{item.observacion}}</div><div class="text-caption text-grey-7 q-mt-xs">{{[item.cambiado_por_nombre,item.cambiado_por_apellido].filter(Boolean).join(' ')||'Sistema'}} · {{pretty(item.tipo_cambio)}}</div></div></q-timeline-entry></q-timeline></div>
+          <div v-else-if="activeTab==='historial'" class="history-panel"><div class="text-h6 text-weight-bold">Historial de estados</div><div class="text-caption text-grey-7 q-mb-lg">Nada se borra: cada avance, corrección o cambio automático conserva fecha, usuario y observación.</div><q-timeline color="primary" layout="comfortable"><q-timeline-entry v-for="item in history" :key="item.id" :title="item.estado_label" :subtitle="dateTime(item.cambiado_at)" :icon="stateMeta(item.estado).icon" :color="item.tipo_cambio==='correccion'?'orange':stateMeta(item.estado).color"><div><span v-if="item.estado_anterior_label" class="text-caption text-grey-7">Desde {{item.estado_anterior_label}}</span><div v-if="item.observacion" class="q-mt-xs">{{item.observacion}}</div><div class="text-caption text-grey-7 q-mt-xs">{{[item.cambiado_por_nombre,item.cambiado_por_apellido].filter(Boolean).join(' ')||'Sistema'}} · {{pretty(item.tipo_cambio)}}</div></div></q-timeline-entry></q-timeline></div>
         </q-card-section>
       </q-card>
     </q-dialog>
@@ -377,5 +426,5 @@ onMounted(loadAll)
 </template>
 
 <style scoped>
-.services-page{max-width:1550px;margin:0 auto}.services-page h1{color:var(--viti-text)}.status-strip{display:flex;gap:6px;overflow:auto;padding-bottom:4px}.filters-card,.service-row,.inner-card{border-radius:16px}.service-list{display:grid;gap:10px}.service-row{transition:transform .15s ease,box-shadow .15s ease}.service-row:hover{transform:translateY(-1px);box-shadow:0 8px 22px rgba(20,55,87,.08)}.form-dialog{width:820px;max-width:96vw}.form-scroll{max-height:70vh;overflow:auto}.service-dialog{width:1220px;max-width:98vw;max-height:96vh}.service-header{background:linear-gradient(135deg,var(--electro-primary),var(--electro-secondary));color:#fff}.service-header .text-caption{color:rgba(255,255,255,.8)}.next-actions{background:color-mix(in srgb,var(--electro-primary) 5%,var(--viti-card))}.service-tabs{overflow:auto}.tab-content{min-height:420px;max-height:62vh;overflow:auto}.section-editor{max-width:850px;display:grid;gap:16px}.detail-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}.detail-grid>div{display:flex;flex-direction:column;gap:4px}.detail-grid span{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--viti-muted);font-weight:700}.detail-grid .span-2{grid-column:1/-1}.amount-row{display:flex;justify-content:space-between;gap:20px;padding:10px 0;border-bottom:1px solid var(--viti-border)}.evidence-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:12px}.evidence-card{border-radius:14px}.history-panel{max-width:900px}.rounded-borders{border-radius:14px}@media(max-width:700px){.services-page{padding:12px}.services-page h1{font-size:26px}.service-dialog{width:100%;max-width:100%;max-height:none}.tab-content{max-height:none}.detail-grid{grid-template-columns:1fr}.detail-grid .span-2{grid-column:auto}}
+.services-page{max-width:1550px;margin:0 auto}.services-page h1{color:var(--viti-text)}.focus-banner{background:color-mix(in srgb,var(--electro-primary) 7%,var(--viti-card));color:var(--viti-text);border:1px solid var(--viti-border)}.status-strip{display:flex;gap:6px;overflow:auto;padding-bottom:4px}.filters-card,.service-row,.inner-card{border-radius:16px}.service-list{display:grid;gap:10px}.service-row{transition:transform .15s ease,box-shadow .15s ease}.service-row:hover{transform:translateY(-1px);box-shadow:0 8px 22px rgba(20,55,87,.08)}.form-dialog{width:820px;max-width:96vw}.form-scroll{max-height:70vh;overflow:auto}.service-dialog{width:1220px;max-width:98vw;max-height:96vh}.service-header{background:linear-gradient(135deg,var(--electro-primary),var(--electro-secondary));color:#fff}.service-header .text-caption{color:rgba(255,255,255,.8)}.next-actions{background:color-mix(in srgb,var(--electro-primary) 5%,var(--viti-card))}.service-tabs{overflow:auto}.tab-content{min-height:420px;max-height:62vh;overflow:auto}.section-editor{max-width:850px;display:grid;gap:16px}.detail-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}.detail-grid>div{display:flex;flex-direction:column;gap:4px}.detail-grid span{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--viti-muted);font-weight:700}.detail-grid .span-2{grid-column:1/-1}.amount-row{display:flex;justify-content:space-between;gap:20px;padding:10px 0;border-bottom:1px solid var(--viti-border)}.evidence-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:12px}.evidence-card{border-radius:14px}.history-panel{max-width:900px}.rounded-borders{border-radius:14px}@media(max-width:700px){.services-page{padding:12px}.services-page h1{font-size:26px}.service-dialog{width:100%;max-width:100%;max-height:none}.tab-content{max-height:none}.detail-grid{grid-template-columns:1fr}.detail-grid .span-2{grid-column:auto}}
 </style>
