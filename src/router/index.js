@@ -4,12 +4,28 @@ import routes from './routes'
 import { useAuthStore } from '../stores/auth'
 import { useTenantStore } from '../stores/tenant'
 import MainLayout from '../layouts/MainLayout.vue'
+import AuthLayout from '../layouts/AuthLayout.vue'
 
 export default defineRouter(({ store }) => {
   const publicRoutes = [
-    { path:'/viti', name:'viti-landing', component:() => import('../pages/VitiLandingPage.vue'), meta:{publicLanding:true} },
-    { path:'/viti/planes', name:'viti-plans', component:() => import('../pages/VitiPlansPage.vue'), meta:{publicLanding:true} },
-    { path:'/viti/acceso', name:'viti-access', component:() => import('../pages/VitiAccessPage.vue'), meta:{publicLanding:true} },
+    {
+      path:'/viti',
+      component:AuthLayout,
+      children:[{ path:'', name:'viti-landing', component:() => import('../pages/VitiLandingPage.vue'), meta:{publicLanding:true} }],
+      meta:{publicLanding:true},
+    },
+    {
+      path:'/viti/planes',
+      component:AuthLayout,
+      children:[{ path:'', name:'viti-plans', component:() => import('../pages/VitiPlansPage.vue'), meta:{publicLanding:true} }],
+      meta:{publicLanding:true},
+    },
+    {
+      path:'/viti/acceso',
+      component:AuthLayout,
+      children:[{ path:'', name:'viti-access', component:() => import('../pages/VitiAccessPage.vue'), meta:{publicLanding:true} }],
+      meta:{publicLanding:true},
+    },
     { path:'/planes', redirect:'/viti/planes', meta:{publicLanding:true} },
     { path:'/acceso', redirect:'/viti/acceso', meta:{publicLanding:true} },
     { path:'/presentacion', redirect:'/viti', meta:{publicLanding:true} },
