@@ -1,13 +1,26 @@
 <script setup>
-import { reactive, ref } from 'vue'
+import { onMounted, reactive, ref } from 'vue'
 import { useQuasar } from 'quasar'
+import { useRoute } from 'vue-router'
 import { api } from '../boot/axios'
 import AppBrand from '../components/AppBrand.vue'
 
 const $q = useQuasar()
+const route = useRoute()
 const mode = ref('code')
 const loading = ref(false)
 const sent = ref(false)
+
+const planCatalog = {
+  'basico-1800': { name:'VITI Inicial', monthly:89, annual:890 },
+  'profesional-1950': { name:'VITI Profesional', monthly:129, annual:1290 },
+  'empresa-2500': { name:'VITI Empresa', monthly:189, annual:1890 },
+  'personalizado': { name:'Cotización personalizada', monthly:null, annual:null },
+}
+
+const selectedPlanCode = ref(typeof route.query.plan === 'string' && planCatalog[route.query.plan] ? route.query.plan : '')
+const selectedBilling = ref(route.query.modalidad === 'anual' ? 'anual' : 'mensual')
+const selectedPlan = () => selectedPlanCode.value ? planCatalog[selectedPlanCode.value] : null
 
 const codeForm = reactive({ codigo: '' })
 const requestForm = reactive({
@@ -16,6 +29,8 @@ const requestForm = reactive({
   whatsapp: '',
   negocio: '',
   actividad: '',
+  plan_codigo: selectedPlanCode.value,
+  modalidad: selectedPlanCode.value ? selectedBilling.value : null,
   mensaje: '',
 })
 
@@ -60,6 +75,21 @@ async function requestAccess() {
     loading.value = false
   }
 }
+
+function clearSelectedPlan() {
+  selectedPlanCode.value = ''
+  requestForm.plan_codigo = null
+  requestForm.modalidad = null
+}
+
+function restart() {
+  sent.value = false
+  mode.value = 'code'
+}
+
+onMounted(() => {
+  if (selectedPlanCode.value) mode.value = 'request'
+})
 </script>
 
 <template>
@@ -72,6 +102,17 @@ async function requestAccess() {
       <p class="text-body1 text-grey-7 q-mb-xl">
         Si AGR Studio ya te envió un acceso, puedes usar tu código. Si todavía no tienes uno, puedes solicitarlo sin crear una cuenta todavía.
       </p>
+
+      <q-banner v-if="selectedPlan()" rounded class="selected-plan q-mb-lg">
+        <template #avatar><q-icon name="workspace_premium" color="primary" /></template>
+        <div class="row items-center no-wrap q-gutter-sm">
+          <div class="col">
+            <div class="text-weight-bold">Solicitud para {{ selectedPlan().name }}</div>
+            <div class="text-caption">Preferencia {{ selectedBilling }} · La contratación final se valida durante el análisis de tu necesidad.</div>
+          </div>
+          <q-btn flat dense no-caps color="primary" label="Cambiar" @click="clearSelectedPlan" />
+        </div>
+      </q-banner>
 
       <q-btn-toggle
         v-model="mode"
@@ -110,17 +151,7 @@ async function requestAccess() {
             <template #prepend><q-icon name="key" /></template>
           </q-input>
 
-          <q-btn
-            color="primary"
-            unelevated
-            no-caps
-            size="lg"
-            class="full-width q-mt-md"
-            icon="arrow_forward"
-            label="Continuar con mi código"
-            :loading="loading"
-            @click="useCode"
-          />
+          <q-btn color="primary" unelevated no-caps size="lg" class="full-width q-mt-md" icon="arrow_forward" label="Continuar con mi código" :loading="loading" @click="useCode" />
         </q-card-section>
       </q-card>
 
@@ -142,6 +173,13 @@ async function requestAccess() {
             </div>
             <q-input v-model="requestForm.negocio" outlined label="Nombre del negocio" class="q-mt-sm" />
             <q-input v-model="requestForm.actividad" outlined label="¿A qué se dedica tu negocio?" class="q-mt-sm" />
+
+            <q-banner v-if="selectedPlan()" rounded class="plan-summary q-mt-sm">
+              <template #avatar><q-icon name="sell" color="primary" /></template>
+              <div class="text-weight-bold">Plan solicitado: {{ selectedPlan().name }}</div>
+              <div class="text-caption">Modalidad preferida: {{ selectedBilling }}. Esto orienta la revisión comercial; no activa una suscripción automáticamente.</div>
+            </q-banner>
+
             <q-input v-model="requestForm.mensaje" outlined type="textarea" autogrow label="¿Qué te gustaría organizar o digitalizar? (opcional)" class="q-mt-sm" />
 
             <q-banner rounded class="info-banner q-mt-lg">
@@ -158,10 +196,8 @@ async function requestAccess() {
         <q-card-section class="text-center q-py-xl">
           <q-avatar size="64px" color="green-1" text-color="positive" icon="check_circle" />
           <div class="text-h5 text-weight-bold q-mt-md">Solicitud recibida</div>
-          <p class="text-body1 text-grey-7 q-mt-sm">
-            AGR Studio revisará tus datos y, si corresponde, te enviará un código y un enlace personal para continuar.
-          </p>
-          <q-btn outline color="primary" no-caps label="Volver a elegir una opción" icon="arrow_back" class="q-mt-md" @click="sent = false; mode = 'code'" />
+          <p class="text-body1 text-grey-7 q-mt-sm">AGR Studio revisará tus datos{{ selectedPlan() ? ` y la preferencia ${selectedPlan().name}` : '' }} y, si corresponde, te enviará un código y un enlace personal para continuar.</p>
+          <q-btn outline color="primary" no-caps label="Volver a elegir una opción" icon="arrow_back" class="q-mt-md" @click="restart" />
         </q-card-section>
       </q-card>
 
@@ -180,7 +216,7 @@ async function requestAccess() {
 .access-shell{width:min(720px,100%);padding:38px;border-radius:24px}
 .mode-toggle{border:1px solid var(--viti-border);border-radius:14px;overflow:hidden}
 .access-card{border-radius:20px;background:var(--viti-card)}
-.info-banner{background:color-mix(in srgb,var(--viti-card) 88%,var(--agr-purple) 12%);border:1px solid var(--viti-border)}
+.info-banner,.selected-plan,.plan-summary{background:color-mix(in srgb,var(--viti-card) 88%,var(--agr-purple) 12%);border:1px solid var(--viti-border)}
 .success-card{border-color:color-mix(in srgb,#21ba45 30%,var(--viti-border))}
 .agr-signature{padding-top:18px;border-top:1px solid var(--viti-border);font-size:11px;color:var(--viti-muted);text-align:center;letter-spacing:.02em}
 .agr-signature strong{color:var(--viti-text);font-weight:800}
