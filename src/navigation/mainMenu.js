@@ -13,6 +13,7 @@ export function buildMainMenu({
     if (hasClientProfile) items.push({ label: 'Mi cuenta', icon: 'account_circle', to: '/mi-cuenta' })
     items.push(
       { label: 'Mi negocio', icon: 'storefront', to: '/mi-negocio' },
+      { label: 'Mi plan', icon: 'workspace_premium', to: '/mi-plan' },
       { label: 'Aplicaciones', icon: 'apps', children: [{ label: 'Instaladas', icon: 'grid_view', to: '/mi-aplicaciones' }] },
     )
     if (isManager) {
