@@ -48,6 +48,20 @@ export default defineRouter(({ store }) => {
     return { path:`${targetBase}/${tail || fallback}`, query:to.query, hash:to.hash }
   }
 
+  // Página dedicada para que las cuentas cliente puedan consultar su plan sin mezclarla
+  // con la vista de pagos. El backend ya expone /mi/plan dentro del espacio cliente.
+  router.addRoute({
+    path:'/mi-plan',
+    component:MainLayout,
+    meta:{ requiresAuth:true, clientOnly:true },
+    children:[{
+      path:'',
+      name:'client-plan',
+      component:() => import('../pages/ClientPlanPage.vue'),
+      meta:{ requiresAuth:true, clientOnly:true },
+    }],
+  })
+
   // URLs comerciales limpias. Las rutas técnicas `electrofrio` siguen siendo las canónicas
   // por compatibilidad con clientes existentes, Flutter y enlaces ya emitidos.
   router.addRoute({ path:'/apps/aires/:pathMatch(.*)*', redirect:to => redirectAlias(to, '/apps/electrofrio') })
