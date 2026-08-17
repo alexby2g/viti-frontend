@@ -17,6 +17,7 @@ import AppBrand from '../components/AppBrand.vue'
           Si recibiste una invitación, abre exactamente el enlace que te enviaron. Es personal, tiene fecha de vencimiento y solo puede utilizarse una vez.
         </q-banner>
         <q-btn color="primary" unelevated no-caps icon="login" label="Ya tengo una cuenta" to="/login?tipo=cliente" class="full-width q-mt-lg" />
+        <q-btn flat color="primary" no-caps icon="info" label="Conocer VITI y cómo funciona" to="/viti" class="full-width q-mt-sm" />
       </q-card-section>
     </q-card>
   </q-page>
