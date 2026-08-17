@@ -104,11 +104,14 @@ onMounted(()=>{warmBackend().catch(()=>{})})
         <q-btn type="submit" color="primary" unelevated label="Ingresar a VITI" no-caps class="full-width q-mt-md" size="lg" :loading="auth.loading"><template #loading><q-spinner size="22px" class="q-mr-sm"/><span>{{ auth.loginStage || 'Conectando...' }}</span></template></q-btn>
       </q-form>
 
-      <div v-if="mode==='cliente'" class="text-center q-mt-lg">¿Es tu primera vez? <router-link to="/registro">Ver cómo obtener acceso</router-link></div>
+      <div v-if="mode==='cliente'" class="text-center q-mt-lg">
+        ¿Es tu primera vez? <router-link to="/viti/acceso">Ver cómo obtener acceso</router-link>
+      </div>
       <div v-else class="text-caption text-grey-6 q-mt-md text-center">El código secreto pertenece únicamente al superadministrador. Las cuentas internas usan su usuario y contraseña normal.</div>
 
       <div class="row justify-center q-gutter-sm q-mt-lg">
         <q-btn flat no-caps color="primary" icon="info" label="Conocer VITI" to="/viti" />
+        <q-btn v-if="mode==='cliente'" flat no-caps color="primary" icon="vpn_key" label="Tengo un código" to="/viti/acceso" />
       </div>
       <div class="agr-signature q-mt-lg">Desarrollado y administrado por <strong>AGR Studio</strong></div>
     </div>
