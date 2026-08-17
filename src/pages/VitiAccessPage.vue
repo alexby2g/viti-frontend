@@ -1,5 +1,5 @@
 <script setup>
-import { onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import { useQuasar } from 'quasar'
 import { useRoute } from 'vue-router'
 import { api } from '../boot/axios'
@@ -9,18 +9,20 @@ const $q = useQuasar()
 const route = useRoute()
 const mode = ref('code')
 const loading = ref(false)
+const plansLoading = ref(false)
 const sent = ref(false)
+const plans = ref([])
 
-const planCatalog = {
-  'basico-1800': { name:'VITI Inicial', monthly:89, annual:890 },
-  'profesional-1950': { name:'VITI Profesional', monthly:129, annual:1290 },
-  'empresa-2500': { name:'VITI Empresa', monthly:189, annual:1890 },
-  'personalizado': { name:'Cotización personalizada', monthly:null, annual:null },
-}
-
-const selectedPlanCode = ref(typeof route.query.plan === 'string' && planCatalog[route.query.plan] ? route.query.plan : '')
+const selectedPlanCode = ref(typeof route.query.plan === 'string' ? route.query.plan.trim() : '')
 const selectedBilling = ref(route.query.modalidad === 'anual' ? 'anual' : 'mensual')
-const selectedPlan = () => selectedPlanCode.value ? planCatalog[selectedPlanCode.value] : null
+
+const selectedPlan = computed(() => {
+  if (!selectedPlanCode.value) return null
+  return plans.value.find(plan => plan.codigo === selectedPlanCode.value) || {
+    codigo: selectedPlanCode.value,
+    nombre: selectedPlanCode.value,
+  }
+})
 
 const codeForm = reactive({ codigo: '' })
 const requestForm = reactive({
@@ -29,13 +31,32 @@ const requestForm = reactive({
   whatsapp: '',
   negocio: '',
   actividad: '',
-  plan_codigo: selectedPlanCode.value,
+  plan_codigo: selectedPlanCode.value || null,
   modalidad: selectedPlanCode.value ? selectedBilling.value : null,
   mensaje: '',
 })
 
 function normalizeCode() {
   codeForm.codigo = codeForm.codigo.toUpperCase().replace(/\s+/g, '')
+}
+
+async function loadPlans() {
+  plansLoading.value = true
+  try {
+    const response = await api.get('/publico/planes')
+    plans.value = Array.isArray(response.data?.data) ? response.data.data : []
+
+    if (selectedPlanCode.value && !plans.value.some(plan => plan.codigo === selectedPlanCode.value)) {
+      $q.notify({
+        type: 'warning',
+        message: 'El plan seleccionado ya no está disponible. Puedes enviar la solicitud sin una preferencia de plan.',
+      })
+    }
+  } catch {
+    plans.value = []
+  } finally {
+    plansLoading.value = false
+  }
 }
 
 async function useCode() {
@@ -66,7 +87,11 @@ async function requestAccess() {
 
   loading.value = true
   try {
-    await api.post('/publico/acceso/solicitar', requestForm)
+    await api.post('/publico/acceso/solicitar', {
+      ...requestForm,
+      plan_codigo: selectedPlan.value?.codigo || null,
+      modalidad: selectedPlan.value ? selectedBilling.value : null,
+    })
     sent.value = true
     $q.notify({ type: 'positive', message: 'Solicitud enviada correctamente.' })
   } catch (error) {
@@ -84,11 +109,12 @@ function clearSelectedPlan() {
 
 function restart() {
   sent.value = false
-  mode.value = 'code'
+  mode.value = selectedPlanCode.value ? 'request' : 'code'
 }
 
-onMounted(() => {
+onMounted(async () => {
   if (selectedPlanCode.value) mode.value = 'request'
+  await loadPlans()
 })
 </script>
 
@@ -100,18 +126,23 @@ onMounted(() => {
       <div class="q-mt-xl text-overline text-primary text-weight-bold">PRIMER ACCESO A VITI</div>
       <h1 class="text-h3 text-weight-bold q-mt-sm q-mb-sm">¿Es tu primera vez en VITI?</h1>
       <p class="text-body1 text-grey-7 q-mb-xl">
-        Si AGR Studio ya te envió un acceso, puedes usar tu código. Si todavía no tienes uno, puedes solicitarlo sin crear una cuenta todavía.
+        Si AGR Studio ya te envió un código o enlace personal, úsalo para continuar. Si todavía no tienes acceso, puedes solicitarlo sin crear una cuenta.
       </p>
 
-      <q-banner v-if="selectedPlan()" rounded class="selected-plan q-mb-lg">
+      <q-banner v-if="selectedPlan" rounded class="selected-plan q-mb-lg">
         <template #avatar><q-icon name="workspace_premium" color="primary" /></template>
         <div class="row items-center no-wrap q-gutter-sm">
           <div class="col">
-            <div class="text-weight-bold">Solicitud para {{ selectedPlan().name }}</div>
-            <div class="text-caption">Preferencia {{ selectedBilling }} · La contratación final se valida durante el análisis de tu necesidad.</div>
+            <div class="text-weight-bold">Preferencia: {{ selectedPlan.nombre }}</div>
+            <div class="text-caption">Modalidad {{ selectedBilling }} · La contratación final se valida durante el análisis de tu necesidad.</div>
           </div>
-          <q-btn flat dense no-caps color="primary" label="Cambiar" @click="clearSelectedPlan" />
+          <q-btn flat dense no-caps color="primary" label="Quitar" @click="clearSelectedPlan" />
         </div>
+      </q-banner>
+
+      <q-banner v-if="selectedPlanCode && !selectedPlan?.codigo" rounded class="info-banner q-mb-lg">
+        <template #avatar><q-icon name="info" color="primary" /></template>
+        El plan indicado en el enlace no está disponible actualmente. Puedes continuar con una solicitud general.
       </q-banner>
 
       <q-btn-toggle
@@ -133,7 +164,7 @@ onMounted(() => {
             <q-avatar color="blue-1" text-color="primary" icon="vpn_key" />
             <div class="q-ml-md">
               <div class="text-h6 text-weight-bold">Tengo un código de acceso</div>
-              <div class="text-body2 text-grey-7 q-mt-xs">Escribe el código que te envió AGR Studio. No crees otra cuenta; el código te llevará al registro personal que ya está habilitado para ti.</div>
+              <div class="text-body2 text-grey-7 q-mt-xs">Escribe el código que te envió AGR Studio. El código solo sirve para abrir el registro personal que ya fue habilitado para ti.</div>
             </div>
           </div>
 
@@ -145,6 +176,7 @@ onMounted(() => {
             placeholder="VITI-ABC123"
             maxlength="11"
             autocomplete="one-time-code"
+            :disable="loading"
             @update:model-value="normalizeCode"
             @keyup.enter="useCode"
           >
@@ -161,33 +193,33 @@ onMounted(() => {
             <q-avatar color="blue-1" text-color="primary" icon="person_add" />
             <div class="q-ml-md">
               <div class="text-h6 text-weight-bold">Necesito acceso a VITI</div>
-              <div class="text-body2 text-grey-7 q-mt-xs">Déjanos una solicitud breve. AGR Studio la revisará antes de crear tu invitación personal.</div>
+              <div class="text-body2 text-grey-7 q-mt-xs">Déjanos una solicitud breve. AGR Studio la revisará antes de crear una invitación personal.</div>
             </div>
           </div>
 
           <q-form class="q-mt-lg" @submit.prevent="requestAccess">
-            <q-input v-model="requestForm.nombre" outlined label="Nombre completo" class="q-mb-sm" />
+            <q-input v-model="requestForm.nombre" outlined label="Nombre completo" class="q-mb-sm" :disable="loading" />
             <div class="row q-col-gutter-sm">
-              <div class="col-12 col-sm-6"><q-input v-model="requestForm.telefono" outlined label="Teléfono" /></div>
-              <div class="col-12 col-sm-6"><q-input v-model="requestForm.whatsapp" outlined label="WhatsApp (opcional)" /></div>
+              <div class="col-12 col-sm-6"><q-input v-model="requestForm.telefono" outlined label="Teléfono" :disable="loading" /></div>
+              <div class="col-12 col-sm-6"><q-input v-model="requestForm.whatsapp" outlined label="WhatsApp (opcional)" :disable="loading" /></div>
             </div>
-            <q-input v-model="requestForm.negocio" outlined label="Nombre del negocio" class="q-mt-sm" />
-            <q-input v-model="requestForm.actividad" outlined label="¿A qué se dedica tu negocio?" class="q-mt-sm" />
+            <q-input v-model="requestForm.negocio" outlined label="Nombre del negocio" class="q-mt-sm" :disable="loading" />
+            <q-input v-model="requestForm.actividad" outlined label="¿A qué se dedica tu negocio?" class="q-mt-sm" :disable="loading" />
 
-            <q-banner v-if="selectedPlan()" rounded class="plan-summary q-mt-sm">
+            <q-banner v-if="selectedPlan" rounded class="plan-summary q-mt-sm">
               <template #avatar><q-icon name="sell" color="primary" /></template>
-              <div class="text-weight-bold">Plan solicitado: {{ selectedPlan().name }}</div>
+              <div class="text-weight-bold">Plan solicitado: {{ selectedPlan.nombre }}</div>
               <div class="text-caption">Modalidad preferida: {{ selectedBilling }}. Esto orienta la revisión comercial; no activa una suscripción automáticamente.</div>
             </q-banner>
 
-            <q-input v-model="requestForm.mensaje" outlined type="textarea" autogrow label="¿Qué te gustaría organizar o digitalizar? (opcional)" class="q-mt-sm" />
+            <q-input v-model="requestForm.mensaje" outlined type="textarea" autogrow label="¿Qué te gustaría organizar o digitalizar? (opcional)" class="q-mt-sm" :disable="loading" />
 
             <q-banner rounded class="info-banner q-mt-lg">
               <template #avatar><q-icon name="verified_user" color="primary" /></template>
               Enviar esta solicitud no crea una cuenta ni da acceso al sistema. Primero se revisa y, si corresponde, se genera una invitación personal.
             </q-banner>
 
-            <q-btn color="primary" unelevated no-caps size="lg" class="full-width q-mt-lg" icon="send" label="Solicitar acceso" :loading="loading" type="submit" />
+            <q-btn color="primary" unelevated no-caps size="lg" class="full-width q-mt-lg" icon="send" label="Solicitar acceso" :loading="loading" :disable="plansLoading" type="submit" />
           </q-form>
         </q-card-section>
       </q-card>
@@ -196,7 +228,7 @@ onMounted(() => {
         <q-card-section class="text-center q-py-xl">
           <q-avatar size="64px" color="green-1" text-color="positive" icon="check_circle" />
           <div class="text-h5 text-weight-bold q-mt-md">Solicitud recibida</div>
-          <p class="text-body1 text-grey-7 q-mt-sm">AGR Studio revisará tus datos{{ selectedPlan() ? ` y la preferencia ${selectedPlan().name}` : '' }} y, si corresponde, te enviará un código y un enlace personal para continuar.</p>
+          <p class="text-body1 text-grey-7 q-mt-sm">AGR Studio revisará tus datos{{ selectedPlan ? ` y la preferencia ${selectedPlan.nombre}` : '' }} y, si corresponde, te enviará un código y un enlace personal para continuar.</p>
           <q-btn outline color="primary" no-caps label="Volver a elegir una opción" icon="arrow_back" class="q-mt-md" @click="restart" />
         </q-card-section>
       </q-card>
