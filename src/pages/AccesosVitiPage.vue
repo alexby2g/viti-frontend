@@ -20,6 +20,8 @@ const statusOptions = [
 
 const statusColor = value => ({ pendiente: 'orange', en_revision: 'primary', aprobada: 'positive', rechazada: 'negative' }[value] || 'grey')
 const statusLabel = value => ({ pendiente: 'Pendiente', en_revision: 'En revisión', aprobada: 'Aprobada', rechazada: 'Rechazada' }[value] || value)
+const invitationColor = value => ({ pendiente:'orange', usada:'positive', deshabilitada:'grey' }[value] || 'grey')
+const invitationLabel = value => ({ pendiente:'Disponible', usada:'Utilizada', deshabilitada:'Deshabilitada' }[value] || value || 'Sin acceso')
 const planLabel = row => row.plan?.nombre || row.plan_codigo || 'Sin plan seleccionado'
 const billingLabel = row => row.modalidad === 'anual' ? 'Anual' : row.modalidad === 'mensual' ? 'Mensual' : 'Por definir'
 
@@ -98,6 +100,10 @@ async function copy(text, label) {
   }
 }
 
+function invitationLink(row) {
+  return row.invitacion?.codigo ? `${siteOrigin}/registro-cliente/${row.invitacion.codigo}` : ''
+}
+
 onMounted(load)
 </script>
 
@@ -142,6 +148,7 @@ onMounted(load)
           { name:'negocio', label:'Negocio', field:'negocio', align:'left' },
           { name:'plan', label:'Preferencia comercial', field:'plan_codigo', align:'left' },
           { name:'contacto', label:'Contacto', field:'telefono', align:'left' },
+          { name:'acceso', label:'Acceso', field:'invitacion_id', align:'left' },
           { name:'estado', label:'Estado', field:'estado', align:'left' },
           { name:'fecha', label:'Fecha', field:'created_at', align:'left' },
           { name:'acciones', label:'', field:'id', align:'right' },
@@ -167,6 +174,16 @@ onMounted(load)
           <q-td :props="props">
             <div>{{ props.row.telefono }}</div>
             <div v-if="props.row.whatsapp" class="text-caption text-grey-6">WhatsApp: {{ props.row.whatsapp }}</div>
+          </q-td>
+        </template>
+        <template #body-cell-acceso="props">
+          <q-td :props="props">
+            <template v-if="props.row.invitacion">
+              <q-badge rounded :color="invitationColor(props.row.invitacion.estado)" :label="invitationLabel(props.row.invitacion.estado)" />
+              <div class="text-caption text-weight-bold q-mt-xs">{{ props.row.invitacion.codigo }}</div>
+              <div class="text-caption text-grey-6">Vence: {{ props.row.invitacion.expira_at ? new Date(props.row.invitacion.expira_at).toLocaleDateString('es-BO') : '—' }}</div>
+            </template>
+            <span v-else class="text-caption text-grey-6">Sin invitación</span>
           </q-td>
         </template>
         <template #body-cell-estado="props">
