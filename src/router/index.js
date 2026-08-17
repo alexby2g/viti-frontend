@@ -3,15 +3,28 @@ import { createRouter, createWebHistory } from 'vue-router'
 import routes from './routes'
 import { useAuthStore } from '../stores/auth'
 import { useTenantStore } from '../stores/tenant'
+import MainLayout from '../layouts/MainLayout.vue'
 
 export default defineRouter(({ store }) => {
   const publicRoutes = [
     { path:'/viti', name:'viti-landing', component:() => import('../pages/VitiLandingPage.vue'), meta:{publicLanding:true} },
     { path:'/viti/planes', name:'viti-plans', component:() => import('../pages/VitiPlansPage.vue'), meta:{publicLanding:true} },
+    { path:'/viti/acceso', name:'viti-access', component:() => import('../pages/VitiAccessPage.vue'), meta:{publicLanding:true} },
     { path:'/planes', redirect:'/viti/planes', meta:{publicLanding:true} },
+    { path:'/acceso', redirect:'/viti/acceso', meta:{publicLanding:true} },
     { path:'/presentacion', redirect:'/viti', meta:{publicLanding:true} },
   ]
-  const router = createRouter({ history: createWebHistory(), routes:[...publicRoutes, ...routes] })
+
+  const adminAccessRoute = {
+    path:'/accesos',
+    component:MainLayout,
+    meta:{ requiresAuth:true, adminOnly:true },
+    children:[
+      { path:'', name:'viti-access-requests', component:() => import('../pages/AccesosVitiPage.vue'), meta:{ requiresAuth:true, adminOnly:true } },
+    ],
+  }
+
+  const router = createRouter({ history: createWebHistory(), routes:[...publicRoutes, adminAccessRoute, ...routes] })
 
   const redirectAlias = (to, targetBase, fallback='inicio') => {
     const raw = to.params.pathMatch
@@ -34,9 +47,9 @@ export default defineRouter(({ store }) => {
   }
 
   router.beforeEach(async (to, from) => {
-    // La presentación y los planes deben abrir incluso si el API está dormido, en mantenimiento o
-    // todavía no fue configurado. Son páginas públicas de producto, no parte del panel.
-    if (to.meta.publicLanding || to.name === 'viti-landing' || to.name === 'viti-plans') return true
+    // La presentación, los planes y el primer acceso deben abrir incluso si el API está dormido,
+    // en mantenimiento o todavía no fue configurado. Son páginas públicas de producto.
+    if (to.meta.publicLanding || ['viti-landing','viti-plans','viti-access'].includes(to.name)) return true
 
     const auth = useAuthStore(store)
     if (auth.setupRequired === null) await auth.checkSetup()
