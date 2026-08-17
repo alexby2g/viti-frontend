@@ -17,7 +17,7 @@ const steps = [
 </script>
 
 <template>
-  <q-page class="landing-page">
+  <div class="landing-page">
     <header class="landing-nav">
       <div class="landing-container row items-center no-wrap">
         <AppBrand />
@@ -161,7 +161,7 @@ const steps = [
         <div class="text-caption">Plataforma para digitalizar y organizar la gestión de servicios.</div>
       </div>
     </footer>
-  </q-page>
+  </div>
 </template>
 
 <style scoped>
