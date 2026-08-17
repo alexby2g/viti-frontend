@@ -125,7 +125,7 @@ onMounted(load)
             </q-list>
 
             <div class="plan-capacity q-mt-md">
-              <q-chip dense color="blue-1" text-color="primary" icon="apps">{{ plan.max_aplicaciones ? `${plan.max_aplicaciones} aplicación${plan.max_aplicaciones > 1 ? 'es' : ''}` : 'Aplicaciones según alcance' }}</q-chip>
+              <q-chip dense color="blue-1" text-color="primary" icon="apps">{{ plan.max_aplicaciones ? `${plan.max_aplicaciones} ${plan.max_aplicaciones > 1 ? 'aplicaciones' : 'aplicación'}` : 'Aplicaciones según alcance' }}</q-chip>
               <q-chip dense color="grey-2" text-color="grey-8" icon="support_agent">Soporte VITI</q-chip>
             </div>
 
