@@ -7,6 +7,19 @@ import { useTenantStore } from '../stores/tenant'
 export default defineRouter(({ store }) => {
   const router = createRouter({ history: createWebHistory(), routes })
 
+  const redirectAlias = (to, targetBase, fallback='inicio') => {
+    const raw = to.params.pathMatch
+    const tail = Array.isArray(raw) ? raw.join('/') : String(raw || fallback)
+    return { path:`${targetBase}/${tail || fallback}`, query:to.query, hash:to.hash }
+  }
+
+  // URLs comerciales limpias. Las rutas técnicas `electrofrio` siguen siendo las canónicas
+  // por compatibilidad con clientes existentes, Flutter y enlaces ya emitidos.
+  router.addRoute({ path:'/apps/aires/:pathMatch(.*)*', redirect:to => redirectAlias(to, '/apps/electrofrio') })
+  router.addRoute({ path:'/mi-apps/aires/:pathMatch(.*)*', redirect:to => redirectAlias(to, '/mi-apps/electrofrio') })
+  router.addRoute({ path:'/portal/aires/:pathMatch(.*)*', redirect:to => redirectAlias(to, '/portal/electrofrio') })
+  router.addRoute({ path:'/aires/acceso', redirect:'/electrofrio/acceso' })
+
   const homeFor = (user) => {
     if (user?.rol === 'cliente_negocio') return { name:'electro-customer-home' }
     if (user?.rol === 'cliente') return { name:'client-portal' }
