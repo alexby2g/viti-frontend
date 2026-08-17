@@ -167,6 +167,7 @@ async function requestAccess() {
 
       <div class="row justify-center q-gutter-sm q-mt-lg">
         <q-btn flat no-caps color="primary" icon="login" label="Ya tengo una cuenta" to="/login?tipo=cliente" />
+        <q-btn flat no-caps color="primary" icon="payments" label="Ver planes" to="/viti/planes" />
         <q-btn flat no-caps color="primary" icon="info" label="Conocer VITI" to="/viti" />
       </div>
       <div class="agr-signature q-mt-lg">Desarrollado y administrado por <strong>AGR Studio</strong></div>
