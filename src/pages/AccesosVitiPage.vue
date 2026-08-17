@@ -20,6 +20,8 @@ const statusOptions = [
 
 const statusColor = value => ({ pendiente: 'orange', en_revision: 'primary', aprobada: 'positive', rechazada: 'negative' }[value] || 'grey')
 const statusLabel = value => ({ pendiente: 'Pendiente', en_revision: 'En revisión', aprobada: 'Aprobada', rechazada: 'Rechazada' }[value] || value)
+const planLabel = row => row.plan?.nombre || row.plan_codigo || 'Sin plan seleccionado'
+const billingLabel = row => row.modalidad === 'anual' ? 'Anual' : row.modalidad === 'mensual' ? 'Mensual' : 'Por definir'
 
 async function load() {
   loading.value = true
@@ -31,6 +33,23 @@ async function load() {
   } finally {
     loading.value = false
   }
+}
+
+function markReview(row) {
+  $q.dialog({
+    title: 'Tomar solicitud en revisión',
+    message: `¿Quieres marcar la solicitud de ${row.nombre} (${row.negocio}) como en revisión?`,
+    cancel: true,
+    persistent: true,
+  }).onOk(async () => {
+    try {
+      await api.post(`/accesos/${row.id}/revision`)
+      $q.notify({ type: 'positive', message: 'La solicitud quedó en revisión.' })
+      await load()
+    } catch (error) {
+      $q.notify({ type: 'negative', message: error.response?.data?.message || 'No se pudo actualizar la solicitud.' })
+    }
+  })
 }
 
 function approve(row) {
@@ -84,7 +103,7 @@ onMounted(load)
 
 <template>
   <q-page class="viti-page q-pa-lg">
-    <PageHeader title="Solicitudes de acceso" subtitle="Revisa quién solicita entrar a VITI y genera una invitación personal solamente cuando corresponda." />
+    <PageHeader title="Solicitudes de acceso" subtitle="Revisa quién solicita entrar a VITI, qué plan le interesa y genera una invitación personal solamente cuando corresponda." />
 
     <div class="row items-center q-col-gutter-md q-mt-lg">
       <div class="col-12 col-md-5">
@@ -102,6 +121,7 @@ onMounted(load)
           <div class="q-ml-md col">
             <div class="text-subtitle1 text-weight-bold">Acceso generado correctamente</div>
             <div class="text-body2 text-grey-7">Comparte este código o el enlace personal. El código expira en la fecha indicada y el registro seguirá usando el onboarding actual de VITI.</div>
+            <div v-if="generated.solicitud?.plan" class="text-caption text-grey-7 q-mt-sm">Plan solicitado: <strong>{{ generated.solicitud.plan.nombre }}</strong> · Modalidad: {{ billingLabel(generated.solicitud) }}</div>
             <div class="generated-code q-mt-md">{{ generated.codigo }}</div>
             <div class="text-caption text-grey-6 q-mt-xs">Vence: {{ generated.expira_at ? new Date(generated.expira_at).toLocaleString('es-BO') : '—' }}</div>
             <div class="row q-gutter-sm q-mt-md">
@@ -120,6 +140,7 @@ onMounted(load)
         :columns="[
           { name:'persona', label:'Solicitante', field:'nombre', align:'left' },
           { name:'negocio', label:'Negocio', field:'negocio', align:'left' },
+          { name:'plan', label:'Preferencia comercial', field:'plan_codigo', align:'left' },
           { name:'contacto', label:'Contacto', field:'telefono', align:'left' },
           { name:'estado', label:'Estado', field:'estado', align:'left' },
           { name:'fecha', label:'Fecha', field:'created_at', align:'left' },
@@ -134,6 +155,12 @@ onMounted(load)
           <q-td :props="props">
             <div class="text-weight-bold">{{ props.row.nombre }}</div>
             <div class="text-caption text-grey-6">{{ props.row.actividad || 'Actividad no indicada' }}</div>
+          </q-td>
+        </template>
+        <template #body-cell-plan="props">
+          <q-td :props="props">
+            <div class="text-weight-medium">{{ planLabel(props.row) }}</div>
+            <div class="text-caption text-grey-6">{{ billingLabel(props.row) }}</div>
           </q-td>
         </template>
         <template #body-cell-contacto="props">
@@ -151,6 +178,7 @@ onMounted(load)
         <template #body-cell-acciones="props">
           <q-td :props="props">
             <div v-if="['pendiente','en_revision'].includes(props.row.estado)" class="row justify-end q-gutter-xs">
+              <q-btn v-if="props.row.estado === 'pendiente'" flat round dense color="primary" icon="visibility" @click="markReview(props.row)"><q-tooltip>Marcar en revisión</q-tooltip></q-btn>
               <q-btn flat round dense color="positive" icon="check" @click="approve(props.row)"><q-tooltip>Aprobar y generar acceso</q-tooltip></q-btn>
               <q-btn flat round dense color="negative" icon="close" @click="reject(props.row)"><q-tooltip>Rechazar</q-tooltip></q-btn>
             </div>
