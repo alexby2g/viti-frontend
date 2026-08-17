@@ -9,6 +9,7 @@ const loading = ref(true)
 const rows = ref([])
 const status = ref('pendiente')
 const generated = ref(null)
+const siteOrigin = window.location.origin
 
 const statusOptions = [
   { label: 'Pendientes', value: 'pendiente' },
@@ -105,7 +106,7 @@ onMounted(load)
             <div class="text-caption text-grey-6 q-mt-xs">Vence: {{ generated.expira_at ? new Date(generated.expira_at).toLocaleString('es-BO') : '—' }}</div>
             <div class="row q-gutter-sm q-mt-md">
               <q-btn unelevated color="primary" no-caps icon="content_copy" label="Copiar código" @click="copy(generated.codigo, 'Código')" />
-              <q-btn flat color="primary" no-caps icon="link" label="Copiar enlace" @click="copy(`${window.location.origin}${generated.ruta}`, 'Enlace')" />
+              <q-btn flat color="primary" no-caps icon="link" label="Copiar enlace" @click="copy(`${siteOrigin}${generated.ruta}`, 'Enlace')" />
             </div>
           </div>
           <q-btn flat round dense icon="close" @click="generated = null" />
