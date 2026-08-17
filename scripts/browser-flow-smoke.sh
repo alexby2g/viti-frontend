@@ -41,6 +41,13 @@ check_page(){
   if grep -Fq '<div id="q-app"></div>' "$file"; then fail_smoke "Vue no renderizó $name"; fi
 }
 
+check_page viti-landing "$BASE/viti" \
+  "La información de tus servicios, organizada en un solo lugar." \
+  "¿De qué se encarga VITI?" \
+  "Cómo funciona" \
+  "Guía rápida" \
+  "Ingresar a VITI"
+
 check_page public-1 "$BASE/solicitar/e2e-token-viti?paso=1" "Solicitud VITI" "VITI Inicial" "Continuar" "Registro completado"
 check_page public-2 "$BASE/solicitar/e2e-token-viti?paso=2" "Configuración de VITI Inicial" "Saltar configuración" "¿Cuántas personas usarán el sistema?"
 check_page public-3 "$BASE/solicitar/e2e-token-viti?paso=3" "Forma de pago de la implementación" "Enviar a revisión" "Suscripción"
@@ -62,4 +69,4 @@ check_page client-apps "$BASE/mi-aplicaciones" \
   "Mi negocio" \
   "Nueva solicitud"
 
-echo "Flow E2E OK: formulario público, panel administrativo y cliente multiempresa renderizan con contexto explícito en Chrome headless."
+echo "Flow E2E OK: presentación VITI, formulario público, panel administrativo y cliente multiempresa renderizan con contexto explícito en Chrome headless."
