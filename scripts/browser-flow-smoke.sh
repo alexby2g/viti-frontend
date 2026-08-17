@@ -14,6 +14,7 @@ trap 'kill "$SERVER_PID" >/dev/null 2>&1 || true' EXIT
 
 fail_smoke(){
   local message="$1"
+  echo "::error title=Browser Smoke::$message" >&2
   echo "ERROR Browser Smoke: $message" >&2
   echo "--- Últimas líneas del servidor E2E ---" >&2
   tail -n 80 "$SERVER_LOG" >&2 || true
@@ -30,6 +31,7 @@ check_page(){
   local name="$1"; shift
   local url="$1"; shift
   local file="$TMP/viti-flow-${name}.html"
+  echo "Comprobando $name → $url"
   "$CHROME_BIN" --headless=new --no-sandbox --disable-gpu --disable-dev-shm-usage --virtual-time-budget=11000 --dump-dom "$url" >"$file" || fail_smoke "Chrome no pudo abrir $name ($url)"
   for text in "$@"; do
     if ! grep -Fq "$text" "$file"; then
