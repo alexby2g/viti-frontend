@@ -25,6 +25,11 @@ const inboxTarget=computed(()=>item.value?.conversacion?.id?{path:'/buzon',query
 const access=computed(()=>item.value?.acceso_cliente||{})
 const hasAccount=computed(()=>Boolean(access.value?.tiene_cuenta)||access.value?.estado==='cuenta_creada')
 const canCreateProject=computed(()=>!item.value?.proyecto&&item.value?.estado==='aprobada')
+const invitationDelivery=computed(()=>{
+  if(access.value?.enviada_at)return {label:access.value?.ultimo_envio_at?'Último envío':'Correo enviado',date:access.value?.ultimo_envio_at||access.value?.enviada_at}
+  if(access.value?.ultimo_envio_at)return {label:'Último intento',date:access.value.ultimo_envio_at}
+  return {label:'Envío',date:null}
+})
 const nextDecision=computed(()=>{
   if(item.value?.proyecto)return {icon:'check_circle',klass:'bg-green-1 text-green-9',title:'Solicitud convertida en proyecto',text:'El plan y la empresa ya quedaron vinculados al proyecto.'}
   if(!hasAccount.value){
@@ -117,7 +122,7 @@ watch(()=>route.params.id,load)
 
   <template v-if="item">
     <PageHeader eyebrow="Solicitud VITI" :title="`${item.codigo||'Sin código'} · ${item.titulo||'Sin título'}`" :subtitle="`${item.empresa?.nombre_comercial||'Sin empresa'} · ${item.cliente?.nombre||'Sin responsable'} · ${item.cliente?.telefono||'Sin teléfono'}`">
-      <div class="row q-gutter-sm"><q-btn outline color="primary" icon="open_in_new" label="Ver formulario" no-caps @click="openPublic"/><q-btn outline color="primary" icon="content_copy" label="Copiar formulario" no-caps @click="copyPublicLink"/><q-btn outline color="primary" icon="forum" label="Responder en buzón" no-caps :to="inboxTarget"/><q-btn outline color="primary" icon="edit" label="Editar" no-caps @click="openEdit"/><q-btn outline color="primary" icon="picture_as_pdf" label="PDF" no-caps @click="downloadFile(`/reportes/solicitudes/${item.id}.pdf`,`${item.codigo}-solicitud.pdf`)"/><q-btn v-if="canCreateProject" color="secondary" unelevated icon="rocket_launch" label="Convertir en proyecto" no-caps @click="openProject"/><q-btn v-else color="primary" outline icon="open_in_new" label="Abrir proyecto" no-caps :to="`/proyectos/${item.proyecto.id}`"/></div>
+      <div class="row q-gutter-sm"><q-btn outline color="primary" icon="open_in_new" label="Ver formulario" no-caps @click="openPublic"/><q-btn outline color="primary" icon="content_copy" label="Copiar formulario" no-caps @click="copyPublicLink"/><q-btn outline color="primary" icon="forum" label="Responder en buzón" no-caps :to="inboxTarget"/><q-btn outline color="primary" icon="edit" label="Editar" no-caps @click="openEdit"/><q-btn outline color="primary" icon="picture_as_pdf" label="PDF" no-caps @click="downloadFile(`/reportes/solicitudes/${item.id}.pdf`,`${item.codigo}-solicitud.pdf`)"/><q-btn v-if="canCreateProject" color="secondary" unelevated icon="rocket_launch" label="Convertir en proyecto" no-caps @click="openProject"/><q-btn v-else-if="item.proyecto?.id" color="primary" outline icon="open_in_new" label="Abrir proyecto" no-caps :to="`/proyectos/${item.proyecto.id}`"/></div>
     </PageHeader>
 
     <div class="row q-col-gutter-lg q-mb-lg">
@@ -170,7 +175,7 @@ watch(()=>route.params.id,load)
               <q-banner v-if="access.error_envio" rounded class="bg-orange-1 text-orange-10 q-mb-md"><template #avatar><q-icon name="mail_lock"/></template>{{access.error_envio}}</q-banner>
               <div class="row q-col-gutter-md q-mb-md" v-if="access.id">
                 <div class="col-12 col-sm-4"><div class="detail-label">Estado</div><div class="text-weight-bold">{{pretty(access.estado)}}</div></div>
-                <div class="col-12 col-sm-4"><div class="detail-label">Último envío</div><div>{{formatDateTime(access.ultimo_envio_at||access.enviada_at)}}</div></div>
+                <div class="col-12 col-sm-4"><div class="detail-label">{{invitationDelivery.label}}</div><div>{{invitationDelivery.date?formatDateTime(invitationDelivery.date):'Sin intentos todavía'}}</div></div>
                 <div class="col-12 col-sm-4"><div class="detail-label">Vence</div><div>{{formatDateTime(access.expira_at)}}</div></div>
               </div>
               <div class="row q-gutter-sm">
