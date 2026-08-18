@@ -49,7 +49,7 @@ async function load() {
   try {
     const response = await api.get('/publico/planes')
     plans.value = response.data?.data || []
-  } catch (error) {
+  } catch {
     plans.value = []
     $q.notify({ type: 'warning', message: 'Mostramos la referencia comercial de VITI. El catálogo en línea no está disponible en este momento.' })
   } finally {
@@ -61,7 +61,7 @@ onMounted(load)
 </script>
 
 <template>
-  <q-page class="plans-page">
+  <div class="plans-page">
     <header class="plans-nav">
       <div class="plans-container row items-center no-wrap">
         <q-btn flat round icon="arrow_back" to="/viti" aria-label="Volver a VITI" />
@@ -79,7 +79,6 @@ onMounted(load)
         <div class="kicker">Planes VITI</div>
         <h1>Elige cómo quieres organizar tu negocio.</h1>
         <p>VITI separa la implementación del sistema de la suscripción que mantiene la plataforma, alojamiento, base de datos, respaldos, actualizaciones generales y soporte según el plan contratado.</p>
-
         <div class="billing-switch q-mt-lg">
           <q-btn-toggle v-model="billingMode" no-caps unelevated rounded toggle-color="primary" :options="[{label:'Mensual',value:'mensual'},{label:'Anual',value:'anual'}]" />
         </div>
@@ -96,36 +95,29 @@ onMounted(load)
               <q-space />
               <q-badge v-if="plan.codigo === 'profesional-1950'" color="primary" label="Recomendado" />
             </div>
-
             <p class="plan-description q-mt-md">{{ plan.descripcion }}</p>
-
             <div class="price-block q-mt-lg">
               <div class="price-label">Implementación</div>
               <div class="price-value">{{ money(plan.precio_proyecto) }}</div>
               <div class="text-caption text-grey-6">Pago del desarrollo, configuración y puesta en marcha.</div>
             </div>
-
             <q-separator class="q-my-lg" />
-
             <div class="price-block">
               <div class="price-label">Suscripción {{ billingMode }}</div>
               <div class="price-value">{{ money(billingMode === 'anual' ? plan.precio_anual : plan.precio_mensual) }}<span v-if="(billingMode === 'mensual' ? plan.precio_mensual : plan.precio_anual) != null" class="price-period"> / {{ billingMode === 'mensual' ? 'mes' : 'año' }}</span></div>
               <div v-if="billingMode === 'anual' && annualSaving(plan)" class="saving-chip">Ahorras {{ annualSaving(plan).toFixed(0) }} Bs al año</div>
               <div class="text-caption text-grey-6 q-mt-xs">{{ plan.dias_prueba || 0 }} días de prueba disponibles.</div>
             </div>
-
             <q-list dense class="feature-list q-mt-lg">
               <q-item v-for="module in modules(plan)" :key="module" dense>
                 <q-item-section avatar><q-icon name="check_circle" color="positive" /></q-item-section>
                 <q-item-section>{{ moduleLabels[module] || module }}</q-item-section>
               </q-item>
             </q-list>
-
             <div class="plan-capacity q-mt-md">
               <q-chip dense color="blue-1" text-color="primary" icon="apps">{{ plan.max_aplicaciones ? `${plan.max_aplicaciones} aplicación${plan.max_aplicaciones > 1 ? 'es' : ''}` : 'Aplicaciones según alcance' }}</q-chip>
               <q-chip dense color="grey-2" text-color="grey-8" icon="support_agent">Soporte VITI</q-chip>
             </div>
-
             <q-btn color="primary" :outline="plan.codigo === 'personalizado'" unelevated no-caps size="lg" class="full-width q-mt-lg" :label="plan.codigo === 'personalizado' ? 'Solicitar cotización' : 'Elegir plan'" :to="accessTo(plan)" />
           </q-card-section>
         </q-card>
@@ -154,7 +146,7 @@ onMounted(load)
         <q-btn flat no-caps color="primary" icon="arrow_back" label="Volver a la presentación" to="/viti" />
       </div>
     </footer>
-  </q-page>
+  </div>
 </template>
 
 <style scoped>
