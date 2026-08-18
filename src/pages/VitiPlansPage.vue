@@ -37,6 +37,8 @@ const annualSaving = plan => {
 }
 const money = value => value == null ? 'Cotizar' : `${Number(value).toFixed(0)} Bs`
 const modules = plan => Array.isArray(plan.modulos) ? plan.modulos : []
+const accessTo = plan => ({ path: '/acceso', query: { plan: plan.codigo, modalidad: billingMode.value } })
+
 const moduleLabels = {
   inicio: 'Panel principal', agenda: 'Agenda', ordenes: 'Órdenes de servicio', clientes: 'Clientes', equipos: 'Equipos',
   tecnicos: 'Técnicos', inventario: 'Inventario', pagos: 'Pagos', garantias: 'Garantías', historial: 'Historial', buzon: 'Buzón y soporte',
@@ -124,7 +126,7 @@ onMounted(load)
               <q-chip dense color="grey-2" text-color="grey-8" icon="support_agent">Soporte VITI</q-chip>
             </div>
 
-            <q-btn color="primary" :outline="plan.codigo === 'personalizado'" unelevated no-caps size="lg" class="full-width q-mt-lg" :label="plan.codigo === 'personalizado' ? 'Solicitar cotización' : 'Elegir plan'" to="/viti" />
+            <q-btn color="primary" :outline="plan.codigo === 'personalizado'" unelevated no-caps size="lg" class="full-width q-mt-lg" :label="plan.codigo === 'personalizado' ? 'Solicitar cotización' : 'Elegir plan'" :to="accessTo(plan)" />
           </q-card-section>
         </q-card>
       </section>

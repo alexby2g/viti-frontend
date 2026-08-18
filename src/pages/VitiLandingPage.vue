@@ -9,7 +9,7 @@ const benefits = [
 ]
 
 const steps = [
-  { number:'01', title:'La empresa recibe su acceso', text:'AGR Studio habilita un enlace personal para registrar de forma segura al negocio y su responsable.' },
+  { number:'01', title:'La empresa solicita su acceso', text:'Si todavía no tiene invitación, envía una solicitud breve. AGR Studio la revisa antes de habilitar el registro personal.' },
   { number:'02', title:'Se registra la necesidad', text:'La empresa explica qué servicio brinda, qué problema desea resolver y qué información necesita organizar.' },
   { number:'03', title:'VITI asigna la solución', text:'La solución se configura para el negocio, conservando su identidad, usuarios, datos y flujo de trabajo.' },
   { number:'04', title:'El negocio trabaja desde VITI', text:'Clientes, equipos, citas y servicios quedan centralizados para consultar qué ocurrió, qué falta y qué sigue.' },
@@ -41,7 +41,7 @@ const steps = [
               VITI ayuda a las microempresas de servicios a registrar, organizar y controlar digitalmente la información de sus clientes, equipos, citas y trabajos realizados.
             </p>
             <div class="row q-gutter-sm q-mt-xl">
-              <q-btn color="primary" unelevated no-caps size="lg" icon-right="arrow_forward" label="Conocer cómo funciona" href="#como-funciona" />
+              <q-btn color="primary" unelevated no-caps size="lg" icon="person_add" label="Solicitar acceso" to="/acceso" />
               <q-btn outline color="primary" no-caps size="lg" icon="login" label="Ya tengo acceso" to="/login?tipo=cliente" />
             </div>
             <div class="hero-trust q-mt-xl">
@@ -137,8 +137,9 @@ const steps = [
               <q-btn color="primary" unelevated no-caps size="lg" icon="login" label="Ingresar a VITI" to="/login" class="full-width q-mt-lg" />
               <q-separator class="q-my-lg" />
               <div class="text-body2 text-weight-medium">¿Todavía no tienes acceso?</div>
-              <div class="text-caption text-grey-7 q-mt-xs">El registro de nuevas empresas se habilita mediante un enlace personal para proteger la información y evitar registros no autorizados.</div>
-              <q-btn flat color="primary" no-caps icon="info" label="Ver cómo funciona el registro" to="/registro" class="full-width q-mt-md" />
+              <div class="text-caption text-grey-7 q-mt-xs">Envíanos una solicitud breve. AGR Studio revisará tu negocio antes de generar una invitación personal.</div>
+              <q-btn color="primary" unelevated no-caps icon="person_add" label="Solicitar acceso a VITI" to="/acceso" class="full-width q-mt-md" />
+              <q-btn flat color="primary" no-caps icon="info" label="Cómo funciona el registro" to="/registro" class="full-width q-mt-sm" />
             </q-card-section>
           </q-card>
         </div>
