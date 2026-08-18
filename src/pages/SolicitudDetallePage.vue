@@ -8,11 +8,12 @@ import { formatDate, formatDateTime, todayInput } from '../utils/date'
 import PageHeader from '../components/PageHeader.vue'
 
 const route=useRoute(),router=useRouter(),$q=useQuasar()
-const item=ref(null),loading=ref(true),saving=ref(false),inviteLoading=ref(false),projectDialog=ref(false),editDialog=ref(false),editSaving=ref(false),loadError=ref(''),tab=ref('resumen'),clients=ref([])
+const item=ref(null),loading=ref(true),saving=ref(false),inviteLoading=ref(false),projectDialog=ref(false),editDialog=ref(false),editSaving=ref(false),rejectDialog=ref(false),rejectLoading=ref(false),timelineLoading=ref(false),loadError=ref(''),tab=ref('resumen'),clients=ref([]),timeline=ref([])
 const answers=reactive({})
 const declaration=reactive({aceptada:false,nombre:'',fecha:todayInput()})
 const project=reactive({solicitud_id:null,empresa_id:null,cliente_id:null,nombre:'',descripcion:'',fase:'levantamiento',estado:'activo',progreso:0,fecha_inicio:todayInput()})
 const editForm=reactive({empresa_id:null,cliente_id:null,titulo:'',resumen:'',prioridad:'normal',fecha_limite_deseada:null,presupuesto_estimado:null,estado:'borrador'})
+const rejectForm=reactive({motivo:''})
 const sections=computed(()=>item.value?.cuestionario?.secciones||[])
 function hasAnswer(questionId){const value=answers[questionId];return Array.isArray(value)?value.length>0:String(value??'').trim()!==''}
 const answeredCount=computed(()=>Object.keys(answers).filter(id=>hasAnswer(id)).length)
@@ -25,6 +26,7 @@ const inboxTarget=computed(()=>item.value?.conversacion?.id?{path:'/buzon',query
 const access=computed(()=>item.value?.acceso_cliente||{})
 const hasAccount=computed(()=>Boolean(access.value?.tiene_cuenta)||access.value?.estado==='cuenta_creada')
 const canCreateProject=computed(()=>!item.value?.proyecto&&item.value?.estado==='aprobada')
+const canReject=computed(()=>['borrador','en_revision'].includes(item.value?.estado)&&!item.value?.proyecto)
 const invitationDelivery=computed(()=>{
   if(access.value?.enviada_at)return {label:access.value?.ultimo_envio_at?'Último envío':'Correo enviado',date:access.value?.ultimo_envio_at||access.value?.enviada_at}
   if(access.value?.ultimo_envio_at)return {label:'Último intento',date:access.value.ultimo_envio_at}
@@ -42,6 +44,7 @@ const nextDecision=computed(()=>{
   if(item.value?.estado==='borrador')return {icon:'fact_check',klass:'bg-blue-1 text-primary',title:'Cuenta creada · completar solicitud',text:'El cliente ya tiene acceso. Ahora puede revisar el formulario, elegir condiciones y enviar la solicitud a revisión.'}
   if(item.value?.estado==='en_revision')return {icon:'rate_review',klass:'bg-blue-1 text-primary',title:'Revisar alcance y acuerdo comercial',text:'La cuenta ya está creada y la solicitud fue enviada. Verifica alcance, plan y condiciones antes de aprobar.'}
   if(item.value?.estado==='aprobada')return {icon:'rocket_launch',klass:'bg-green-1 text-green-9',title:'Lista para convertir en proyecto',text:'La solicitud está aprobada. Ya puedes crear el proyecto conservando toda la trazabilidad.'}
+  if(item.value?.estado==='rechazada')return {icon:'block',klass:'bg-red-1 text-negative',title:'Solicitud rechazada',text:'La decisión quedó registrada en el historial. Puede volver a revisión si el cliente corrige la información.'}
   return {icon:'info',klass:'bg-blue-1 text-primary',title:'Continuar seguimiento',text:'Revisa el estado actual y completa la siguiente etapa del flujo VITI.'}
 })
 
@@ -59,7 +62,7 @@ async function load(){
   const id=Number(route.params.id);loadError.value='';item.value=null
   if(!Number.isInteger(id)||id<=0){loadError.value='La solicitud indicada no es válida.';loading.value=false;return}
   loading.value=true
-  try{const payload=normalizePayload(await api.get(`/solicitudes/${id}`));if(!payload?.id)throw new Error('El servidor no devolvió una solicitud válida.');item.value=payload;initAnswers()}
+  try{const payload=normalizePayload(await api.get(`/solicitudes/${id}`));if(!payload?.id)throw new Error('El servidor no devolvió una solicitud válida.');item.value=payload;initAnswers();await loadTimeline()}
   catch(error){loadError.value=error.response?.data?.message||error.message||'No se pudo abrir la solicitud.'}
   finally{loading.value=false}
 }
@@ -109,6 +112,25 @@ function revokeInvitation(){
   if(!item.value?.id)return
   $q.dialog({title:'Revocar invitación',message:'El enlace dejará de funcionar inmediatamente. ¿Continuar?',cancel:true,persistent:true}).onOk(async()=>{inviteLoading.value=true;try{await api.delete(`/solicitudes/${item.value.id}/invitacion`);$q.notify({type:'positive',message:'Invitación revocada.'});await load()}catch(error){$q.notify({type:'negative',message:error.response?.data?.message||'No se pudo revocar la invitación.'})}finally{inviteLoading.value=false}})
 }
+
+async function loadTimeline(){
+  if(!item.value?.id)return
+  timelineLoading.value=true
+  try{const response=await api.get(`/solicitudes/${item.value.id}/historial`);timeline.value=Array.isArray(response.data?.data)?response.data.data:[]}
+  catch{timeline.value=[]}
+  finally{timelineLoading.value=false}
+}
+function timelineTitle(event){return ({solicitud_acceso_publica_creada:'Solicitud de acceso recibida',invitacion_cliente_creada:'Invitación generada',invitacion_cliente_reenviada:'Invitación reenviada',invitacion_cliente_revocada:'Invitación revocada',cuenta_cliente_creada:'Cuenta VITI creada',solicitud_enviada:'Solicitud enviada a revisión',solicitud_rechazada:'Solicitud rechazada',solicitud_actualizada:'Solicitud actualizada',cuestionario_guardado:'Respuestas guardadas'}[event?.accion]||pretty(event?.accion||'Actividad'))}
+function timelineIcon(event){return ({solicitud_acceso_publica_creada:'person_add',invitacion_cliente_creada:'mark_email_read',invitacion_cliente_reenviada:'forward_to_inbox',invitacion_cliente_revocada:'link_off',cuenta_cliente_creada:'verified_user',solicitud_enviada:'send',solicitud_rechazada:'block',solicitud_actualizada:'edit',cuestionario_guardado:'fact_check'}[event?.accion]||'history')}
+function openReject(){rejectForm.motivo='';rejectDialog.value=true}
+async function rejectRequest(){
+  if(!item.value?.id)return
+  if(String(rejectForm.motivo||'').trim().length<5){$q.notify({type:'warning',message:'Escribe un motivo breve para registrar la decisión.'});return}
+  rejectLoading.value=true
+  try{await api.post(`/solicitudes/${item.value.id}/rechazar`,{motivo:String(rejectForm.motivo).trim()});rejectDialog.value=false;$q.notify({type:'positive',message:'Solicitud rechazada y registrada en el historial.'});await load();await loadTimeline()}
+  catch(error){$q.notify({type:'negative',message:error.response?.data?.message||'No se pudo rechazar la solicitud.'})}
+  finally{rejectLoading.value=false}
+}
 function openProject(){if(!item.value?.id)return;Object.assign(project,{solicitud_id:item.value.id,empresa_id:item.value.empresa_id,cliente_id:item.value.cliente_id,nombre:item.value.titulo||'',descripcion:item.value.resumen||'',fase:'levantamiento',estado:'activo',progreso:0,fecha_inicio:todayInput()});projectDialog.value=true}
 async function createProject(){if(!item.value?.id)return;try{const created=normalizePayload(await api.post('/proyectos',project));if(!created?.id)throw new Error('El servidor no devolvió el proyecto creado.');projectDialog.value=false;await router.push(`/proyectos/${created.id}`)}catch(error){$q.notify({type:'negative',message:error.response?.data?.message||error.message||'No se pudo crear el proyecto.'})}}
 
@@ -122,7 +144,7 @@ watch(()=>route.params.id,load)
 
   <template v-if="item">
     <PageHeader eyebrow="Solicitud VITI" :title="`${item.codigo||'Sin código'} · ${item.titulo||'Sin título'}`" :subtitle="`${item.empresa?.nombre_comercial||'Sin empresa'} · ${item.cliente?.nombre||'Sin responsable'} · ${item.cliente?.telefono||'Sin teléfono'}`">
-      <div class="row q-gutter-sm"><q-btn outline color="primary" icon="open_in_new" label="Ver formulario" no-caps @click="openPublic"/><q-btn outline color="primary" icon="content_copy" label="Copiar formulario" no-caps @click="copyPublicLink"/><q-btn outline color="primary" icon="forum" label="Responder en buzón" no-caps :to="inboxTarget"/><q-btn outline color="primary" icon="edit" label="Editar" no-caps @click="openEdit"/><q-btn outline color="primary" icon="picture_as_pdf" label="PDF" no-caps @click="downloadFile(`/reportes/solicitudes/${item.id}.pdf`,`${item.codigo}-solicitud.pdf`)"/><q-btn v-if="canCreateProject" color="secondary" unelevated icon="rocket_launch" label="Convertir en proyecto" no-caps @click="openProject"/><q-btn v-else-if="item.proyecto?.id" color="primary" outline icon="open_in_new" label="Abrir proyecto" no-caps :to="`/proyectos/${item.proyecto.id}`"/></div>
+      <div class="row q-gutter-sm"><q-btn outline color="primary" icon="open_in_new" label="Ver formulario" no-caps @click="openPublic"/><q-btn outline color="primary" icon="content_copy" label="Copiar formulario" no-caps @click="copyPublicLink"/><q-btn outline color="primary" icon="forum" label="Responder en buzón" no-caps :to="inboxTarget"/><q-btn outline color="primary" icon="edit" label="Editar" no-caps @click="openEdit"/><q-btn outline color="primary" icon="picture_as_pdf" label="PDF" no-caps @click="downloadFile(`/reportes/solicitudes/${item.id}.pdf`,`${item.codigo}-solicitud.pdf`)"/><q-btn v-if="canReject" outline color="negative" icon="block" label="Rechazar" no-caps @click="openReject"/><q-btn v-if="canCreateProject" color="secondary" unelevated icon="rocket_launch" label="Convertir en proyecto" no-caps @click="openProject"/><q-btn v-else-if="item.proyecto?.id" color="primary" outline icon="open_in_new" label="Abrir proyecto" no-caps :to="`/proyectos/${item.proyecto.id}`"/></div>
     </PageHeader>
 
     <div class="row q-col-gutter-lg q-mb-lg">
@@ -130,7 +152,7 @@ watch(()=>route.params.id,load)
       <div class="col-12 col-xl-5"><q-card flat class="viti-card commercial-card full-height"><q-card-section><div class="row items-center justify-between"><div><div class="section-label">Acuerdo comercial</div><div class="text-h6 text-weight-bold">{{plan?.nombre||'Plan sin seleccionar'}}</div></div><q-icon name="workspace_premium" color="primary" size="32px"/></div><div v-if="plan" class="commercial-prices q-mt-md"><div><span>Implementación</span><strong>{{money(plan.precio_proyecto)}}</strong></div><div><span>Mensual</span><strong>{{money(plan.precio_mensual)}}</strong></div><div><span>Anual</span><strong>{{money(plan.precio_anual)}}</strong></div></div><div v-if="annualSaving" class="text-caption text-positive text-weight-bold q-mt-sm">Ahorro anual frente a 12 mensualidades: {{money(annualSaving)}}</div><q-separator class="q-my-md"/><div class="row q-col-gutter-md"><div class="col-12 col-sm-6"><div class="detail-label">Pago de implementación</div><div class="text-weight-bold">{{paymentLabel(item.forma_pago_preferida)}}</div></div><div class="col-12 col-sm-6"><div class="detail-label">Suscripción preferida</div><div class="text-weight-bold">{{item.frecuencia_suscripcion_preferida?pretty(item.frecuencia_suscripcion_preferida):plan?.precio_mensual?'Pendiente de definir':'A cotizar'}}</div></div><div class="col-12"><q-badge :color="item.acuerdo_comercial_aceptado?'positive':'orange'" outline>{{item.acuerdo_comercial_aceptado?'Acuerdo inicial aceptado':'Acuerdo pendiente'}}</q-badge><span v-if="item.acuerdo_comercial_nombre" class="text-caption text-grey-7 q-ml-sm">{{item.acuerdo_comercial_nombre}} · {{formatDate(item.acuerdo_comercial_fecha)}}</span></div></div></q-card-section></q-card></div>
     </div>
 
-    <q-tabs v-model="tab" align="left" dense active-color="primary" indicator-color="primary" class="q-mb-md"><q-tab name="resumen" icon="info" label="Resumen" no-caps/><q-tab name="cuestionario" icon="fact_check" :label="`Respuestas (${answeredCount})`" no-caps/></q-tabs>
+    <q-tabs v-model="tab" align="left" dense active-color="primary" indicator-color="primary" class="q-mb-md"><q-tab name="resumen" icon="info" label="Resumen" no-caps/><q-tab name="cuestionario" icon="fact_check" :label="`Respuestas (${answeredCount})`" no-caps/><q-tab name="historial" icon="history" :label="`Historial (${timeline.length})`" no-caps/></q-tabs>
     <q-tab-panels v-model="tab" animated class="bg-transparent">
       <q-tab-panel name="resumen" class="q-pa-none">
         <div class="row q-col-gutter-lg">
@@ -197,10 +219,33 @@ watch(()=>route.params.id,load)
         <q-card flat class="viti-card q-mb-lg"><q-card-section><div class="section-label">Confirmación</div><div class="text-h6 text-weight-bold">Confirmación de la información</div><div class="row q-col-gutter-md q-mt-sm"><div class="col-12 col-sm-6"><q-input v-model="declaration.nombre" outlined label="Nombre"/></div><div class="col-12 col-sm-3"><q-input v-model="declaration.fecha" outlined type="date" stack-label label="Fecha"/></div><div class="col-12 col-sm-3 flex items-center"><q-checkbox v-model="declaration.aceptada" label="Aceptada"/></div></div></q-card-section></q-card>
         <div class="row justify-end q-gutter-sm q-mb-xl"><q-btn outline color="primary" label="Guardar respuestas" no-caps :loading="saving" @click="saveAnswers"/><q-btn v-if="item.estado==='borrador'" color="primary" unelevated label="Enviar a revisión" no-caps :loading="saving" @click="submit"/></div>
       </q-tab-panel>
+
+      <q-tab-panel name="historial" class="q-pa-none">
+        <q-card flat class="viti-card q-mb-xl">
+          <q-card-section class="row items-center justify-between">
+            <div><div class="section-label">Trazabilidad</div><div class="text-h6 text-weight-bold">Historial de la solicitud</div><div class="text-caption text-grey-7">Eventos administrativos y del acceso del cliente, ordenados cronológicamente.</div></div>
+            <q-btn flat round icon="refresh" color="primary" :loading="timelineLoading" @click="loadTimeline"/>
+          </q-card-section>
+          <q-separator/>
+          <q-card-section>
+            <q-inner-loading :showing="timelineLoading"/>
+            <div v-if="!timelineLoading&&!timeline.length" class="text-grey-6 q-py-md">Todavía no hay eventos de auditoría para esta solicitud.</div>
+            <q-timeline v-else color="primary" layout="comfortable">
+              <q-timeline-entry v-for="event in timeline" :key="event.id" :icon="timelineIcon(event)" :title="timelineTitle(event)" :subtitle="formatDateTime(event.created_at)">
+                <div>{{event.descripcion||'Actividad registrada en VITI.'}}</div>
+                <div v-if="event.datos?.motivo" class="text-caption text-grey-7 q-mt-xs"><strong>Motivo:</strong> {{event.datos.motivo}}</div>
+                <div v-if="event.usuario" class="text-caption text-grey-6 q-mt-xs">Por {{[event.usuario.nombre,event.usuario.apellido].filter(Boolean).join(' ')}}</div>
+              </q-timeline-entry>
+            </q-timeline>
+          </q-card-section>
+        </q-card>
+      </q-tab-panel>
     </q-tab-panels>
   </template>
 
   <q-dialog v-model="editDialog"><q-card style="width:760px;max-width:94vw"><q-card-section><div class="section-label">Editar solicitud</div><div class="text-h5 text-weight-bold">Actualizar datos generales</div><div class="text-caption text-grey-6">El plan y la preferencia comercial se preservan al guardar.</div></q-card-section><q-separator/><q-card-section><div class="row q-col-gutter-md"><div class="col-12"><q-select v-model="editForm.cliente_id" outlined emit-value map-options :options="clients.map(row=>({label:`${row.nombre} · ${row.telefono}`,value:row.id}))" label="Responsable *" @update:model-value="editClientChanged"/></div><div class="col-12"><q-select v-model="editForm.empresa_id" outlined emit-value map-options :options="editCompanyOptions" label="Empresa *" :disable="!editForm.cliente_id"/></div><div class="col-12"><q-input v-model="editForm.titulo" outlined label="Título del sistema *"/></div><div class="col-12"><q-input v-model="editForm.resumen" outlined type="textarea" autogrow label="Resumen inicial"/></div><div class="col-12 col-sm-3"><q-select v-model="editForm.prioridad" outlined :options="['baja','normal','alta','urgente']" label="Prioridad"/></div><div class="col-12 col-sm-3"><q-select v-model="editForm.estado" outlined :options="['borrador','en_revision','aprobada','rechazada','convertida','cerrada']" label="Estado"/></div><div class="col-12 col-sm-3"><q-input v-model="editForm.fecha_limite_deseada" outlined type="date" stack-label label="Fecha deseada"/></div><div class="col-12 col-sm-3"><q-input v-model.number="editForm.presupuesto_estimado" outlined type="number" prefix="Bs" label="Presupuesto"/></div></div></q-card-section><q-card-actions align="right"><q-btn flat label="Cancelar" v-close-popup/><q-btn color="primary" unelevated label="Guardar cambios" no-caps :loading="editSaving" @click="saveEdit"/></q-card-actions></q-card></q-dialog>
+
+  <q-dialog v-model="rejectDialog"><q-card style="width:560px;max-width:94vw"><q-card-section><div class="section-label text-negative">Decisión administrativa</div><div class="text-h5 text-weight-bold">Rechazar solicitud</div><div class="text-body2 text-grey-7 q-mt-sm">La decisión quedará registrada en el historial. El cliente podrá corregir la información y la solicitud podrá volver a revisión más adelante.</div></q-card-section><q-separator/><q-card-section><q-input v-model="rejectForm.motivo" outlined type="textarea" autogrow counter maxlength="1000" label="Motivo del rechazo *" hint="Explica qué debe corregirse o por qué no se continuará por ahora."/></q-card-section><q-card-actions align="right"><q-btn flat label="Cancelar" v-close-popup/><q-btn color="negative" unelevated icon="block" label="Confirmar rechazo" no-caps :loading="rejectLoading" @click="rejectRequest"/></q-card-actions></q-card></q-dialog>
 
   <q-dialog v-model="projectDialog"><q-card style="width:700px;max-width:94vw"><q-card-section><div class="section-label">Nuevo proyecto</div><div class="text-h5 text-weight-bold">Convertir solicitud en proyecto</div><div v-if="plan" class="text-caption text-grey-6 q-mt-xs">{{plan.nombre}} · implementación {{money(plan.precio_proyecto)}} · suscripción {{item.frecuencia_suscripcion_preferida?pretty(item.frecuencia_suscripcion_preferida):'por definir'}}</div></q-card-section><q-separator/><q-card-section><q-banner v-if="item.acuerdo_comercial_requerido&&!item.acuerdo_comercial_aceptado" rounded class="bg-orange-1 text-orange-10 q-mb-md">El acuerdo comercial todavía aparece como pendiente. Confírmalo antes de iniciar el proyecto.</q-banner><q-input v-model="project.nombre" outlined label="Nombre del proyecto *"/><q-input v-model="project.descripcion" outlined type="textarea" label="Descripción" class="q-mt-md"/><div class="row q-col-gutter-md q-mt-xs"><div class="col-6"><q-select v-model="project.fase" outlined :options="['levantamiento','analisis','diseno','desarrollo','beta','pruebas','ajustes','implementacion']" label="Fase inicial"/></div><div class="col-6"><q-input v-model="project.fecha_inicio" outlined type="date" label="Fecha de inicio" stack-label/></div></div></q-card-section><q-card-actions align="right"><q-btn flat label="Cancelar" v-close-popup/><q-btn color="primary" unelevated label="Crear proyecto" no-caps :disable="item.acuerdo_comercial_requerido&&!item.acuerdo_comercial_aceptado" @click="createProject"/></q-card-actions></q-card></q-dialog>
 </q-page></template>
