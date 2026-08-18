@@ -10,6 +10,7 @@ const route = useRoute()
 const loading = ref(false)
 const plansLoading = ref(false)
 const sent = ref(false)
+const sentEmail = ref('')
 const plans = ref([])
 
 const selectedPlanCode = ref(typeof route.query.plan === 'string' ? route.query.plan.trim() : '')
@@ -22,6 +23,7 @@ const selectedPlan = computed(() => {
 
 const form = reactive({
   nombre: '',
+  correo: '',
   telefono: '',
   whatsapp: '',
   ciudad: '',
@@ -53,8 +55,13 @@ async function requestAccess() {
   form.telefono = onlyDigits(form.telefono)
   form.whatsapp = onlyDigits(form.whatsapp)
 
-  if (!form.nombre.trim() || !form.telefono || !form.ciudad.trim() || !form.negocio.trim() || !form.necesidad.trim()) {
-    $q.notify({ type: 'warning', message: 'Completa tu nombre, teléfono, ciudad, negocio y la necesidad que deseas resolver.' })
+  const email = form.correo.trim().toLowerCase()
+  if (!form.nombre.trim() || !email || !form.telefono || !form.ciudad.trim() || !form.negocio.trim() || !form.necesidad.trim()) {
+    $q.notify({ type: 'warning', message: 'Completa tu nombre, correo, teléfono, ciudad, negocio y la necesidad que deseas resolver.' })
+    return
+  }
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    $q.notify({ type: 'warning', message: 'Ingresa un correo electrónico válido para recibir la invitación.' })
     return
   }
   if (!/^\d{7,15}$/.test(form.telefono) || (form.whatsapp && !/^\d{7,15}$/.test(form.whatsapp))) {
@@ -66,6 +73,7 @@ async function requestAccess() {
   try {
     const response = await api.post('/publico/solicitudes', {
       nombre: form.nombre.trim(),
+      correo: email,
       telefono: form.telefono,
       whatsapp: form.whatsapp || null,
       ciudad: form.ciudad.trim(),
@@ -77,6 +85,7 @@ async function requestAccess() {
       plan_codigo: selectedPlan.value?.codigo || null,
       modalidad: selectedPlan.value ? selectedBilling.value : null,
     })
+    sentEmail.value = response.data?.data?.correo || email
     sent.value = true
     $q.notify({ type: 'positive', message: response.data?.message || 'Solicitud enviada correctamente.' })
   } catch (error) {
@@ -92,6 +101,7 @@ function clearSelectedPlan() {
 
 function restart() {
   sent.value = false
+  sentEmail.value = ''
 }
 
 onMounted(loadPlans)
@@ -137,6 +147,7 @@ onMounted(loadPlans)
 
           <q-form class="q-mt-lg" @submit.prevent="requestAccess">
             <q-input v-model="form.nombre" outlined label="Nombre completo *" class="q-mb-sm" :disable="loading" maxlength="180" />
+            <q-input v-model="form.correo" outlined type="email" label="Correo electrónico *" hint="Aquí enviaremos tu invitación si la solicitud es aprobada." class="q-mb-sm" :disable="loading" maxlength="160" autocomplete="email" />
             <div class="row q-col-gutter-sm">
               <div class="col-12 col-sm-6">
                 <q-input v-model="form.telefono" outlined label="Teléfono *" inputmode="numeric" maxlength="15" :disable="loading" @update:model-value="form.telefono = onlyDigits($event)" />
@@ -159,7 +170,7 @@ onMounted(loadPlans)
 
             <q-banner rounded class="info-banner q-mt-lg">
               <template #avatar><q-icon name="security" color="primary" /></template>
-              La solicitud no crea usuario, contraseña ni acceso. Si es aprobada, AGR Studio te enviará una invitación personal para completar el registro seguro.
+              La solicitud no crea usuario, contraseña ni acceso. Si es aprobada, AGR Studio enviará una invitación personal al correo registrado para completar el registro seguro.
             </q-banner>
 
             <q-btn color="primary" unelevated no-caps size="lg" class="full-width q-mt-lg" icon="send" label="Solicitar acceso" :loading="loading" :disable="plansLoading" type="submit" />
@@ -171,7 +182,7 @@ onMounted(loadPlans)
         <q-card-section class="text-center q-py-xl">
           <q-avatar size="64px" color="green-1" text-color="positive" icon="check_circle" />
           <div class="text-h5 text-weight-bold q-mt-md">Solicitud recibida</div>
-          <p class="text-body1 text-grey-7 q-mt-sm">AGR Studio revisará tus datos{{ selectedPlan ? ` y la preferencia ${selectedPlan.nombre}` : '' }}. Si la solicitud es viable, recibirás una invitación personal para continuar con el registro.</p>
+          <p class="text-body1 text-grey-7 q-mt-sm">AGR Studio revisará tus datos{{ selectedPlan ? ` y la preferencia ${selectedPlan.nombre}` : '' }}. Si la solicitud es aprobada, enviaremos la invitación personal a <strong>{{ sentEmail }}</strong>.</p>
           <q-btn outline color="primary" no-caps label="Enviar otra solicitud" icon="add" class="q-mt-md" @click="restart" />
         </q-card-section>
       </q-card>

@@ -13,6 +13,7 @@ const loading = ref(true)
 const saving = ref(false)
 const step = ref(1)
 const valid = ref(false)
+const invitationInfo = ref(null)
 const fileInput = ref(null)
 const photo = ref(null)
 const photoPreview = ref('')
@@ -27,6 +28,8 @@ const form = reactive({
 })
 
 const hasErrors = computed(() => Object.keys(fieldErrors.errors).length > 0)
+const invitationEmail = computed(() => invitationInfo.value?.correo || '')
+const linkedRequest = computed(() => Boolean(invitationInfo.value?.vinculada_solicitud))
 const step1Fields = ['nombre','usuario','telefono','whatsapp','ci','ci_expedido','ciudad','direccion','password','password_confirmation','foto']
 const step2Fields = ['empresa_nombre','empresa_actividad','empresa_telefono','empresa_whatsapp','empresa_ciudad','empresa_direccion','titulo_sistema','resumen']
 
@@ -71,7 +74,14 @@ function continueFromStep2() { if (validateStep2()) step.value = 3 }
 async function load() {
   loading.value = true
   try {
-    await api.get(`/publico/registro/${route.params.token}`)
+    const response = await api.get(`/publico/registro/${route.params.token}`)
+    invitationInfo.value = response.data?.data || null
+    const prefill = invitationInfo.value?.prefill
+    if (prefill) {
+      for (const [key, value] of Object.entries(prefill)) {
+        if (key in form && value !== null && value !== undefined) form[key] = String(value)
+      }
+    }
     valid.value = true
   } catch (e) {
     valid.value = false
@@ -117,7 +127,7 @@ async function submit() {
     if (photo.value) payload.append('foto', photo.value)
     await initCsrf()
     const { data } = await api.post(`/publico/registro/${route.params.token}`, payload, { headers:{'Content-Type':'multipart/form-data'} })
-    $q.notify({ type:'positive', message:'Registro completado. Ahora elige el plan VITI que mejor encaje con tu negocio.' })
+    $q.notify({ type:'positive', message: linkedRequest.value ? 'Cuenta creada y vinculada a tu solicitud.' : 'Registro completado. Ahora continúa con tu solicitud.' })
     await router.replace(data.data.ruta_cuestionario)
   } catch (e) {
     const message = errorMessage(e, 'No pudimos completar tu registro. Revisa los campos marcados.')
@@ -142,8 +152,9 @@ onMounted(load)
       </div>
 
       <div class="section-label">Bienvenido a VITI</div>
-      <h1 class="page-title">Cuéntanos quién eres y qué necesitas</h1>
-      <p class="page-subtitle">Completa una sola vez tus datos personales, los de tu negocio y una breve necesidad. Si algún dato necesita corrección, VITI marcará el campo y te indicará qué debes revisar.</p>
+      <h1 class="page-title">Crea tu cuenta VITI</h1>
+      <p class="page-subtitle" v-if="linkedRequest">Ya recibimos los datos de tu solicitud. Revísalos, completa la información de seguridad de tu cuenta y confirma para continuar sin volver a registrar tu negocio desde cero.</p>
+      <p class="page-subtitle" v-else>Completa una sola vez tus datos personales, los de tu negocio y una breve necesidad. Si algún dato necesita corrección, VITI marcará el campo y te indicará qué debes revisar.</p>
 
       <q-banner v-if="hasErrors" rounded class="error-summary q-mt-lg">
         <template #avatar><q-icon name="error_outline" color="negative" /></template>
@@ -162,10 +173,11 @@ onMounted(load)
 
         <q-card-section v-if="step===1" class="q-pa-lg">
           <div class="text-h6 text-weight-bold q-mb-xs">Tus datos</div>
-          <div class="text-caption text-grey-6 q-mb-lg">Estos datos crearán tu ficha y tu acceso futuro a VITI.</div>
+          <div class="text-caption text-grey-6 q-mb-lg">{{ linkedRequest ? 'Tus datos básicos ya vienen de la solicitud aprobada. Completa la seguridad de tu cuenta y corrige solo lo necesario.' : 'Estos datos crearán tu ficha y tu acceso futuro a VITI.' }}</div>
           <div class="row q-col-gutter-md">
             <div class="col-12 col-sm-8" data-error-field="nombre"><q-input v-model="form.nombre" outlined label="Nombre completo *" autocomplete="name" :error="fieldErrors.has('nombre')" :error-message="fieldErrors.message('nombre')" @update:model-value="clearField('nombre')" /></div>
             <div class="col-12 col-sm-4" data-error-field="telefono"><q-input v-model="form.telefono" outlined label="Teléfono *" inputmode="numeric" maxlength="15" :error="fieldErrors.has('telefono')" :error-message="fieldErrors.message('telefono')" @update:model-value="v=>{form.telefono=String(v??'').replace(/\D/g,'');clearField('telefono')}" /></div>
+            <div v-if="invitationEmail" class="col-12"><q-input :model-value="invitationEmail" outlined readonly label="Correo autorizado para esta invitación"><template #prepend><q-icon name="mail" color="primary"/></template></q-input><div class="text-caption text-grey-6 q-mt-xs">Este correo proviene de tu solicitud y quedará asociado a tu cuenta VITI.</div></div>
             <div class="col-12" data-error-field="usuario"><q-input v-model="form.usuario" outlined label="Nombre de usuario *" autocomplete="username" maxlength="40" hint="Lo usarás junto con tu contraseña para ingresar a VITI." :error="fieldErrors.has('usuario')" :error-message="fieldErrors.message('usuario')" @update:model-value="v => {form.usuario=String(v ?? '').toLowerCase().replace(/\s+/g,'');clearField('usuario')}"><template #prepend><q-icon name="alternate_email" /></template></q-input></div>
             <div class="col-12 col-sm-6" data-error-field="whatsapp"><q-input v-model="form.whatsapp" outlined label="WhatsApp" inputmode="numeric" maxlength="15" hint="Si lo dejas vacío usaremos tu teléfono." :error="fieldErrors.has('whatsapp')" :error-message="fieldErrors.message('whatsapp')" @update:model-value="v=>{form.whatsapp=String(v??'').replace(/\D/g,'');clearField('whatsapp')}" /></div>
             <div class="col-12 col-sm-6" data-error-field="ci"><q-input v-model="form.ci" outlined label="Cédula de identidad *" inputmode="numeric" maxlength="15" hint="También podrás iniciar sesión con tu CI." :error="fieldErrors.has('ci')" :error-message="fieldErrors.message('ci')" @update:model-value="v=>{form.ci=String(v??'').replace(/\D/g,'');clearField('ci')}" /></div>
@@ -186,7 +198,7 @@ onMounted(load)
 
         <q-card-section v-else-if="step===2" class="q-pa-lg">
           <div class="text-h6 text-weight-bold q-mb-xs">Tu negocio o proyecto</div>
-          <div class="text-caption text-grey-6 q-mb-lg">Esta información se registra aquí y no volveremos a preguntártela en los pasos siguientes.</div>
+          <div class="text-caption text-grey-6 q-mb-lg">{{ linkedRequest ? 'Esta información ya fue tomada de tu solicitud. Revísala y corrige únicamente si algo cambió.' : 'Esta información se registra aquí y no volveremos a preguntártela en los pasos siguientes.' }}</div>
           <div class="row q-col-gutter-md">
             <div class="col-12" data-error-field="empresa_nombre"><q-input v-model="form.empresa_nombre" outlined label="Nombre del negocio, institución o proyecto *" :error="fieldErrors.has('empresa_nombre')" :error-message="fieldErrors.message('empresa_nombre')" @update:model-value="clearField('empresa_nombre')" /></div>
             <div class="col-12" data-error-field="empresa_actividad"><q-input v-model="form.empresa_actividad" outlined label="¿A qué se dedica?" :error="fieldErrors.has('empresa_actividad')" :error-message="fieldErrors.message('empresa_actividad')" @update:model-value="clearField('empresa_actividad')" /></div>
@@ -200,12 +212,12 @@ onMounted(load)
         </q-card-section>
 
         <q-card-section v-else class="q-pa-lg">
-          <div class="text-h6 text-weight-bold q-mb-sm">Todo listo para elegir tu plan</div>
-          <div class="text-body2 text-grey-7 q-mb-lg">Al continuar crearemos tu cuenta, tu ficha, tu negocio y la solicitud. Si el servidor detecta un dato duplicado o inválido, VITI volverá al paso correspondiente y marcará exactamente el campo que necesita corrección.</div>
+          <div class="text-h6 text-weight-bold q-mb-sm">Todo listo para crear tu cuenta</div>
+          <div class="text-body2 text-grey-7 q-mb-lg">{{ linkedRequest ? 'Al continuar crearemos únicamente tu cuenta y la vincularemos con el responsable, negocio y solicitud que AGR Studio ya revisó. No se crearán registros duplicados.' : 'Al continuar crearemos tu cuenta, tu ficha, tu negocio y la solicitud. Si el servidor detecta un dato duplicado o inválido, VITI volverá al paso correspondiente y marcará exactamente el campo que necesita corrección.' }}</div>
           <q-list bordered separator class="rounded-borders">
             <q-item><q-item-section avatar><q-icon name="person" color="primary"/></q-item-section><q-item-section><q-item-label>{{form.nombre}}</q-item-label><q-item-label caption>@{{form.usuario}} · {{form.telefono}} · {{form.ciudad}}</q-item-label></q-item-section></q-item>
             <q-item><q-item-section avatar><q-icon name="business" color="primary"/></q-item-section><q-item-section><q-item-label>{{form.empresa_nombre}}</q-item-label><q-item-label caption>{{form.empresa_actividad||'Actividad por completar'}}</q-item-label></q-item-section></q-item>
-            <q-item><q-item-section avatar><q-icon name="workspace_premium" color="primary"/></q-item-section><q-item-section><q-item-label>{{form.titulo_sistema}}</q-item-label><q-item-label caption>Después del registro compararás VITI Inicial, Profesional, Empresa y Personalizado.</q-item-label></q-item-section></q-item>
+            <q-item><q-item-section avatar><q-icon name="workspace_premium" color="primary"/></q-item-section><q-item-section><q-item-label>{{form.titulo_sistema}}</q-item-label><q-item-label caption>{{ linkedRequest ? 'Continuarás con esta misma solicitud y sus preferencias comerciales.' : 'Después del registro compararás VITI Inicial, Profesional, Empresa y Personalizado.' }}</q-item-label></q-item-section></q-item>
           </q-list>
         </q-card-section>
 
@@ -215,7 +227,7 @@ onMounted(load)
           <q-space />
           <q-btn v-if="step===1" color="primary" unelevated no-caps label="Continuar" icon-right="arrow_forward" @click="continueFromStep1" />
           <q-btn v-else-if="step===2" color="primary" unelevated no-caps label="Revisar datos" icon-right="arrow_forward" @click="continueFromStep2" />
-          <q-btn v-else color="primary" unelevated no-caps label="Crear registro y elegir plan" icon-right="workspace_premium" :loading="saving" @click="submit" />
+          <q-btn v-else color="primary" unelevated no-caps :label="linkedRequest ? 'Crear mi cuenta y continuar' : 'Crear registro y elegir plan'" icon-right="verified_user" :loading="saving" @click="submit" />
         </q-card-actions>
       </q-card>
 

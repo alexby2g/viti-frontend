@@ -8,7 +8,7 @@ import { formatDate, formatDateTime, todayInput } from '../utils/date'
 import PageHeader from '../components/PageHeader.vue'
 
 const route=useRoute(),router=useRouter(),$q=useQuasar()
-const item=ref(null),loading=ref(true),saving=ref(false),projectDialog=ref(false),editDialog=ref(false),editSaving=ref(false),loadError=ref(''),tab=ref('resumen'),clients=ref([])
+const item=ref(null),loading=ref(true),saving=ref(false),inviteLoading=ref(false),projectDialog=ref(false),editDialog=ref(false),editSaving=ref(false),loadError=ref(''),tab=ref('resumen'),clients=ref([])
 const answers=reactive({})
 const declaration=reactive({aceptada:false,nombre:'',fecha:todayInput()})
 const project=reactive({solicitud_id:null,empresa_id:null,cliente_id:null,nombre:'',descripcion:'',fase:'levantamiento',estado:'activo',progreso:0,fecha_inicio:todayInput()})
@@ -22,6 +22,23 @@ const editCompanyOptions=computed(()=>editSelectedClient.value?.empresas?.map(ro
 const plan=computed(()=>item.value?.plan_viti||null)
 const annualSaving=computed(()=>plan.value?.precio_mensual&&plan.value?.precio_anual?Math.max(0,Number(plan.value.precio_mensual)*12-Number(plan.value.precio_anual)):0)
 const inboxTarget=computed(()=>item.value?.conversacion?.id?{path:'/buzon',query:{c:item.value.conversacion.id}}:'/buzon')
+const access=computed(()=>item.value?.acceso_cliente||{})
+const hasAccount=computed(()=>Boolean(access.value?.tiene_cuenta)||access.value?.estado==='cuenta_creada')
+const canCreateProject=computed(()=>!item.value?.proyecto&&item.value?.estado==='aprobada')
+const nextDecision=computed(()=>{
+  if(item.value?.proyecto)return {icon:'check_circle',klass:'bg-green-1 text-green-9',title:'Solicitud convertida en proyecto',text:'El plan y la empresa ya quedaron vinculados al proyecto.'}
+  if(!hasAccount.value){
+    if(access.value?.estado==='enviada')return {icon:'schedule',klass:'bg-purple-1 text-purple-9',title:'Esperando registro del cliente',text:`La invitación fue enviada a ${access.value.correo||'su correo'}. Cuando cree su cuenta, VITI conservará esta misma solicitud.`}
+    if(access.value?.estado==='pendiente')return {icon:'mark_email_unread',klass:'bg-orange-1 text-orange-10',title:'Invitación creada; falta entregarla',text:'El enlace está generado. Revisa la configuración de correo o copia la invitación manualmente.'}
+    if(access.value?.estado==='vencida')return {icon:'event_busy',klass:'bg-orange-1 text-orange-10',title:'La invitación venció',text:'Genera una nueva invitación para que el responsable pueda crear su cuenta.'}
+    if(access.value?.estado==='sin_correo')return {icon:'alternate_email',klass:'bg-red-1 text-negative',title:'Falta correo del responsable',text:'Registra un correo válido antes de habilitar el acceso.'}
+    return {icon:'verified_user',klass:'bg-blue-1 text-primary',title:'Revisar solicitud de acceso',text:'Si los datos del negocio son correctos, aprueba el acceso y envía la invitación personal.'}
+  }
+  if(item.value?.estado==='borrador')return {icon:'fact_check',klass:'bg-blue-1 text-primary',title:'Cuenta creada · completar solicitud',text:'El cliente ya tiene acceso. Ahora puede revisar el formulario, elegir condiciones y enviar la solicitud a revisión.'}
+  if(item.value?.estado==='en_revision')return {icon:'rate_review',klass:'bg-blue-1 text-primary',title:'Revisar alcance y acuerdo comercial',text:'La cuenta ya está creada y la solicitud fue enviada. Verifica alcance, plan y condiciones antes de aprobar.'}
+  if(item.value?.estado==='aprobada')return {icon:'rocket_launch',klass:'bg-green-1 text-green-9',title:'Lista para convertir en proyecto',text:'La solicitud está aprobada. Ya puedes crear el proyecto conservando toda la trazabilidad.'}
+  return {icon:'info',klass:'bg-blue-1 text-primary',title:'Continuar seguimiento',text:'Revisa el estado actual y completa la siguiente etapa del flujo VITI.'}
+})
 
 function normalizePayload(response){return response?.data?.data ?? response?.data ?? null}
 function pretty(value){return String(value||'').replaceAll('_',' ').replace(/\b\w/g,char=>char.toUpperCase())}
@@ -68,6 +85,25 @@ async function saveAnswers(){
 async function submit(){if(!item.value?.id)return;const saved=await saveAnswers();if(!saved)return;try{await api.post(`/solicitudes/${item.value.id}/enviar`);$q.notify({type:'positive',message:'Solicitud enviada a revisión.'});await load()}catch(error){$q.notify({type:'negative',message:error.response?.data?.message||'No se pudo enviar la solicitud.'})}}
 async function copyPublicLink(){if(!item.value?.enlace_publico)return;if($q.platform.is.secureContext!==false)await navigator.clipboard.writeText(item.value.enlace_publico);$q.notify({type:'positive',message:'Enlace del formulario copiado.'})}
 function openPublic(){if(item.value?.enlace_publico)window.open(item.value.enlace_publico,'_blank','noopener')}
+async function createInvitation(){
+  if(!item.value?.id)return
+  inviteLoading.value=true
+  try{const response=await api.post(`/solicitudes/${item.value.id}/invitacion`,{dias_vigencia:7});const data=response.data?.data||{};$q.notify({type:data.email_enviado?'positive':'warning',message:response.data?.message||'Invitación creada.'});await load()}
+  catch(error){$q.notify({type:'negative',message:error.response?.data?.message||'No se pudo generar la invitación.'})}
+  finally{inviteLoading.value=false}
+}
+async function resendInvitation(){
+  if(!item.value?.id)return
+  inviteLoading.value=true
+  try{const response=await api.post(`/solicitudes/${item.value.id}/invitacion/reenviar`);const data=response.data?.data||{};$q.notify({type:data.email_enviado?'positive':'warning',message:response.data?.message||'Reenvío procesado.'});await load()}
+  catch(error){$q.notify({type:'negative',message:error.response?.data?.message||'No se pudo reenviar la invitación.'})}
+  finally{inviteLoading.value=false}
+}
+async function copyInvitation(){if(!access.value?.url)return;try{await navigator.clipboard.writeText(access.value.url);$q.notify({type:'positive',message:'Invitación copiada.'})}catch{$q.notify({type:'info',message:'No se pudo copiar automáticamente. Abre el enlace y cópialo manualmente.'})}}
+function revokeInvitation(){
+  if(!item.value?.id)return
+  $q.dialog({title:'Revocar invitación',message:'El enlace dejará de funcionar inmediatamente. ¿Continuar?',cancel:true,persistent:true}).onOk(async()=>{inviteLoading.value=true;try{await api.delete(`/solicitudes/${item.value.id}/invitacion`);$q.notify({type:'positive',message:'Invitación revocada.'});await load()}catch(error){$q.notify({type:'negative',message:error.response?.data?.message||'No se pudo revocar la invitación.'})}finally{inviteLoading.value=false}})
+}
 function openProject(){if(!item.value?.id)return;Object.assign(project,{solicitud_id:item.value.id,empresa_id:item.value.empresa_id,cliente_id:item.value.cliente_id,nombre:item.value.titulo||'',descripcion:item.value.resumen||'',fase:'levantamiento',estado:'activo',progreso:0,fecha_inicio:todayInput()});projectDialog.value=true}
 async function createProject(){if(!item.value?.id)return;try{const created=normalizePayload(await api.post('/proyectos',project));if(!created?.id)throw new Error('El servidor no devolvió el proyecto creado.');projectDialog.value=false;await router.push(`/proyectos/${created.id}`)}catch(error){$q.notify({type:'negative',message:error.response?.data?.message||error.message||'No se pudo crear el proyecto.'})}}
 
@@ -81,7 +117,7 @@ watch(()=>route.params.id,load)
 
   <template v-if="item">
     <PageHeader eyebrow="Solicitud VITI" :title="`${item.codigo||'Sin código'} · ${item.titulo||'Sin título'}`" :subtitle="`${item.empresa?.nombre_comercial||'Sin empresa'} · ${item.cliente?.nombre||'Sin responsable'} · ${item.cliente?.telefono||'Sin teléfono'}`">
-      <div class="row q-gutter-sm"><q-btn outline color="primary" icon="open_in_new" label="Ver formulario" no-caps @click="openPublic"/><q-btn outline color="primary" icon="content_copy" label="Copiar enlace" no-caps @click="copyPublicLink"/><q-btn outline color="primary" icon="forum" label="Responder en buzón" no-caps :to="inboxTarget"/><q-btn outline color="primary" icon="edit" label="Editar" no-caps @click="openEdit"/><q-btn outline color="primary" icon="picture_as_pdf" label="PDF" no-caps @click="downloadFile(`/reportes/solicitudes/${item.id}.pdf`,`${item.codigo}-solicitud.pdf`)"/><q-btn v-if="!item.proyecto" color="secondary" unelevated icon="rocket_launch" label="Convertir en proyecto" no-caps @click="openProject"/><q-btn v-else color="primary" outline icon="open_in_new" label="Abrir proyecto" no-caps :to="`/proyectos/${item.proyecto.id}`"/></div>
+      <div class="row q-gutter-sm"><q-btn outline color="primary" icon="open_in_new" label="Ver formulario" no-caps @click="openPublic"/><q-btn outline color="primary" icon="content_copy" label="Copiar formulario" no-caps @click="copyPublicLink"/><q-btn outline color="primary" icon="forum" label="Responder en buzón" no-caps :to="inboxTarget"/><q-btn outline color="primary" icon="edit" label="Editar" no-caps @click="openEdit"/><q-btn outline color="primary" icon="picture_as_pdf" label="PDF" no-caps @click="downloadFile(`/reportes/solicitudes/${item.id}.pdf`,`${item.codigo}-solicitud.pdf`)"/><q-btn v-if="canCreateProject" color="secondary" unelevated icon="rocket_launch" label="Convertir en proyecto" no-caps @click="openProject"/><q-btn v-else color="primary" outline icon="open_in_new" label="Abrir proyecto" no-caps :to="`/proyectos/${item.proyecto.id}`"/></div>
     </PageHeader>
 
     <div class="row q-col-gutter-lg q-mb-lg">
@@ -91,7 +127,64 @@ watch(()=>route.params.id,load)
 
     <q-tabs v-model="tab" align="left" dense active-color="primary" indicator-color="primary" class="q-mb-md"><q-tab name="resumen" icon="info" label="Resumen" no-caps/><q-tab name="cuestionario" icon="fact_check" :label="`Respuestas (${answeredCount})`" no-caps/></q-tabs>
     <q-tab-panels v-model="tab" animated class="bg-transparent">
-      <q-tab-panel name="resumen" class="q-pa-none"><div class="row q-col-gutter-lg"><div class="col-12 col-md-6"><q-card flat class="viti-card"><q-card-section><div class="text-h6 text-weight-bold">Empresa</div></q-card-section><q-separator/><q-list><q-item><q-item-section avatar><q-icon name="business"/></q-item-section><q-item-section><q-item-label caption>Empresa o microempresa</q-item-label><q-item-label class="text-weight-bold">{{item.empresa?.nombre_comercial}}</q-item-label><q-item-label caption>{{item.empresa?.actividad||'Actividad no registrada'}}</q-item-label></q-item-section></q-item><q-item><q-item-section avatar><q-icon name="person"/></q-item-section><q-item-section><q-item-label caption>Responsable</q-item-label><q-item-label>{{item.cliente?.nombre}} · {{item.cliente?.telefono}}</q-item-label></q-item-section></q-item></q-list></q-card></div><div class="col-12 col-md-6"><q-card flat class="viti-card"><q-card-section><div class="text-h6 text-weight-bold">Siguiente decisión</div></q-card-section><q-separator/><q-card-section><q-banner rounded :class="item.proyecto?'bg-green-1 text-green-9':'bg-blue-1 text-primary'"><template #avatar><q-icon :name="item.proyecto?'check_circle':'rate_review'"/></template><div class="text-weight-bold">{{item.proyecto?'Solicitud convertida en proyecto':'Revisar alcance antes de convertir'}}</div><div class="text-caption">{{item.proyecto?'El plan y la empresa ya quedaron vinculados al proyecto.':'Verifica que el plan cubra las funciones pedidas y que el acuerdo comercial sea coherente antes de iniciar.'}}</div></q-banner></q-card-section></q-card></div></div></q-tab-panel>
+      <q-tab-panel name="resumen" class="q-pa-none">
+        <div class="row q-col-gutter-lg">
+          <div class="col-12 col-md-6">
+            <q-card flat class="viti-card full-height">
+              <q-card-section><div class="text-h6 text-weight-bold">Empresa</div></q-card-section><q-separator/>
+              <q-list>
+                <q-item><q-item-section avatar><q-icon name="business"/></q-item-section><q-item-section><q-item-label caption>Empresa o microempresa</q-item-label><q-item-label class="text-weight-bold">{{item.empresa?.nombre_comercial}}</q-item-label><q-item-label caption>{{item.empresa?.actividad||'Actividad no registrada'}}</q-item-label></q-item-section></q-item>
+                <q-item><q-item-section avatar><q-icon name="person"/></q-item-section><q-item-section><q-item-label caption>Responsable</q-item-label><q-item-label>{{item.cliente?.nombre}} · {{item.cliente?.telefono}}</q-item-label><q-item-label v-if="item.cliente?.correo" caption>{{item.cliente.correo}}</q-item-label></q-item-section></q-item>
+              </q-list>
+            </q-card>
+          </div>
+          <div class="col-12 col-md-6">
+            <q-card flat class="viti-card full-height">
+              <q-card-section><div class="text-h6 text-weight-bold">Siguiente decisión</div></q-card-section><q-separator/>
+              <q-card-section><q-banner rounded :class="nextDecision.klass"><template #avatar><q-icon :name="nextDecision.icon"/></template><div class="text-weight-bold">{{nextDecision.title}}</div><div class="text-caption">{{nextDecision.text}}</div></q-banner></q-card-section>
+            </q-card>
+          </div>
+        </div>
+
+        <q-card flat class="viti-card access-admin-card q-mt-lg">
+          <q-card-section class="row items-start justify-between q-col-gutter-md">
+            <div class="col-12 col-md">
+              <div class="section-label">Acceso del cliente</div>
+              <div class="text-h6 text-weight-bold">{{ hasAccount ? 'Cuenta VITI creada' : 'Invitación de registro' }}</div>
+              <div class="text-body2 text-grey-7 q-mt-xs">
+                <template v-if="hasAccount">El responsable ya tiene una cuenta vinculada a esta misma solicitud.</template>
+                <template v-else>Correo de entrega: <strong>{{access.correo||'No registrado'}}</strong></template>
+              </div>
+            </div>
+            <div class="col-12 col-md-auto row q-gutter-sm items-center">
+              <q-badge v-if="access.estado" outline :color="hasAccount?'positive':access.estado==='enviada'?'positive':access.estado==='vencida'||access.estado==='revocada'?'negative':'orange'">{{pretty(access.estado)}}</q-badge>
+            </div>
+          </q-card-section>
+          <q-separator/>
+          <q-card-section>
+            <div v-if="hasAccount" class="row items-center q-gutter-md">
+              <q-icon name="verified_user" color="positive" size="34px"/>
+              <div><div class="text-weight-bold">Registro completado</div><div class="text-caption text-grey-7">Usuario: {{access.usuario||'Cuenta vinculada'}}. El flujo puede continuar con la revisión y aprobación comercial.</div></div>
+            </div>
+            <template v-else>
+              <q-banner v-if="access.error_envio" rounded class="bg-orange-1 text-orange-10 q-mb-md"><template #avatar><q-icon name="mail_lock"/></template>{{access.error_envio}}</q-banner>
+              <div class="row q-col-gutter-md q-mb-md" v-if="access.id">
+                <div class="col-12 col-sm-4"><div class="detail-label">Estado</div><div class="text-weight-bold">{{pretty(access.estado)}}</div></div>
+                <div class="col-12 col-sm-4"><div class="detail-label">Último envío</div><div>{{formatDateTime(access.ultimo_envio_at||access.enviada_at)}}</div></div>
+                <div class="col-12 col-sm-4"><div class="detail-label">Vence</div><div>{{formatDateTime(access.expira_at)}}</div></div>
+              </div>
+              <div class="row q-gutter-sm">
+                <q-btn v-if="['pendiente_aprobacion','vencida','revocada'].includes(access.estado)" color="primary" unelevated no-caps icon="mark_email_read" label="Aprobar y enviar invitación" :loading="inviteLoading" :disable="!access.correo" @click="createInvitation"/>
+                <q-btn v-else-if="!access.id && access.puede_enviar" color="primary" unelevated no-caps icon="mark_email_read" label="Aprobar y enviar invitación" :loading="inviteLoading" @click="createInvitation"/>
+                <q-btn v-if="access.puede_reenviar" outline color="primary" no-caps icon="forward_to_inbox"  :label="access.estado==='pendiente'?'Intentar enviar correo':'Reenviar correo'" :loading="inviteLoading" @click="resendInvitation"/>
+                <q-btn v-if="access.url" outline color="primary" no-caps icon="content_copy" label="Copiar invitación" @click="copyInvitation"/>
+                <q-btn v-if="access.puede_revocar" flat color="negative" no-caps icon="link_off" label="Revocar" :loading="inviteLoading" @click="revokeInvitation"/>
+              </div>
+              <div v-if="access.estado==='sin_correo'" class="q-mt-sm"><div class="text-caption text-negative">La solicitud necesita un correo del responsable antes de generar la invitación.</div><q-btn flat color="primary" no-caps icon="edit" label="Editar responsable" to="/empresas" class="q-mt-xs"/></div>
+            </template>
+          </q-card-section>
+        </q-card>
+      </q-tab-panel>
 
       <q-tab-panel name="cuestionario" class="q-pa-none">
         <div v-if="!answeredSections.length" class="text-grey-6 q-py-lg">Sin respuestas adicionales registradas.</div>
