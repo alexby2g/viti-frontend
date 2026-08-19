@@ -85,7 +85,7 @@
       <q-card style="width: 760px; max-width: 95vw" class="bg-dark">
         <q-card-section>
           <div class="text-h6">Integrar usuarios — {{ selected?.name }}</div>
-          <div class="text-caption text-grey-5">Solo se pueden integrar usuarios que ya pertenecen a la empresa.</div>
+          <div class="text-caption text-grey-5">Los usuarios disponibles pertenecen a la empresa de la aplicación.</div>
         </q-card-section>
         <q-card-section>
           <q-input v-model="userSearch" outlined dense placeholder="Buscar usuario VITI..." class="q-mb-md" />
@@ -96,10 +96,10 @@
                 <q-item-label>{{ user.name }}</q-item-label>
                 <q-item-label caption>{{ user.email || user.username }}</q-item-label>
               </q-item-section>
+              <q-item-section side><q-select v-model="user.role" dense outlined :options="roles" /></q-item-section>
               <q-item-section side>
-                <q-select v-model="user.role" dense outlined :options="roles" />
+                <q-btn flat :color="user.integrated ? 'positive' : 'primary'" :icon="user.integrated ? 'check' : 'add_link'" :disable="user.integrated" @click="integrateUser(user)" />
               </q-item-section>
-              <q-item-section side><q-btn flat color="primary" icon="add_link" @click="integrateUser(user)" /></q-item-section>
             </q-item>
           </q-list>
         </q-card-section>
@@ -168,7 +168,7 @@ function normalizeApp (row) {
     primary_color: row.color_primario || '',
     secondary_color: row.color_secundario || '',
     modules: Array.isArray(row.modulos) ? row.modulos : [],
-    is_active: row.estado !== 'retirado',
+    is_active: row.configuracion?.habilitada !== false && row.estado !== 'retirado',
     type: row.es_plantilla ? 'template' : 'application',
     company_name: row.empresa?.nombre_comercial || ''
   }
@@ -191,7 +191,7 @@ async function loadCompanies () {
 }
 
 async function editApp (app) {
-  selected.value = { ...app, modules: [...(app.modules || [])] }
+  selected.value = { ...app, modules: [...(app.modules || [])], configuracion: { ...(app.configuracion || {}) } }
   showEdit.value = true
 }
 
@@ -204,7 +204,8 @@ async function saveApp () {
       icono: selected.value.icon,
       color_primario: selected.value.primary_color,
       color_secundario: selected.value.secondary_color,
-      modulos: selected.value.modules
+      modulos: selected.value.modules,
+      configuracion: { ...selected.value.configuracion, habilitada: selected.value.is_active }
     })
     await loadApps(); showEdit.value = false
   } catch (e) { console.error(e) }
@@ -213,15 +214,22 @@ async function saveApp () {
 async function openUsers (app) {
   selected.value = app
   try {
-    const { data } = await api.get(`/aplicaciones/${app.id}`)
-    const rows = data.data?.usuarios ?? []
-    users.value = rows.map(u => ({
-      id: u.id,
-      name: `${u.nombre || ''} ${u.apellido || ''}`.trim() || u.usuario,
-      email: u.correo,
-      username: u.usuario,
-      role: u.pivot?.rol || 'Consulta'
-    }))
+    const detailResponse = await api.get(`/aplicaciones/${app.id}`)
+    const integrated = detailResponse.data?.data?.usuarios ?? []
+    const integratedMap = new Map(integrated.map(u => [u.id, u]))
+    const usersResponse = await api.get('/usuarios')
+    const all = usersResponse.data?.data ?? usersResponse.data ?? []
+    users.value = (Array.isArray(all) ? all : []).map(u => {
+      const current = integratedMap.get(u.id)
+      return {
+        id: u.id,
+        name: `${u.nombre || ''} ${u.apellido || ''}`.trim() || u.usuario,
+        email: u.correo,
+        username: u.usuario,
+        role: current?.pivot?.rol || 'Consulta',
+        integrated: Boolean(current)
+      }
+    })
   } catch (e) { console.error(e); users.value = [] }
   showUsers.value = true
 }
@@ -229,6 +237,7 @@ async function openUsers (app) {
 async function integrateUser (user) {
   try {
     await api.put(`/aplicaciones/${selected.value.id}`, { integrar_usuario: true, user_id: user.id, role: user.role.toLowerCase() })
+    user.integrated = true
   } catch (e) { console.error(e) }
 }
 
