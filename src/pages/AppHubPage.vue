@@ -32,8 +32,8 @@
             <q-card flat bordered class="app-card full-height">
               <q-card-section class="row no-wrap items-start">
                 <q-avatar size="52px" color="primary" text-color="white" class="q-mr-md">
-                  <img v-if="app.icon" :src="app.icon" alt="" />
-                  <q-icon v-else name="apps" />
+                  <img v-if="isImageIcon(app.icon)" :src="app.icon" alt="" @error="onIconError" />
+                  <q-icon v-else :name="app.icon || 'apps'" />
                 </q-avatar>
                 <div class="col">
                   <div class="text-h6">{{ app.name }}</div>
@@ -59,12 +59,25 @@
     </q-card>
 
     <q-dialog v-model="showEdit">
-      <q-card style="width: 760px; max-width: 95vw" class="bg-dark">
+      <q-card style="width: 800px; max-width: 95vw" class="bg-dark">
         <q-card-section><div class="text-h6">Personalizar aplicación</div></q-card-section>
         <q-card-section v-if="selected">
           <div class="row q-col-gutter-md">
             <q-input v-model="selected.name" outlined label="Nombre del sistema" class="col-12 col-md-6" />
-            <q-input v-model="selected.icon" outlined label="URL del ícono/logo" class="col-12 col-md-6" />
+            <q-input v-model="selected.icon" outlined label="URL del ícono/logo" hint="También puedes subir una imagen debajo." class="col-12 col-md-6" />
+            <div class="col-12 col-md-6">
+              <q-file v-model="selected.icon_file" outlined accept="image/png,image/jpeg,image/webp,image/svg+xml" label="Subir foto o logo" clearable @update:model-value="prepareIconFile">
+                <template #prepend><q-icon name="upload" /></template>
+              </q-file>
+              <div v-if="selected.icon_file" class="text-caption text-grey-5 q-mt-xs">{{ selected.icon_file.name }}</div>
+            </div>
+            <div class="col-12 col-md-6 flex items-center">
+              <q-avatar size="64px" color="primary" text-color="white">
+                <img v-if="isImageIcon(selected.icon)" :src="selected.icon" alt="" />
+                <q-icon v-else :name="selected.icon || 'apps'" />
+              </q-avatar>
+              <div class="q-ml-md text-caption text-grey-5">Vista previa del ícono</div>
+            </div>
             <q-input v-model="selected.description" outlined label="Descripción" class="col-12" />
             <q-input v-model="selected.primary_color" outlined label="Color principal" class="col-12 col-md-6" />
             <q-input v-model="selected.secondary_color" outlined label="Color secundario" class="col-12 col-md-6" />
@@ -83,25 +96,29 @@
     </q-dialog>
 
     <q-dialog v-model="showUsers">
-      <q-card style="width: 760px; max-width: 95vw" class="bg-dark">
+      <q-card style="width: 800px; max-width: 95vw" class="bg-dark">
         <q-card-section>
-          <div class="text-h6">Integrar usuarios — {{ selected?.name }}</div>
-          <div class="text-caption text-grey-5">Solo aparecen usuarios que ya pertenecen a la empresa.</div>
+          <div class="text-h6">Integrar usuarios VITI — {{ selected?.name }}</div>
+          <div class="text-caption text-grey-5">Busca aquí a los usuarios que ya existen en VITI y después intégralos a esta aplicación.</div>
         </q-card-section>
         <q-card-section>
-          <q-input v-model="userSearch" outlined dense placeholder="Buscar usuario VITI..." class="q-mb-md" />
+          <q-input v-model="userSearch" outlined dense clearable placeholder="Buscar por nombre, usuario, correo o teléfono..." class="q-mb-md">
+            <template #prepend><q-icon name="search" /></template>
+          </q-input>
           <q-list bordered separator>
             <q-item v-for="user in filteredUsers" :key="user.id">
               <q-item-section avatar><q-avatar color="primary" text-color="white"><q-icon name="person" /></q-avatar></q-item-section>
               <q-item-section>
                 <q-item-label>{{ user.name }}</q-item-label>
-                <q-item-label caption>{{ user.email || user.username }}</q-item-label>
+                <q-item-label caption>{{ user.email || user.username || user.phone || 'Usuario VITI' }}</q-item-label>
+                <q-item-label v-if="user.company_name" caption class="text-primary">{{ user.company_name }}</q-item-label>
               </q-item-section>
               <q-item-section side><q-select v-model="user.role" dense outlined :options="roles" /></q-item-section>
               <q-item-section side>
-                <q-btn flat :color="user.integrated ? 'positive' : 'primary'" :icon="user.integrated ? 'check' : 'add_link'" :disable="user.integrated" @click="integrateUser(user)" />
+                <q-btn flat :color="user.integrated ? 'positive' : 'primary'" :icon="user.integrated ? 'check' : 'add_link'" :label="user.integrated ? 'Integrado' : 'Integrar'" :disable="user.integrated" @click="integrateUser(user)" />
               </q-item-section>
             </q-item>
+            <q-item v-if="!filteredUsers.length"><q-item-section class="text-center text-grey-5 q-pa-lg">No se encontró ningún usuario de VITI con esa búsqueda.</q-item-section></q-item>
           </q-list>
         </q-card-section>
         <q-card-actions align="right"><q-btn flat label="Cerrar" v-close-popup /></q-card-actions>
@@ -155,7 +172,11 @@ const filteredApps = computed(() => apps.value.filter(a =>
   `${a.name} ${a.description || ''} ${a.company_name || ''}`.toLowerCase().includes(search.value.toLowerCase())
 ))
 const templates = computed(() => apps.value.filter(a => a.type === 'template'))
-const filteredUsers = computed(() => users.value.filter(u => `${u.name} ${u.email || ''} ${u.username || ''}`.toLowerCase().includes(userSearch.value.toLowerCase())))
+const filteredUsers = computed(() => users.value.filter(u => {
+  const q = userSearch.value.toLowerCase().trim()
+  if (!q) return true
+  return `${u.name} ${u.email || ''} ${u.username || ''} ${u.phone || ''} ${u.company_name || ''}`.toLowerCase().includes(q)
+}))
 const stats = computed(() => [
   { label: 'Aplicaciones', value: apps.value.filter(a => a.type !== 'template').length },
   { label: 'Plantillas', value: apps.value.filter(a => a.type === 'template').length },
@@ -175,6 +196,29 @@ function notifyError (error, fallback = 'No se pudo completar la operación.') {
     return
   }
   Notify.create({ type: 'negative', timeout: 6000, message: message || fallback })
+}
+
+function isImageIcon (icon) {
+  return typeof icon === 'string' && /^(https?:\/\/|data:image\/|blob:)/i.test(icon)
+}
+
+function onIconError (event) {
+  event.target.style.display = 'none'
+}
+
+function prepareIconFile (file) {
+  if (!file || !selected.value) return
+  if (file.size > 1024 * 1024) {
+    Notify.create({ type: 'warning', message: 'El logo debe pesar como máximo 1 MB.' })
+    selected.value.icon_file = null
+    return
+  }
+  const reader = new FileReader()
+  reader.onload = () => {
+    selected.value.icon = String(reader.result || '')
+  }
+  reader.onerror = () => Notify.create({ type: 'negative', message: 'No se pudo leer la imagen seleccionada.' })
+  reader.readAsDataURL(file)
 }
 
 function normalizeApp (row) {
@@ -210,7 +254,7 @@ async function loadCompanies () {
 }
 
 async function editApp (app) {
-  selected.value = { ...app, modules: [...(app.modules || [])], configuracion: { ...(app.configuracion || {}) } }
+  selected.value = { ...app, modules: [...(app.modules || [])], configuracion: { ...(app.configuracion || {}) }, icon_file: null }
   showEdit.value = true
 }
 
@@ -234,26 +278,34 @@ async function saveApp () {
 
 async function openUsers (app) {
   selected.value = app
+  userSearch.value = ''
   try {
     const detailResponse = await api.get(`/aplicaciones/${app.id}`)
     const integrated = detailResponse.data?.data?.usuarios ?? []
     const integratedMap = new Map(integrated.map(u => [u.id, u]))
-    const usersResponse = await api.get('/usuarios')
-    const all = usersResponse.data?.data ?? usersResponse.data ?? []
-    users.value = (Array.isArray(all) ? all : [])
-      .filter(u => Array.isArray(u.negocios) && u.negocios.some(b => Number(b.id) === Number(app.empresa_id)))
-      .map(u => {
-        const current = integratedMap.get(u.id)
-        return {
-          id: u.id,
-          name: `${u.nombre || ''} ${u.apellido || ''}`.trim() || u.usuario,
-          email: u.correo,
-          username: u.usuario,
-          role: current?.pivot?.rol || 'Consulta',
-          integrated: Boolean(current)
-        }
-      })
-  } catch (e) { console.error(e); users.value = []; notifyError(e, 'No se pudieron cargar los usuarios.') }
+
+    // /usuarios ya representa a los usuarios registrados en VITI. No filtramos por
+    // `negocios` porque ese campo no viene garantizado por este endpoint y hacía
+    // desaparecer usuarios válidos del buscador.
+    const usersResponse = await api.get('/usuarios', { params: { per_page: 100 } })
+    const payload = usersResponse.data?.data ?? usersResponse.data ?? []
+    const all = Array.isArray(payload) ? payload : []
+
+    users.value = all.map(u => {
+      const current = integratedMap.get(u.id)
+      const company = u.empresa?.nombre_comercial || u.empresa?.nombre || u.empresa_nombre || ''
+      return {
+        id: u.id,
+        name: `${u.nombre || ''} ${u.apellido || ''}`.trim() || u.usuario || u.username || 'Usuario VITI',
+        email: u.correo || u.email,
+        username: u.usuario || u.username,
+        phone: u.telefono || u.celular,
+        company_name: company,
+        role: current?.pivot?.rol || 'Consulta',
+        integrated: Boolean(current)
+      }
+    })
+  } catch (e) { console.error(e); users.value = []; notifyError(e, 'No se pudieron cargar los usuarios de VITI.') }
   showUsers.value = true
 }
 
