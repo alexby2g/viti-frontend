@@ -3,9 +3,11 @@ import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { useQuasar } from 'quasar'
 import { api } from '../boot/axios'
+import { useTenantStore } from '../stores/tenant'
 
 const $q = useQuasar()
 const route = useRoute()
+const tenant = useTenantStore()
 const base = '/mi/apps/peluqueria'
 const loading = ref(false)
 const resumen = ref({clientes:0,citas_hoy:0,en_atencion:0,atenciones_hoy:0,ingresos_hoy:0,agenda_hoy:[]})
@@ -20,6 +22,7 @@ const atencionForm = reactive({cita_id:null,cliente_id:null,servicio_id:null,per
 const pagoForm = reactive({metodo:'efectivo',monto:0,referencia:''})
 
 const section = computed(()=>route.meta.hairSection || 'inicio')
+const hasModule = module => tenant.hasModule(module)
 const activeClientes = computed(()=>clientes.value.filter(x=>x.activo))
 const activeServicios = computed(()=>servicios.value.filter(x=>x.activo))
 const activePersonal = computed(()=>personal.value.filter(x=>x.activo))
@@ -34,10 +37,25 @@ const notifyError = (e,msg='No se pudo completar la operación.')=>$q.notify({ty
 async function loadAll(){
   loading.value=true
   try{
-    const [r,c,s,p,a,t,h]=await Promise.all([
-      api.get(`${base}/resumen`),api.get(`${base}/clientes`),api.get(`${base}/servicios`),api.get(`${base}/personal`),api.get(`${base}/citas`),api.get(`${base}/atenciones`),api.get(`${base}/historial`),
-    ])
-    resumen.value=r.data.data||resumen.value; clientes.value=c.data.data||[]; servicios.value=s.data.data||[]; personal.value=p.data.data||[]; citas.value=a.data.data||[]; atenciones.value=t.data.data||[]; historial.value=h.data.data||[]
+    if(!tenant.loaded) await tenant.load()
+    const requests = []
+    if(hasModule('inicio')) requests.push(['resumen',api.get(`${base}/resumen`)])
+    if(hasModule('clientes')) requests.push(['clientes',api.get(`${base}/clientes`)])
+    if(hasModule('ordenes')) requests.push(['servicios',api.get(`${base}/servicios`)],['atenciones',api.get(`${base}/atenciones`)])
+    if(hasModule('tecnicos')) requests.push(['personal',api.get(`${base}/personal`)])
+    if(hasModule('agenda')) requests.push(['citas',api.get(`${base}/citas`)])
+    if(hasModule('historial')) requests.push(['historial',api.get(`${base}/historial`)])
+
+    const results = await Promise.all(requests.map(async ([key,promise]) => [key,(await promise).data.data]))
+    for(const [key,data] of results){
+      if(key==='resumen') resumen.value=data||resumen.value
+      if(key==='clientes') clientes.value=data||[]
+      if(key==='servicios') servicios.value=data||[]
+      if(key==='personal') personal.value=data||[]
+      if(key==='citas') citas.value=data||[]
+      if(key==='atenciones') atenciones.value=data||[]
+      if(key==='historial') historial.value=data||[]
+    }
   }catch(e){notifyError(e,'No se pudieron cargar los datos de Peluquería.')}finally{loading.value=false}
 }
 
@@ -84,17 +102,17 @@ watch(()=>route.fullPath,()=>window.scrollTo({top:0,behavior:'smooth'}))
 
   <div class="row items-center q-col-gutter-md q-mb-lg">
     <div class="col"><div class="text-overline text-primary">Peluquería</div><div class="text-h4 text-weight-bold">{{ pretty(section) }}</div><div class="text-body2 text-grey-7">Administra tu negocio desde tu aplicación VITI.</div></div>
-    <div class="col-auto row q-gutter-sm" v-if="['inicio','agenda','atenciones'].includes(section)"><q-btn color="primary" unelevated no-caps icon="event" label="Nueva cita" @click="open('cita')"/><q-btn outline color="primary" no-caps icon="content_cut" label="Nueva atención" @click="open('atencion')"/></div>
+    <div class="col-auto row q-gutter-sm" v-if="['inicio','agenda','atenciones'].includes(section)"><q-btn v-if="hasModule('agenda')" color="primary" unelevated no-caps icon="event" label="Nueva cita" @click="open('cita')"/><q-btn v-if="hasModule('ordenes')" outline color="primary" no-caps icon="content_cut" label="Nueva atención" @click="open('atencion')"/></div>
   </div>
 
   <template v-if="section==='inicio'">
     <div class="metrics-grid">
-      <q-card flat class="hair-card"><q-card-section><q-icon name="groups" color="primary" size="30px"/><div class="metric">{{resumen.clientes}}</div><div class="text-caption text-grey-6">Clientes activos</div></q-card-section></q-card>
-      <q-card flat class="hair-card"><q-card-section><q-icon name="event" color="primary" size="30px"/><div class="metric">{{resumen.citas_hoy}}</div><div class="text-caption text-grey-6">Citas hoy</div></q-card-section></q-card>
-      <q-card flat class="hair-card"><q-card-section><q-icon name="content_cut" color="primary" size="30px"/><div class="metric">{{resumen.en_atencion}}</div><div class="text-caption text-grey-6">En atención</div></q-card-section></q-card>
-      <q-card flat class="hair-card"><q-card-section><q-icon name="payments" color="primary" size="30px"/><div class="metric money">{{money(resumen.ingresos_hoy)}}</div><div class="text-caption text-grey-6">Ingresos hoy</div></q-card-section></q-card>
+      <q-card v-if="hasModule('clientes')" flat class="hair-card"><q-card-section><q-icon name="groups" color="primary" size="30px"/><div class="metric">{{resumen.clientes}}</div><div class="text-caption text-grey-6">Clientes activos</div></q-card-section></q-card>
+      <q-card v-if="hasModule('agenda')" flat class="hair-card"><q-card-section><q-icon name="event" color="primary" size="30px"/><div class="metric">{{resumen.citas_hoy}}</div><div class="text-caption text-grey-6">Citas hoy</div></q-card-section></q-card>
+      <q-card v-if="hasModule('ordenes')" flat class="hair-card"><q-card-section><q-icon name="content_cut" color="primary" size="30px"/><div class="metric">{{resumen.en_atencion}}</div><div class="text-caption text-grey-6">En atención</div></q-card-section></q-card>
+      <q-card v-if="hasModule('pagos')" flat class="hair-card"><q-card-section><q-icon name="payments" color="primary" size="30px"/><div class="metric money">{{money(resumen.ingresos_hoy)}}</div><div class="text-caption text-grey-6">Ingresos hoy</div></q-card-section></q-card>
     </div>
-    <q-card flat class="hair-card q-mt-lg"><q-card-section><div class="text-h6 text-weight-bold">Agenda de hoy</div></q-card-section><q-list separator><q-item v-for="c in resumen.agenda_hoy||[]" :key="c.id"><q-item-section avatar><q-avatar color="primary" text-color="white" icon="event"/></q-item-section><q-item-section><q-item-label class="text-weight-bold">{{(c.hora_inicio||'').slice(0,5)}} · {{c.cliente?.nombre}}</q-item-label><q-item-label caption>{{c.servicio?.nombre}} · {{c.personal?.nombre||'Sin asignar'}}</q-item-label></q-item-section><q-item-section side><q-badge :color="statusColor(c.estado)">{{pretty(c.estado)}}</q-badge></q-item-section></q-item><div v-if="!(resumen.agenda_hoy||[]).length" class="empty">No hay citas para hoy.</div></q-list></q-card>
+    <q-card v-if="hasModule('agenda')" flat class="hair-card q-mt-lg"><q-card-section><div class="text-h6 text-weight-bold">Agenda de hoy</div></q-card-section><q-list separator><q-item v-for="c in resumen.agenda_hoy||[]" :key="c.id"><q-item-section avatar><q-avatar color="primary" text-color="white" icon="event"/></q-item-section><q-item-section><q-item-label class="text-weight-bold">{{(c.hora_inicio||'').slice(0,5)}} · {{c.cliente?.nombre}}</q-item-label><q-item-label caption>{{c.servicio?.nombre}} · {{c.personal?.nombre||'Sin asignar'}}</q-item-label></q-item-section><q-item-section side><q-badge :color="statusColor(c.estado)">{{pretty(c.estado)}}</q-badge></q-item-section></q-item><div v-if="!(resumen.agenda_hoy||[]).length" class="empty">No hay citas para hoy.</div></q-list></q-card>
   </template>
 
   <template v-else-if="section==='agenda'">
@@ -119,7 +137,7 @@ watch(()=>route.fullPath,()=>window.scrollTo({top:0,behavior:'smooth'}))
 
   <template v-else-if="section==='atenciones'">
     <div class="toolbar"><div class="text-h6 text-weight-bold">Atenciones</div><q-btn color="primary" unelevated no-caps icon="add" label="Nueva atención" @click="open('atencion')"/></div>
-    <q-table flat class="hair-card" :rows="atenciones" row-key="id" :columns="[{name:'cliente',label:'Cliente',field:r=>r.cliente?.nombre,align:'left'},{name:'servicio',label:'Servicio',field:r=>r.servicio?.nombre,align:'left'},{name:'personal',label:'Personal',field:r=>r.personal?.nombre||'Sin asignar',align:'left'},{name:'estado',label:'Estado',field:'estado',align:'left'},{name:'total',label:'Total',field:r=>money(r.total),align:'right'},{name:'acciones',label:'',field:'id',align:'right'}]"><template #body-cell-estado="p"><q-td :props="p"><q-badge :color="statusColor(p.row.estado)">{{pretty(p.row.estado)}}</q-badge></q-td></template><template #body-cell-acciones="p"><q-td :props="p"><q-btn v-if="p.row.estado==='en_atencion'" flat dense color="positive" icon="check" label="Finalizar" no-caps @click="finalize(p.row)"/><q-btn v-if="p.row.estado==='finalizada'&&pendingAmount(p.row)>0" flat round dense color="primary" icon="payments" @click="openPayment(p.row)"/></q-td></template></q-table>
+    <q-table flat class="hair-card" :rows="atenciones" row-key="id" :columns="[{name:'cliente',label:'Cliente',field:r=>r.cliente?.nombre,align:'left'},{name:'servicio',label:'Servicio',field:r=>r.servicio?.nombre,align:'left'},{name:'personal',label:'Personal',field:r=>r.personal?.nombre||'Sin asignar',align:'left'},{name:'estado',label:'Estado',field:'estado',align:'left'},{name:'total',label:'Total',field:r=>money(r.total),align:'right'},{name:'acciones',label:'',field:'id',align:'right'}]"><template #body-cell-estado="p"><q-td :props="p"><q-badge :color="statusColor(p.row.estado)">{{pretty(p.row.estado)}}</q-badge></q-td></template><template #body-cell-acciones="p"><q-td :props="p"><q-btn v-if="p.row.estado==='en_atencion'" flat dense color="positive" icon="check" label="Finalizar" no-caps @click="finalize(p.row)"/><q-btn v-if="hasModule('pagos')&&p.row.estado==='finalizada'&&pendingAmount(p.row)>0" flat round dense color="primary" icon="payments" @click="openPayment(p.row)"/></q-td></template></q-table>
   </template>
 
   <template v-else-if="section==='caja'">
@@ -139,7 +157,7 @@ watch(()=>route.fullPath,()=>window.scrollTo({top:0,behavior:'smooth'}))
     <div v-if="dialogType==='atencion'" class="row q-col-gutter-md"><div class="col-12"><q-select v-model="atencionForm.cliente_id" outlined emit-value map-options :options="activeClientes.map(x=>({label:x.nombre,value:x.id}))" label="Cliente *"/></div><div class="col-12 col-sm-6"><q-select v-model="atencionForm.servicio_id" outlined emit-value map-options :options="activeServicios.map(x=>({label:`${x.nombre} · ${money(x.precio)}`,value:x.id}))" label="Servicio *"/></div><div class="col-12 col-sm-6"><q-select v-model="atencionForm.personal_id" outlined emit-value map-options clearable :options="activePersonal.map(x=>({label:x.nombre,value:x.id}))" label="Personal"/></div><div class="col-12"><q-input v-model.number="atencionForm.descuento" outlined type="number" label="Descuento Bs"/></div><div class="col-12"><q-input v-model="atencionForm.observaciones" outlined type="textarea" label="Observaciones"/></div></div>
   </q-card-section><q-card-actions align="right"><q-btn flat label="Cancelar" v-close-popup/><q-btn color="primary" unelevated no-caps label="Guardar" @click="saveDialog"/></q-card-actions></q-card></q-dialog>
 
-  <q-dialog v-model="paymentDialog"><q-card style="width:460px;max-width:94vw"><q-card-section><div class="text-h6 text-weight-bold">Registrar pago</div><div class="text-caption text-grey-6">Saldo pendiente: {{money(paymentAtencion?pendingAmount(paymentAtencion):0)}}</div></q-card-section><q-card-section class="q-gutter-md"><q-select v-model="pagoForm.metodo" outlined :options="['efectivo','qr','transferencia','tarjeta','otro']" label="Método"/><q-input v-model.number="pagoForm.monto" outlined type="number" label="Monto Bs"/><q-input v-model="pagoForm.referencia" outlined label="Referencia"/></q-card-section><q-card-actions align="right"><q-btn flat label="Cancelar" v-close-popup/><q-btn color="primary" unelevated no-caps label="Registrar pago" @click="savePayment"/></q-card-actions></q-card></q-dialog>
+  <q-dialog v-if="hasModule('pagos')" v-model="paymentDialog"><q-card style="width:460px;max-width:94vw"><q-card-section><div class="text-h6 text-weight-bold">Registrar pago</div><div class="text-caption text-grey-6">Saldo pendiente: {{money(paymentAtencion?pendingAmount(paymentAtencion):0)}}</div></q-card-section><q-card-section class="q-gutter-md"><q-select v-model="pagoForm.metodo" outlined :options="['efectivo','qr','transferencia','tarjeta','otro']" label="Método"/><q-input v-model.number="pagoForm.monto" outlined type="number" label="Monto Bs"/><q-input v-model="pagoForm.referencia" outlined label="Referencia"/></q-card-section><q-card-actions align="right"><q-btn flat label="Cancelar" v-close-popup/><q-btn color="primary" unelevated no-caps label="Registrar pago" @click="savePayment"/></q-card-actions></q-card></q-dialog>
 </q-page>
 </template>
 
