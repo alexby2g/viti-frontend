@@ -95,7 +95,7 @@ check_page admin-request "$BASE/solicitudes/501" \
   "Solicitud autenticada E2E" \
   "Empresa Auth E2E" \
   "Cliente Admin E2E" \
-  "Convertir en proyecto" \
+  "Revisar solicitud de acceso" \
   "Empresas" \
   "Salud del sistema"
 
