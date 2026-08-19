@@ -85,7 +85,7 @@
       <q-card style="width: 760px; max-width: 95vw" class="bg-dark">
         <q-card-section>
           <div class="text-h6">Integrar usuarios — {{ selected?.name }}</div>
-          <div class="text-caption text-grey-5">Los usuarios disponibles pertenecen a la empresa de la aplicación.</div>
+          <div class="text-caption text-grey-5">Solo aparecen usuarios que ya pertenecen a la empresa.</div>
         </q-card-section>
         <q-card-section>
           <q-input v-model="userSearch" outlined dense placeholder="Buscar usuario VITI..." class="q-mb-md" />
@@ -219,17 +219,19 @@ async function openUsers (app) {
     const integratedMap = new Map(integrated.map(u => [u.id, u]))
     const usersResponse = await api.get('/usuarios')
     const all = usersResponse.data?.data ?? usersResponse.data ?? []
-    users.value = (Array.isArray(all) ? all : []).map(u => {
-      const current = integratedMap.get(u.id)
-      return {
-        id: u.id,
-        name: `${u.nombre || ''} ${u.apellido || ''}`.trim() || u.usuario,
-        email: u.correo,
-        username: u.usuario,
-        role: current?.pivot?.rol || 'Consulta',
-        integrated: Boolean(current)
-      }
-    })
+    users.value = (Array.isArray(all) ? all : [])
+      .filter(u => Array.isArray(u.negocios) && u.negocios.some(b => Number(b.id) === Number(app.empresa_id)))
+      .map(u => {
+        const current = integratedMap.get(u.id)
+        return {
+          id: u.id,
+          name: `${u.nombre || ''} ${u.apellido || ''}`.trim() || u.usuario,
+          email: u.correo,
+          username: u.usuario,
+          role: current?.pivot?.rol || 'Consulta',
+          integrated: Boolean(current)
+        }
+      })
   } catch (e) { console.error(e); users.value = [] }
   showUsers.value = true
 }
