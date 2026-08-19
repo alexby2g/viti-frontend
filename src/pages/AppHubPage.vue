@@ -68,7 +68,8 @@
             <q-input v-model="selected.description" outlined label="Descripción" class="col-12" />
             <q-input v-model="selected.primary_color" outlined label="Color principal" class="col-12 col-md-6" />
             <q-input v-model="selected.secondary_color" outlined label="Color secundario" class="col-12 col-md-6" />
-            <q-toggle v-model="selected.is_active" label="Aplicación habilitada" class="col-12" />
+            <q-toggle v-model="selected.is_active" label="Aplicación habilitada" class="col-12 col-md-6" />
+            <q-toggle v-model="selected.is_template" label="Usar como plantilla base" class="col-12 col-md-6" />
           </div>
           <div class="text-subtitle1 q-mt-lg q-mb-sm">Módulos habilitados</div>
           <div class="row q-col-gutter-sm">
@@ -169,6 +170,7 @@ function normalizeApp (row) {
     secondary_color: row.color_secundario || '',
     modules: Array.isArray(row.modulos) ? row.modulos : [],
     is_active: row.configuracion?.habilitada !== false && row.estado !== 'retirado',
+    is_template: Boolean(row.es_plantilla),
     type: row.es_plantilla ? 'template' : 'application',
     company_name: row.empresa?.nombre_comercial || ''
   }
@@ -205,6 +207,7 @@ async function saveApp () {
       color_primario: selected.value.primary_color,
       color_secundario: selected.value.secondary_color,
       modulos: selected.value.modules,
+      es_plantilla: selected.value.is_template,
       configuracion: { ...selected.value.configuracion, habilitada: selected.value.is_active }
     })
     await loadApps(); showEdit.value = false
