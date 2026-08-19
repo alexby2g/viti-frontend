@@ -6,7 +6,7 @@ import { useTenantStore } from '../stores/tenant'
 
 export default defineRouter(({ store }) => {
   const publicRoutes = [
-    { path:'/viti', name:'viti-landing', component:() => import('../pages/VitiLandingPage.vue'), meta:{publicLanding:true} },
+    { path:'/viti', name:'viti-landing', component:() => import('../pages/VitiPresentationPage.vue'), meta:{publicLanding:true} },
     { path:'/viti/planes', name:'viti-plans', component:() => import('../pages/VitiPlansPage.vue'), meta:{publicLanding:true} },
     { path:'/planes', redirect:'/viti/planes', meta:{publicLanding:true} },
     { path:'/presentacion', redirect:'/viti', meta:{publicLanding:true} },
@@ -53,9 +53,6 @@ export default defineRouter(({ store }) => {
       if (to.meta.clientOnly && auth.user?.rol !== 'cliente') return homeFor(auth.user)
       if (to.meta.electroCustomerOnly && auth.user?.rol !== 'cliente_negocio') return homeFor(auth.user)
 
-      // Para cuentas cliente resolvemos la empresa activa antes de montar la página.
-      // Así cualquier petición del componente ya lleva X-VITI-Empresa y el backend
-      // nunca tiene que adivinar entre dos negocios del mismo usuario.
       if (auth.user?.rol === 'cliente') {
         const tenant = useTenantStore(store)
         if (!tenant.loaded) {
@@ -63,7 +60,6 @@ export default defineRouter(({ store }) => {
         }
       }
 
-      // Cada tipo de cuenta permanece dentro de su propio espacio autenticado.
       if (auth.user?.rol === 'soporte' && !to.meta.supportOnly) return { name:'support-internal-home' }
       if (!to.meta.electroCustomerOnly && auth.user?.rol === 'cliente_negocio') return { name:'electro-customer-home' }
     }
