@@ -49,6 +49,9 @@ export function buildMainMenu({
   ]
 
   if (isSuperAdmin) {
+    const development = operational.find(item => item.label === 'Desarrollo')
+    if (development) development.children.push({ label: 'AppHub', icon: 'hub', to: '/apphub' })
+
     operational.splice(1, 0, {
       label: 'Planes y cobros',
       icon: 'hub',
