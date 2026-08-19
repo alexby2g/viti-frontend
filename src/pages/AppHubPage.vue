@@ -4,19 +4,17 @@
       <div>
         <div class="text-overline text-primary">VITI APPHUB</div>
         <div class="text-h4 text-weight-bold">Centro de Aplicaciones e Integraciones</div>
-        <div class="text-subtitle1 text-grey-5">Administra plantillas, aplicaciones, usuarios y personalización por cliente.</div>
+        <div class="text-subtitle1 text-grey-5">Personaliza, clona, integra usuarios y entrega aplicaciones sin tocar las demás.</div>
       </div>
       <q-btn color="primary" icon="add" label="Nueva aplicación" @click="showNew = true" />
     </div>
 
     <div class="row q-col-gutter-md q-mb-lg">
       <div v-for="stat in stats" :key="stat.label" class="col-12 col-sm-4">
-        <q-card flat bordered class="bg-dark">
-          <q-card-section>
-            <div class="text-caption text-grey-5">{{ stat.label }}</div>
-            <div class="text-h4 text-weight-bold">{{ stat.value }}</div>
-          </q-card-section>
-        </q-card>
+        <q-card flat bordered class="bg-dark"><q-card-section>
+          <div class="text-caption text-grey-5">{{ stat.label }}</div>
+          <div class="text-h4 text-weight-bold">{{ stat.value }}</div>
+        </q-card-section></q-card>
       </div>
     </div>
 
@@ -40,6 +38,7 @@
                 <div class="col">
                   <div class="text-h6">{{ app.name }}</div>
                   <div class="text-caption text-grey-5">{{ app.description || 'Sin descripción' }}</div>
+                  <div class="text-caption text-grey-6 q-mt-xs">{{ app.company_name || 'Sin empresa' }}</div>
                   <div class="q-mt-sm">
                     <q-badge :color="app.is_active ? 'positive' : 'grey'">{{ app.is_active ? 'Activa' : 'Inactiva' }}</q-badge>
                     <q-badge outline color="primary" class="q-ml-sm">{{ app.type === 'template' ? 'Plantilla' : 'Aplicación' }}</q-badge>
@@ -49,7 +48,7 @@
               <q-separator dark />
               <q-card-actions align="right">
                 <q-btn flat color="primary" label="Editar" icon="edit" @click="editApp(app)" />
-                <q-btn flat color="secondary" label="Integrar usuarios" icon="group_add" @click="openUsers(app)" />
+                <q-btn flat color="secondary" label="Usuarios" icon="group_add" @click="openUsers(app)" />
                 <q-btn flat color="accent" label="Clonar" icon="content_copy" @click="cloneApp(app)" />
               </q-card-actions>
             </q-card>
@@ -68,7 +67,8 @@
             <q-input v-model="selected.icon" outlined label="URL del ícono/logo" class="col-12 col-md-6" />
             <q-input v-model="selected.description" outlined label="Descripción" class="col-12" />
             <q-input v-model="selected.primary_color" outlined label="Color principal" class="col-12 col-md-6" />
-            <q-toggle v-model="selected.is_active" label="Aplicación habilitada" class="col-12 col-md-6" />
+            <q-input v-model="selected.secondary_color" outlined label="Color secundario" class="col-12 col-md-6" />
+            <q-toggle v-model="selected.is_active" label="Aplicación habilitada" class="col-12" />
           </div>
           <div class="text-subtitle1 q-mt-lg q-mb-sm">Módulos habilitados</div>
           <div class="row q-col-gutter-sm">
@@ -82,15 +82,23 @@
     </q-dialog>
 
     <q-dialog v-model="showUsers">
-      <q-card style="width: 700px; max-width: 95vw" class="bg-dark">
-        <q-card-section><div class="text-h6">Integrar usuarios — {{ selected?.name }}</div></q-card-section>
+      <q-card style="width: 760px; max-width: 95vw" class="bg-dark">
+        <q-card-section>
+          <div class="text-h6">Integrar usuarios — {{ selected?.name }}</div>
+          <div class="text-caption text-grey-5">Solo se pueden integrar usuarios que ya pertenecen a la empresa.</div>
+        </q-card-section>
         <q-card-section>
           <q-input v-model="userSearch" outlined dense placeholder="Buscar usuario VITI..." class="q-mb-md" />
           <q-list bordered separator>
-            <q-item v-for="user in users" :key="user.id">
+            <q-item v-for="user in filteredUsers" :key="user.id">
               <q-item-section avatar><q-avatar color="primary" text-color="white"><q-icon name="person" /></q-avatar></q-item-section>
-              <q-item-section><q-item-label>{{ user.name }}</q-item-label><q-item-label caption>{{ user.email || user.username }}</q-item-label></q-item-section>
-              <q-item-section side><q-select v-model="user.role" dense outlined :options="roles" /></q-item-section>
+              <q-item-section>
+                <q-item-label>{{ user.name }}</q-item-label>
+                <q-item-label caption>{{ user.email || user.username }}</q-item-label>
+              </q-item-section>
+              <q-item-section side>
+                <q-select v-model="user.role" dense outlined :options="roles" />
+              </q-item-section>
               <q-item-section side><q-btn flat color="primary" icon="add_link" @click="integrateUser(user)" /></q-item-section>
             </q-item>
           </q-list>
@@ -100,14 +108,16 @@
     </q-dialog>
 
     <q-dialog v-model="showNew">
-      <q-card style="width: 600px; max-width: 95vw" class="bg-dark">
+      <q-card style="width: 650px; max-width: 95vw" class="bg-dark">
         <q-card-section><div class="text-h6">Nueva aplicación</div></q-card-section>
         <q-card-section>
+          <q-select v-model="newApp.company_id" outlined label="Empresa" :options="companies" option-label="name" option-value="id" emit-value map-options class="q-mb-md" />
           <q-input v-model="newApp.name" outlined label="Nombre" class="q-mb-md" />
           <q-input v-model="newApp.description" outlined label="Descripción" class="q-mb-md" />
-          <q-select v-model="newApp.source" outlined label="Origen" :options="['Desde plantilla','Aplicación nueva']" />
+          <q-select v-model="newApp.source" outlined label="Origen" :options="['Desde plantilla','Aplicación nueva']" class="q-mb-md" />
+          <q-select v-if="newApp.source === 'Desde plantilla'" v-model="newApp.template_id" outlined label="Plantilla base" :options="templates" option-label="name" option-value="id" emit-value map-options />
         </q-card-section>
-        <q-card-actions align="right"><q-btn flat label="Cancelar" v-close-popup /><q-btn color="primary" label="Crear" @click="createApp" /></q-card-actions>
+        <q-card-actions align="right"><q-btn flat label="Cancelar" v-close-popup /><q-btn color="primary" label="Crear aplicación" :disable="!newApp.company_id || !newApp.name || (newApp.source === 'Desde plantilla' && !newApp.template_id)" @click="createApp" /></q-card-actions>
       </q-card>
     </q-dialog>
   </q-page>
@@ -118,6 +128,7 @@ import { computed, onMounted, ref } from 'vue'
 import { api } from 'src/boot/axios'
 
 const apps = ref([])
+const companies = ref([])
 const users = ref([])
 const search = ref('')
 const userSearch = ref('')
@@ -126,7 +137,7 @@ const selected = ref(null)
 const showEdit = ref(false)
 const showUsers = ref(false)
 const showNew = ref(false)
-const newApp = ref({ name: '', description: '', source: 'Desde plantilla' })
+const newApp = ref({ company_id: null, name: '', description: '', source: 'Desde plantilla', template_id: null })
 const roles = ['Administrador', 'Operador', 'Soporte', 'Consulta']
 const filters = [{ label: 'Todas', value: 'all' }, { label: 'Aplicaciones', value: 'application' }, { label: 'Plantillas', value: 'template' }]
 const modules = [
@@ -138,45 +149,117 @@ const modules = [
 
 const filteredApps = computed(() => apps.value.filter(a =>
   (filter.value === 'all' || a.type === filter.value) &&
-  `${a.name} ${a.description || ''}`.toLowerCase().includes(search.value.toLowerCase())
+  `${a.name} ${a.description || ''} ${a.company_name || ''}`.toLowerCase().includes(search.value.toLowerCase())
 ))
+const templates = computed(() => apps.value.filter(a => a.type === 'template'))
+const filteredUsers = computed(() => users.value.filter(u => `${u.name} ${u.email || ''} ${u.username || ''}`.toLowerCase().includes(userSearch.value.toLowerCase())))
 const stats = computed(() => [
   { label: 'Aplicaciones', value: apps.value.filter(a => a.type !== 'template').length },
   { label: 'Plantillas', value: apps.value.filter(a => a.type === 'template').length },
   { label: 'Activas', value: apps.value.filter(a => a.is_active).length }
 ])
 
-async function loadApps () {
-  try { const { data } = await api.get('/apphub/applications'); apps.value = data.data ?? data }
-  catch { apps.value = [] }
+function normalizeApp (row) {
+  return {
+    ...row,
+    name: row.nombre,
+    description: row.descripcion || row.notas || '',
+    icon: row.icono || row.catalogo?.icono || null,
+    primary_color: row.color_primario || '',
+    secondary_color: row.color_secundario || '',
+    modules: Array.isArray(row.modulos) ? row.modulos : [],
+    is_active: row.estado !== 'retirado',
+    type: row.es_plantilla ? 'template' : 'application',
+    company_name: row.empresa?.nombre_comercial || ''
+  }
 }
+
+async function loadApps () {
+  try {
+    const { data } = await api.get('/aplicaciones')
+    const rows = data.data ?? data
+    apps.value = Array.isArray(rows) ? rows.map(normalizeApp) : []
+  } catch (e) { console.error(e); apps.value = [] }
+}
+
+async function loadCompanies () {
+  try {
+    const { data } = await api.get('/empresas')
+    const rows = data.data ?? data
+    companies.value = Array.isArray(rows) ? rows.map(c => ({ id: c.id, name: c.nombre_comercial })) : []
+  } catch (e) { console.error(e); companies.value = [] }
+}
+
 async function editApp (app) {
   selected.value = { ...app, modules: [...(app.modules || [])] }
   showEdit.value = true
 }
+
 async function saveApp () {
-  try { await api.put(`/apphub/applications/${selected.value.id}`, selected.value); await loadApps(); showEdit.value = false; }
-  catch (e) { console.error(e); }
+  try {
+    await api.put(`/aplicaciones/${selected.value.id}`, {
+      empresa_id: selected.value.empresa_id,
+      nombre: selected.value.name,
+      descripcion: selected.value.description,
+      icono: selected.value.icon,
+      color_primario: selected.value.primary_color,
+      color_secundario: selected.value.secondary_color,
+      modulos: selected.value.modules
+    })
+    await loadApps(); showEdit.value = false
+  } catch (e) { console.error(e) }
 }
+
 async function openUsers (app) {
   selected.value = app
-  try { const { data } = await api.get(`/apphub/applications/${app.id}/users`); users.value = data.data ?? data }
-  catch { users.value = [] }
+  try {
+    const { data } = await api.get(`/aplicaciones/${app.id}`)
+    const rows = data.data?.usuarios ?? []
+    users.value = rows.map(u => ({
+      id: u.id,
+      name: `${u.nombre || ''} ${u.apellido || ''}`.trim() || u.usuario,
+      email: u.correo,
+      username: u.usuario,
+      role: u.pivot?.rol || 'Consulta'
+    }))
+  } catch (e) { console.error(e); users.value = [] }
   showUsers.value = true
 }
+
 async function integrateUser (user) {
-  try { await api.post(`/apphub/applications/${selected.value.id}/users`, { user_id: user.id, role: user.role }); }
-  catch (e) { console.error(e); }
+  try {
+    await api.put(`/aplicaciones/${selected.value.id}`, { integrar_usuario: true, user_id: user.id, role: user.role.toLowerCase() })
+  } catch (e) { console.error(e) }
 }
+
 async function cloneApp (app) {
-  try { await api.post(`/apphub/applications/${app.id}/clone`, { name: `${app.name} — copia` }); await loadApps(); }
-  catch (e) { console.error(e); }
+  try {
+    await api.post('/aplicaciones', {
+      empresa_id: app.empresa_id,
+      nombre: `${app.name} — copia`,
+      descripcion: app.description,
+      clone_from_id: app.id
+    })
+    await loadApps()
+  } catch (e) { console.error(e) }
 }
+
 async function createApp () {
-  try { await api.post('/apphub/applications', newApp.value); newApp.value = { name: '', description: '', source: 'Desde plantilla' }; showNew.value = false; await loadApps(); }
-  catch (e) { console.error(e); }
+  try {
+    const payload = {
+      empresa_id: newApp.value.company_id,
+      nombre: newApp.value.name,
+      descripcion: newApp.value.description
+    }
+    if (newApp.value.source === 'Desde plantilla') payload.clone_from_id = newApp.value.template_id
+    await api.post('/aplicaciones', payload)
+    newApp.value = { company_id: null, name: '', description: '', source: 'Desde plantilla', template_id: null }
+    showNew.value = false
+    await loadApps()
+  } catch (e) { console.error(e) }
 }
-onMounted(loadApps)
+
+onMounted(async () => { await Promise.all([loadApps(), loadCompanies()]) })
 </script>
 
 <style scoped>
