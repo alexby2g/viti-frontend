@@ -115,10 +115,10 @@
           <q-select v-model="newApp.company_id" outlined label="Empresa" :options="companies" option-label="name" option-value="id" emit-value map-options class="q-mb-md" />
           <q-input v-model="newApp.name" outlined label="Nombre" class="q-mb-md" />
           <q-input v-model="newApp.description" outlined label="Descripción" class="q-mb-md" />
-          <q-select v-model="newApp.source" outlined label="Origen" :options="['Desde plantilla','Aplicación nueva']" class="q-mb-md" />
+          <q-select v-model="newApp.source" outlined label="Origen" :options="sourceOptions" class="q-mb-md" />
           <q-select v-if="newApp.source === 'Desde plantilla'" v-model="newApp.template_id" outlined label="Plantilla base" :options="templates" option-label="name" option-value="id" emit-value map-options />
         </q-card-section>
-        <q-card-actions align="right"><q-btn flat label="Cancelar" v-close-popup /><q-btn color="primary" label="Crear aplicación" :disable="!newApp.company_id || !newApp.name || (newApp.source === 'Desde plantilla' && !newApp.template_id)" @click="createApp" /></q-card-actions>
+        <q-card-actions align="right"><q-btn flat label="Cancelar" v-close-popup /><q-btn color="primary" label="Crear aplicación" :disable="!canCreateApp" @click="createApp" /></q-card-actions>
       </q-card>
     </q-dialog>
   </q-page>
@@ -127,6 +127,7 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue'
 import { api } from 'src/boot/axios'
+import { Notify } from 'quasar'
 
 const apps = ref([])
 const companies = ref([])
@@ -138,9 +139,10 @@ const selected = ref(null)
 const showEdit = ref(false)
 const showUsers = ref(false)
 const showNew = ref(false)
-const newApp = ref({ company_id: null, name: '', description: '', source: 'Desde plantilla', template_id: null })
+const newApp = ref({ company_id: null, name: '', description: '', source: 'Aplicación nueva', template_id: null })
 const roles = ['Administrador', 'Operador', 'Soporte', 'Consulta']
 const filters = [{ label: 'Todas', value: 'all' }, { label: 'Aplicaciones', value: 'application' }, { label: 'Plantillas', value: 'template' }]
+const sourceOptions = computed(() => templates.value.length ? ['Desde plantilla', 'Aplicación nueva'] : ['Aplicación nueva'])
 const modules = [
   { key: 'dashboard', name: 'Dashboard' }, { key: 'clientes', name: 'Clientes' },
   { key: 'usuarios', name: 'Usuarios' }, { key: 'servicios', name: 'Servicios' },
@@ -159,6 +161,21 @@ const stats = computed(() => [
   { label: 'Plantillas', value: apps.value.filter(a => a.type === 'template').length },
   { label: 'Activas', value: apps.value.filter(a => a.is_active).length }
 ])
+const canCreateApp = computed(() => {
+  if (!newApp.value.company_id || !newApp.value.name.trim()) return false
+  if (newApp.value.source === 'Desde plantilla' && !newApp.value.template_id) return false
+  return true
+})
+
+function notifyError (error, fallback = 'No se pudo completar la operación.') {
+  const status = error?.response?.status
+  const message = error?.response?.data?.message || error?.response?.data?.error
+  if (status === 422 && message) {
+    Notify.create({ type: 'negative', timeout: 7000, message: `No se pudo completar: ${message}` })
+    return
+  }
+  Notify.create({ type: 'negative', timeout: 6000, message: message || fallback })
+}
 
 function normalizeApp (row) {
   return {
@@ -211,7 +228,8 @@ async function saveApp () {
       configuracion: { ...selected.value.configuracion, habilitada: selected.value.is_active }
     })
     await loadApps(); showEdit.value = false
-  } catch (e) { console.error(e) }
+    Notify.create({ type: 'positive', message: 'Aplicación actualizada correctamente.' })
+  } catch (e) { console.error(e); notifyError(e) }
 }
 
 async function openUsers (app) {
@@ -235,7 +253,7 @@ async function openUsers (app) {
           integrated: Boolean(current)
         }
       })
-  } catch (e) { console.error(e); users.value = [] }
+  } catch (e) { console.error(e); users.value = []; notifyError(e, 'No se pudieron cargar los usuarios.') }
   showUsers.value = true
 }
 
@@ -243,7 +261,8 @@ async function integrateUser (user) {
   try {
     await api.put(`/aplicaciones/${selected.value.id}`, { integrar_usuario: true, user_id: user.id, role: user.role.toLowerCase() })
     user.integrated = true
-  } catch (e) { console.error(e) }
+    Notify.create({ type: 'positive', message: 'Usuario integrado correctamente.' })
+  } catch (e) { console.error(e); notifyError(e, 'No se pudo integrar el usuario.') }
 }
 
 async function cloneApp (app) {
@@ -255,10 +274,12 @@ async function cloneApp (app) {
       clone_from_id: app.id
     })
     await loadApps()
-  } catch (e) { console.error(e) }
+    Notify.create({ type: 'positive', message: 'Aplicación clonada correctamente.' })
+  } catch (e) { console.error(e); notifyError(e, 'No se pudo clonar la aplicación.') }
 }
 
 async function createApp () {
+  if (!canCreateApp.value) return
   try {
     const payload = {
       empresa_id: newApp.value.company_id,
@@ -267,10 +288,11 @@ async function createApp () {
     }
     if (newApp.value.source === 'Desde plantilla') payload.clone_from_id = newApp.value.template_id
     await api.post('/aplicaciones', payload)
-    newApp.value = { company_id: null, name: '', description: '', source: 'Desde plantilla', template_id: null }
+    newApp.value = { company_id: null, name: '', description: '', source: templates.value.length ? 'Desde plantilla' : 'Aplicación nueva', template_id: null }
     showNew.value = false
     await loadApps()
-  } catch (e) { console.error(e) }
+    Notify.create({ type: 'positive', message: 'Aplicación creada correctamente.' })
+  } catch (e) { console.error(e); notifyError(e, 'No se pudo crear la aplicación.') }
 }
 
 onMounted(async () => { await Promise.all([loadApps(), loadCompanies()]) })
