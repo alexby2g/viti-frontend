@@ -22,12 +22,19 @@ export default defineRouter(({ store }) => {
       meta:{publicLanding:true},
     },
     {
+      path:'/viti/catalogo',
+      component:AuthLayout,
+      children:[{ path:'', name:'viti-catalog', component:() => import('../pages/VitiCatalogoPage.vue'), meta:{publicLanding:true} }],
+      meta:{publicLanding:true},
+    },
+    {
       path:'/viti/acceso',
       component:AuthLayout,
       children:[{ path:'', name:'viti-access', component:() => import('../pages/VitiAccessPage.vue'), meta:{publicLanding:true} }],
       meta:{publicLanding:true},
     },
     { path:'/planes', redirect:'/viti/planes', meta:{publicLanding:true} },
+    { path:'/catalogo', redirect:'/viti/catalogo', meta:{publicLanding:true} },
     { path:'/acceso', redirect:'/viti/acceso', meta:{publicLanding:true} },
     { path:'/presentacion', redirect:'/viti', meta:{publicLanding:true} },
   ]
@@ -74,7 +81,7 @@ export default defineRouter(({ store }) => {
   }
 
   router.beforeEach(async (to, from) => {
-    if (to.meta.publicLanding || ['viti-landing','viti-plans','viti-access'].includes(to.name)) return true
+    if (to.meta.publicLanding || ['viti-landing','viti-plans','viti-catalog','viti-access'].includes(to.name)) return true
 
     const auth = useAuthStore(store)
     if (auth.setupRequired === null) await auth.checkSetup()
