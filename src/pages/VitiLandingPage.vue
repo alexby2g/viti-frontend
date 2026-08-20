@@ -26,6 +26,7 @@ const steps = [
           <q-btn flat no-caps label="Qué es VITI" href="#que-es" />
           <q-btn flat no-caps label="Cómo funciona" href="#como-funciona" />
           <q-btn flat no-caps label="Guía rápida" href="#guia" />
+          <q-btn flat no-caps label="Catálogo" to="/viti/catalogo" />
         </nav>
         <q-btn outline color="primary" no-caps icon="login" label="Ingresar" to="/login" class="q-ml-md" />
       </div>
@@ -41,7 +42,7 @@ const steps = [
               VITI ayuda a las microempresas de servicios a registrar, organizar y controlar digitalmente la información de sus clientes, equipos, citas y trabajos realizados.
             </p>
             <div class="row q-gutter-sm q-mt-xl">
-              <q-btn color="primary" unelevated no-caps size="lg" icon-right="arrow_forward" label="Conocer cómo funciona" href="#como-funciona" />
+              <q-btn color="primary" unelevated no-caps size="lg" icon-right="arrow_forward" label="Ver catálogo de soluciones" to="/viti/catalogo" />
               <q-btn outline color="primary" no-caps size="lg" icon="login" label="Ya tengo acceso" to="/login?tipo=cliente" />
             </div>
             <div class="hero-trust q-mt-xl">
@@ -150,7 +151,10 @@ const steps = [
             <div class="section-kicker">VITI</div>
             <h2>Organiza el servicio. Conserva el historial. Sabe qué sigue.</h2>
           </div>
-          <q-btn color="white" text-color="primary" unelevated no-caps size="lg" icon="login" label="Entrar a la plataforma" to="/login" />
+          <div class="row q-gutter-sm">
+            <q-btn color="white" text-color="primary" unelevated no-caps size="lg" icon="apps" label="Ver catálogo" to="/viti/catalogo" />
+            <q-btn outline color="white" no-caps size="lg" icon="login" label="Entrar a la plataforma" to="/login" />
+          </div>
         </div>
       </section>
     </main>
