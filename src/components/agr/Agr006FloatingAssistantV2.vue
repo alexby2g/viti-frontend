@@ -94,6 +94,7 @@
 import { computed, onBeforeUnmount, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { api } from '../../boot/axios'
+import { resolveAgr006LocalAction, type Agr006LocalAction } from '../../utils/agr006CommandRouter'
 
 interface Message { role: 'user' | 'assistant'; text: string }
 type Action = { type?: string; to?: string }
@@ -113,10 +114,11 @@ let recognition: any = null
 let restartTimer: ReturnType<typeof setTimeout> | null = null
 let audio: HTMLAudioElement | null = null
 let audioUrl: string | null = null
+let recognitionSuppressed = false
 
 const presence = computed(() => {
   if (speaking.value) return '006 está respondiendo.'
-  if (voiceActive.value) return '006 está escuchando.'
+  if (voiceActive.value && listening.value) return '006 está escuchando.'
   if (state.value === 'thinking') return 'Analizando VITI...'
   if (state.value === 'attention') return 'Hay algo que requiere atención.'
   return '006 está activo y vigilando VITI.'
@@ -129,9 +131,40 @@ const isSleep = (value: string) => /(desactivar\s+viti|desactivar\s+006|detener\
 function togglePanel() { open.value = !open.value }
 function pushMessage(role: Message['role'], text: string) { messages.value.push({ role, text }); if (messages.value.length > 60) messages.value.splice(0, messages.value.length - 60) }
 
+function pauseRecognition() {
+  recognitionSuppressed = true
+  if (restartTimer) clearTimeout(restartTimer)
+  restartTimer = null
+  recognition?.stop()
+  listening.value = false
+}
+
+function resumeRecognition() {
+  recognitionSuppressed = false
+  if (voiceArmed.value && voiceActive.value && !speaking.value) ensureRecognition()
+}
+
+async function runLocalAction(message: string): Promise<boolean> {
+  const action = resolveAgr006LocalAction(message)
+  if (!action) return false
+  pushMessage('user', message)
+  state.value = 'thinking'
+  if (action.type === 'navigate') {
+    await router.push(action.to)
+  } else {
+    await router.back()
+  }
+  state.value = 'online'
+  pushMessage('assistant', action.label)
+  await speak(action.label)
+  return true
+}
+
 async function ask(message: string) {
   const value = message.trim()
   if (!value || !visible.value) return
+  if (await runLocalAction(value)) return
+
   state.value = 'thinking'
   pushMessage('user', value)
   try {
@@ -149,14 +182,14 @@ async function ask(message: string) {
   }
 }
 
-async function executeAction(action: Action | null) {
+async function executeAction(action: Action | Agr006LocalAction | null) {
   if (!action?.type) return
   if (action.type === 'navigate' && action.to) await router.push(action.to)
   if (action.type === 'browser_back') await router.back()
 }
 
 function typedActivation(value: string) {
-  if (isWake(value)) { activateVoice(); return true }
+  if (isWake(value)) { void activateVoice(); return true }
   if (isSleep(value)) { deactivateVoice(); return true }
   return false
 }
@@ -164,39 +197,38 @@ function typedActivation(value: string) {
 function submitTyped() {
   const value = draft.value.trim()
   if (!value) return
-  if (typedActivation(value)) { draft.value = ''; return }
   draft.value = ''
+  if (typedActivation(value)) return
   void ask(value)
 }
 
 function submitCommand(value: string) { if (!typedActivation(value)) void ask(value) }
 
-function activateVoice() {
+async function activateVoice() {
   if (voiceActive.value) return
   voiceArmed.value = true
   voiceActive.value = true
   open.value = true
   state.value = 'online'
   pushMessage('assistant', 'VITI activo. Te escucho.')
-  void speak('VITI activo. Te escucho.')
-  ensureRecognition()
+  await speak('VITI activo. Te escucho.')
+  resumeRecognition()
 }
 
 function deactivateVoice() {
   voiceActive.value = false
   voiceArmed.value = false
-  listening.value = false
   draft.value = ''
-  recognition?.stop()
-  if (restartTimer) clearTimeout(restartTimer)
+  pauseRecognition()
   pushMessage('assistant', 'VITI desactivado. Quedo en espera.')
   stopAudio()
+  recognitionSuppressed = false
 }
 
-function toggleVoice() { voiceActive.value ? deactivateVoice() : activateVoice() }
+function toggleVoice() { voiceActive.value ? deactivateVoice() : void activateVoice() }
 
 function ensureRecognition() {
-  if (!voiceArmed.value) return
+  if (!voiceArmed.value || !voiceActive.value || recognitionSuppressed || speaking.value) return
   const Recognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
   if (!Recognition) { pushMessage('assistant', 'Este navegador no dispone de reconocimiento de voz. Puedes seguir usando el chat escrito.'); return }
   recognition?.stop()
@@ -204,22 +236,23 @@ function ensureRecognition() {
   recognition.lang = 'es-BO'
   recognition.interimResults = true
   recognition.continuous = true
-  recognition.onstart = () => { listening.value = true }
+  recognition.onstart = () => { if (!recognitionSuppressed && !speaking.value) listening.value = true }
   recognition.onend = () => {
     listening.value = false
-    if (voiceArmed.value && voiceActive.value) {
+    if (voiceArmed.value && voiceActive.value && !recognitionSuppressed && !speaking.value) {
       if (restartTimer) clearTimeout(restartTimer)
       restartTimer = setTimeout(ensureRecognition, 350)
     }
   }
   recognition.onerror = () => {
     listening.value = false
-    if (voiceArmed.value && voiceActive.value) {
+    if (voiceArmed.value && voiceActive.value && !recognitionSuppressed && !speaking.value) {
       if (restartTimer) clearTimeout(restartTimer)
       restartTimer = setTimeout(ensureRecognition, 800)
     }
   }
   recognition.onresult = (event: any) => {
+    if (recognitionSuppressed || speaking.value) return
     let finalText = ''
     let interim = ''
     for (let i = event.resultIndex; i < event.results.length; i += 1) {
@@ -239,6 +272,7 @@ function ensureRecognition() {
 
 async function speak(textToSpeak: string) {
   if (!textToSpeak.trim()) return
+  pauseRecognition()
   stopAudio()
   speaking.value = true
   try {
@@ -248,21 +282,26 @@ async function speak(textToSpeak: string) {
     audioUrl = URL.createObjectURL(response.data)
     audio = new Audio(audioUrl)
     audio.volume = 1
-    audio.onended = () => { speaking.value = false; stopAudio(false) }
+    audio.onended = () => { speaking.value = false; stopAudio(false); resumeRecognition() }
     await audio.play()
     return
   } catch {
     if ('speechSynthesis' in window) {
-      const utterance = new SpeechSynthesisUtterance(textToSpeak)
-      utterance.lang = 'es-MX'
-      utterance.rate = 0.9
-      utterance.pitch = 0.78
-      utterance.onend = () => { speaking.value = false }
-      window.speechSynthesis.cancel()
-      window.speechSynthesis.speak(utterance)
+      await new Promise<void>((resolve) => {
+        const utterance = new SpeechSynthesisUtterance(textToSpeak)
+        utterance.lang = 'es-MX'
+        utterance.rate = 0.9
+        utterance.pitch = 0.78
+        utterance.onend = () => { speaking.value = false; resumeRecognition(); resolve() }
+        utterance.onerror = () => { speaking.value = false; resumeRecognition(); resolve() }
+        window.speechSynthesis.cancel()
+        window.speechSynthesis.speak(utterance)
+      })
+      return
     }
   }
   speaking.value = false
+  resumeRecognition()
 }
 
 function stopAudio(clearSpeaking = true) {
@@ -272,6 +311,7 @@ function stopAudio(clearSpeaking = true) {
 }
 
 onBeforeUnmount(() => {
+  recognitionSuppressed = true
   recognition?.stop()
   if (restartTimer) clearTimeout(restartTimer)
   stopAudio()
@@ -292,6 +332,6 @@ onBeforeUnmount(() => {
 .agr006-live-transcript{display:flex;align-items:center;gap:8px;margin:0 0 12px;padding:8px 10px;border-radius:10px;background:rgba(47,170,222,.08);border:1px solid rgba(120,220,255,.15);color:#cdefff;font-size:12px}.agr006-live-transcript span{width:8px;height:8px;border-radius:50%;background:#69eaff;box-shadow:0 0 12px #69eaff;animation:pulse .9s infinite}
 .hologram-layer{position:fixed;inset:0;display:grid;place-items:center;pointer-events:none;background:radial-gradient(circle at center,rgba(20,120,255,.10),rgba(0,0,0,0) 52%)}.holo-aura{position:absolute;width:520px;height:620px;border-radius:50%;background:radial-gradient(circle,rgba(65,211,255,.16),rgba(30,100,255,.06) 45%,rgba(0,0,0,0) 72%);filter:blur(15px);animation:breathe 3s ease-in-out infinite}.holo-grid{position:absolute;width:450px;height:650px;border:1px solid rgba(80,211,255,.09);background:repeating-linear-gradient(90deg,transparent 0 40px,rgba(90,220,255,.05) 41px 42px),repeating-linear-gradient(0deg,transparent 0 40px,rgba(90,220,255,.04) 41px 42px);transform:perspective(800px) rotateX(55deg) translateY(180px);opacity:.7}.holo-scanlines{position:absolute;inset:0;background:repeating-linear-gradient(0deg,rgba(128,230,255,.015) 0 2px,transparent 3px 6px);mix-blend-mode:screen}.hologram{position:relative;width:min(520px,78vw);height:min(80vh,760px);overflow:visible;filter:drop-shadow(0 0 14px rgba(72,214,255,.7));animation:materialize .9s ease-out, float 4s ease-in-out infinite}
 .holo-body path,.holo-head path,.holo-head circle{fill:url(#holoFillV2);stroke:url(#holoStrokeV2);stroke-width:2}.holo-head .hair{fill:rgba(91,230,255,.16)}.holo-head .mouth{fill:none;stroke-linecap:round}.holo-head .mouth.talking{animation:mouthTalk .18s steps(2,end) infinite}.holo-caption{position:absolute;bottom:92px;display:flex;gap:10px;align-items:center;letter-spacing:.18em;font-size:12px;color:#b8eeff;text-shadow:0 0 12px rgba(104,227,255,.8)}.status-dot{width:9px;height:9px;border-radius:50%;background:#68efff;box-shadow:0 0 12px #68efff}.holo-wave{position:absolute;bottom:56px;display:flex;gap:4px;align-items:center}.holo-wave i{display:block;width:4px;height:10px;border-radius:4px;background:#64eaff;box-shadow:0 0 8px rgba(100,234,255,.65)}.holo-wave.active i{animation:wave .6s ease-in-out infinite alternate}.holo-wave i:nth-child(2){animation-delay:.08s}.holo-wave i:nth-child(3){animation-delay:.16s}.holo-wave i:nth-child(4){animation-delay:.24s}.holo-wave i:nth-child(5){animation-delay:.32s}.holo-wave i:nth-child(6){animation-delay:.4s}.holo-wave i:nth-child(7){animation-delay:.48s}.holo-wave i:nth-child(8){animation-delay:.56s}
-@keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-7px)}}@keyframes spin{to{transform:rotate(382deg)}}@keyframes spinReverse{to{transform:rotate(-382deg)}}@keyframes pulse{50%{opacity:.35}}@keyframes breathe{0%,100%{transform:scale(.96);opacity:.75}50%{transform:scale(1.04);opacity:1}}@keyframes materialize{from{opacity:0;transform:scale(.96) translateY(20px);filter:drop-shadow(0 0 2px rgba(72,214,255,.2))}to{opacity:1;transform:scale(1) translateY(0)}}@keyframes mouthTalk{0%,100%{d:path('M194 224 Q210 232 226 224')}50%{d:path('M194 223 Q210 240 226 223')}}@keyframes wave{from{height:7px;opacity:.45}to{height:24px;opacity:1}}
+@keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-7px)}}@keyframes spin{to{transform:rotate(382deg)}}@keyframes spinReverse{to{transform:rotate(-382deg)}}@keyframes pulse{50%{opacity:.35}}@keyframes breathe{0%,100%{transform:scale(.96);opacity:.75}50%{transform:scale(1.04);opacity:1}}@keyframes materialize{from{opacity:0;transform:scale(.96) translateY(20px);filter:drop-shadow(0 0 2px rgba(72,214,255,.2))}to{opacity:1;transform:scale(1) translateY(0)}}@keyframes mouthTalk{0%,100%{transform:scaleY(.35)}50%{transform:scaleY(1.25)}}@keyframes wave{from{height:7px;opacity:.45}to{height:24px;opacity:1}}
 @media (max-width:640px){.agr006-root{right:14px;bottom:14px}.agr006-orb{width:68px;height:68px}.agr006-panel{bottom:82px}.hologram-layer{place-items:center}.hologram{width:92vw;height:78vh}.holo-caption{bottom:60px}}
 </style>
