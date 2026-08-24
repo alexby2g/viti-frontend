@@ -41,6 +41,25 @@
         </q-list>
       </q-card-section>
 
+      <q-card-section v-if="incidents.length" class="incidents-card">
+        <div class="row items-center q-mb-sm">
+          <div><div class="text-subtitle1 text-weight-medium">Incidentes activos</div><div class="text-caption text-grey-7">AGR agrupó señales relacionadas para evitar alertas duplicadas.</div></div>
+          <q-space />
+          <q-badge color="negative" :label="`${incidents.length}`" />
+        </div>
+        <q-list separator>
+          <q-item v-for="incident in incidents" :key="incident.id">
+            <q-item-section avatar><q-avatar :color="incident.severity === 'critical' ? 'negative' : 'orange'" text-color="white" icon="warning" /></q-item-section>
+            <q-item-section>
+              <q-item-label class="text-weight-medium">{{ incident.id }} · {{ incident.title }}</q-item-label>
+              <q-item-label caption>{{ incident.summary }}</q-item-label>
+              <q-item-label caption class="q-mt-xs"><strong>Causa probable:</strong> {{ incident.probable_cause }}</q-item-label>
+            </q-item-section>
+            <q-item-section side><q-badge outline :color="incident.severity === 'critical' ? 'negative' : 'warning'" :label="prettySeverity(incident.severity)" /></q-item-section>
+          </q-item>
+        </q-list>
+      </q-card-section>
+
       <q-card-section v-if="recommendations.length">
         <div class="text-subtitle1 text-weight-medium q-mb-sm">Siguientes pasos detectados</div>
         <q-list separator>
@@ -66,15 +85,11 @@
       <q-card-section v-if="activity.length">
         <div class="text-subtitle1 text-weight-medium q-mb-sm">Actividad reciente</div>
         <q-list separator>
-          <q-item v-for="item in activity" :key="item.id">
-            <q-item-section avatar><q-avatar size="32px" :color="activityColor(item.type)" text-color="white" :icon="activityIcon(item.type)" /></q-item-section>
-            <q-item-section><q-item-label>{{ item.title }}</q-item-label><q-item-label caption>{{ item.message }}</q-item-label></q-item-section>
-            <q-item-section side><span class="text-caption text-grey-6">{{ formatDate(item.at) }}</span></q-item-section>
-          </q-item>
+          <q-item v-for="item in activity" :key="item.id"><q-item-section avatar><q-avatar size="32px" :color="activityColor(item.type)" text-color="white" :icon="activityIcon(item.type)" /></q-item-section><q-item-section><q-item-label>{{ item.title }}</q-item-label><q-item-label caption>{{ item.message }}</q-item-label></q-item-section><q-item-section side><span class="text-caption text-grey-6">{{ formatDate(item.at) }}</span></q-item-section></q-item>
         </q-list>
       </q-card-section>
 
-      <q-card-section v-if="!priorities.length && !recommendations.length && !anomalies.length && !warnings.length" class="text-grey-7">AGR no detectó incidencias, procesos detenidos ni anomalías técnicas con la información disponible.</q-card-section>
+      <q-card-section v-if="!priorities.length && !recommendations.length && !incidents.length && !anomalies.length && !warnings.length" class="text-grey-7">AGR no detectó incidencias, procesos detenidos ni anomalías técnicas con la información disponible.</q-card-section>
       <q-card-actions align="between"><div class="text-caption text-grey-6">{{ message }}</div><div class="row q-gutter-sm"><q-btn flat color="primary" icon="health_and_safety" label="Ronda completa" :loading="guardLoading" @click="runGuard" /><q-btn outline color="primary" icon="refresh" label="Revisar ahora" :loading="refreshing" @click="refresh" /></div></q-card-actions>
     </template>
   </q-card>
@@ -98,6 +113,7 @@ const data = computed(() => snapshot.value.metrics || {})
 const systemHealth = computed(() => guardSnapshot.value || {})
 const anomalies = computed(() => systemHealth.value.anomalies || [])
 const warnings = computed(() => systemHealth.value.warnings || [])
+const incidents = computed(() => snapshot.value.incidents || [])
 const metrics = computed(() => [
   { key: 'clients', label: 'Clientes', value: data.value.clients ?? 0 },
   { key: 'companies', label: 'Empresas activas', value: data.value.companies ?? 0 },
@@ -115,8 +131,9 @@ const systemHealthIcon = computed(() => ({ healthy: 'check_circle', attention: '
 const systemHealthMessage = computed(() => systemHealth.value.summary || 'AGR todavía no tiene una ronda técnica disponible.')
 const message = computed(() => snapshot.value.message || 'AGR mantiene el sistema bajo observación local.')
 
-function activityIcon(type) { return ({ autopilot_review: 'auto_awesome', priority_detected: 'priority_high', workflow_recommendation: 'route', system_guard_scan: 'health_and_safety', system_anomaly: 'bug_report' }[type] || 'history') }
-function activityColor(type) { return ({ autopilot_review: 'primary', priority_detected: 'negative', workflow_recommendation: 'warning', system_guard_scan: 'teal', system_anomaly: 'negative' }[type] || 'grey-7') }
+function prettySeverity(value) { return ({ critical: 'Crítico', high: 'Alto', medium: 'Medio' }[value] || value) }
+function activityIcon(type) { return ({ autopilot_review: 'auto_awesome', priority_detected: 'priority_high', workflow_recommendation: 'route', system_guard_scan: 'health_and_safety', system_anomaly: 'bug_report', incident_detected: 'warning' }[type] || 'history') }
+function activityColor(type) { return ({ autopilot_review: 'primary', priority_detected: 'negative', workflow_recommendation: 'warning', system_guard_scan: 'teal', system_anomaly: 'negative', incident_detected: 'deep-orange' }[type] || 'grey-7') }
 function formatDate(value) { try { return new Date(value).toLocaleString('es-BO', { dateStyle: 'short', timeStyle: 'short' }) } catch { return value || '' } }
 
 async function runGuard() {
@@ -129,9 +146,7 @@ async function runGuard() {
     activity.value = response.data?.agr_activity || []
   } catch (err) {
     error.value = err?.response?.data?.message || 'AGR no pudo completar la ronda técnica.'
-  } finally {
-    guardLoading.value = false
-  }
+  } finally { guardLoading.value = false }
 }
 
 async function refresh() {
@@ -145,14 +160,12 @@ async function refresh() {
     activity.value = response.data?.agr_activity || []
   } catch (err) {
     error.value = err?.response?.data?.message || 'AGR no pudo actualizar su análisis.'
-  } finally {
-    refreshing.value = false
-  }
+  } finally { refreshing.value = false }
 }
 </script>
 
 <style scoped>
 .agr-autopilot-panel { border-radius: 20px; }
 .metric-card { min-height: 74px; padding: 12px; border-radius: 14px; background: rgba(0, 0, 0, .03); }
-.system-health-card { border-radius: 16px; background: rgba(25, 118, 210, .04); }
+.system-health-card, .incidents-card { border-radius: 16px; background: rgba(25, 118, 210, .04); }
 </style>
