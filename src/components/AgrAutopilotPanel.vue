@@ -22,10 +22,21 @@
           <div class="col"><div class="text-subtitle1 text-weight-medium">Salud técnica del sistema</div><div class="text-caption text-grey-7">{{ systemHealthMessage }}</div></div>
           <div class="col-auto"><q-badge outline :color="systemHealthColor" :label="systemHealthLabel" /></div>
         </div>
+        <div class="row items-center q-mt-sm q-gutter-sm">
+          <q-badge outline color="primary" :label="`Puntuación ${systemHealth.score ?? '—'}/100`" />
+          <q-badge outline color="grey-7" :label="`${anomalies.length} anomalía(s)`" />
+          <q-badge outline color="orange" :label="`${warnings.length} advertencia(s)`" />
+        </div>
         <q-list v-if="anomalies.length" separator class="q-mt-sm">
           <q-item v-for="item in anomalies" :key="item.key">
             <q-item-section avatar><q-icon :name="item.severity === 'critical' ? 'error' : 'warning'" :color="item.severity === 'critical' ? 'negative' : 'warning'" /></q-item-section>
-            <q-item-section><q-item-label>{{ item.message }}</q-item-label></q-item-section>
+            <q-item-section><q-item-label>{{ item.title }}</q-item-label><q-item-label caption>{{ item.message }}</q-item-label></q-item-section>
+          </q-item>
+        </q-list>
+        <q-list v-if="warnings.length" separator class="q-mt-sm">
+          <q-item v-for="item in warnings" :key="item.key">
+            <q-item-section avatar><q-icon name="visibility" color="warning" /></q-item-section>
+            <q-item-section><q-item-label>{{ item.title }}</q-item-label><q-item-label caption>{{ item.message }}</q-item-label></q-item-section>
           </q-item>
         </q-list>
       </q-card-section>
@@ -63,8 +74,8 @@
         </q-list>
       </q-card-section>
 
-      <q-card-section v-if="!priorities.length && !recommendations.length && !anomalies.length" class="text-grey-7">AGR no detectó incidencias, procesos detenidos ni anomalías técnicas con la información disponible.</q-card-section>
-      <q-card-actions align="between"><div class="text-caption text-grey-6">{{ message }}</div><q-btn outline color="primary" icon="refresh" label="Revisar ahora" :loading="refreshing" @click="refresh" /></q-card-actions>
+      <q-card-section v-if="!priorities.length && !recommendations.length && !anomalies.length && !warnings.length" class="text-grey-7">AGR no detectó incidencias, procesos detenidos ni anomalías técnicas con la información disponible.</q-card-section>
+      <q-card-actions align="between"><div class="text-caption text-grey-6">{{ message }}</div><div class="row q-gutter-sm"><q-btn flat color="primary" icon="health_and_safety" label="Ronda completa" :loading="guardLoading" @click="runGuard" /><q-btn outline color="primary" icon="refresh" label="Revisar ahora" :loading="refreshing" @click="refresh" /></div></q-card-actions>
     </template>
   </q-card>
 </template>
@@ -76,14 +87,17 @@ import { api } from '../boot/axios'
 const props = defineProps({ dashboardData: { type: Object, default: () => ({}) } })
 const loading = ref(false)
 const refreshing = ref(false)
+const guardLoading = ref(false)
 const error = ref('')
 const agrSnapshot = ref(props.dashboardData?.agr_autopilot || null)
 const activity = ref(props.dashboardData?.agr_activity || [])
+const guardSnapshot = ref(agrSnapshot.value?.system_guard || null)
 
 const snapshot = computed(() => agrSnapshot.value || {})
 const data = computed(() => snapshot.value.metrics || {})
-const systemHealth = computed(() => snapshot.value.system_health || {})
+const systemHealth = computed(() => guardSnapshot.value || {})
 const anomalies = computed(() => systemHealth.value.anomalies || [])
+const warnings = computed(() => systemHealth.value.warnings || [])
 const metrics = computed(() => [
   { key: 'clients', label: 'Clientes', value: data.value.clients ?? 0 },
   { key: 'companies', label: 'Empresas activas', value: data.value.companies ?? 0 },
@@ -95,18 +109,30 @@ const recommendations = computed(() => snapshot.value.workflow_recommendations |
 const health = computed(() => snapshot.value.health || 'stable')
 const healthLabel = computed(() => ({ stable: 'Estable', watch: 'Vigilar', attention: 'Atención' }[health.value] || 'Estable'))
 const healthColor = computed(() => ({ stable: 'positive', watch: 'warning', attention: 'negative' }[health.value] || 'positive'))
-const systemHealthLabel = computed(() => ({ healthy: 'Salud OK', warning: 'Requiere revisión', critical: 'Crítico' }[systemHealth.value.status] || 'Sin datos'))
-const systemHealthColor = computed(() => ({ healthy: 'positive', warning: 'warning', critical: 'negative' }[systemHealth.value.status] || 'grey-7'))
-const systemHealthIcon = computed(() => ({ healthy: 'check_circle', warning: 'warning', critical: 'error' }[systemHealth.value.status] || 'help'))
-const systemHealthMessage = computed(() => {
-  const checks = systemHealth.value.checks || []
-  return checks.length ? checks.map(check => check.message).join(' ') : 'AGR todavía no tiene una revisión técnica disponible.'
-})
+const systemHealthLabel = computed(() => ({ healthy: 'Salud OK', attention: 'Requiere revisión', critical: 'Crítico' }[systemHealth.value.status] || 'Sin datos'))
+const systemHealthColor = computed(() => ({ healthy: 'positive', attention: 'warning', critical: 'negative' }[systemHealth.value.status] || 'grey-7'))
+const systemHealthIcon = computed(() => ({ healthy: 'check_circle', attention: 'warning', critical: 'error' }[systemHealth.value.status] || 'help'))
+const systemHealthMessage = computed(() => systemHealth.value.summary || 'AGR todavía no tiene una ronda técnica disponible.')
 const message = computed(() => snapshot.value.message || 'AGR mantiene el sistema bajo observación local.')
 
-function activityIcon(type) { return ({ autopilot_review: 'auto_awesome', priority_detected: 'priority_high', workflow_recommendation: 'route' }[type] || 'history') }
-function activityColor(type) { return ({ autopilot_review: 'primary', priority_detected: 'negative', workflow_recommendation: 'warning' }[type] || 'grey-7') }
+function activityIcon(type) { return ({ autopilot_review: 'auto_awesome', priority_detected: 'priority_high', workflow_recommendation: 'route', system_guard_scan: 'health_and_safety', system_anomaly: 'bug_report' }[type] || 'history') }
+function activityColor(type) { return ({ autopilot_review: 'primary', priority_detected: 'negative', workflow_recommendation: 'warning', system_guard_scan: 'teal', system_anomaly: 'negative' }[type] || 'grey-7') }
 function formatDate(value) { try { return new Date(value).toLocaleString('es-BO', { dateStyle: 'short', timeStyle: 'short' }) } catch { return value || '' } }
+
+async function runGuard() {
+  if (guardLoading.value) return
+  guardLoading.value = true
+  error.value = ''
+  try {
+    const response = await api.get('/dashboard', { params: { agr_guard: true } })
+    guardSnapshot.value = response.data?.agr_guard || null
+    activity.value = response.data?.agr_activity || []
+  } catch (err) {
+    error.value = err?.response?.data?.message || 'AGR no pudo completar la ronda técnica.'
+  } finally {
+    guardLoading.value = false
+  }
+}
 
 async function refresh() {
   if (refreshing.value) return
@@ -115,6 +141,7 @@ async function refresh() {
   try {
     const response = await api.get('/dashboard', { params: { agr_autopilot: true } })
     agrSnapshot.value = response.data?.agr_autopilot || null
+    guardSnapshot.value = agrSnapshot.value?.system_guard || null
     activity.value = response.data?.agr_activity || []
   } catch (err) {
     error.value = err?.response?.data?.message || 'AGR no pudo actualizar su análisis.'
