@@ -85,6 +85,24 @@ function toggle() {
   }
 }
 
+function extractPayload(response: any) {
+  return response?.data || {}
+}
+
+function extractAnswer(payload: any) {
+  return payload?.data?.message
+    ?? payload?.message
+    ?? payload?.data?.data?.message
+    ?? 'No tengo una respuesta disponible todavía.'
+}
+
+function extractAction(payload: any): AgrAction | null {
+  return payload?.data?.action
+    ?? payload?.action
+    ?? payload?.data?.data?.action
+    ?? null
+}
+
 async function ask(message: string) {
   const normalized = message.trim()
   if (!normalized || !visible.value) return
@@ -92,15 +110,17 @@ async function ask(message: string) {
   messages.value.push({ role: 'user', text: normalized })
 
   try {
-    const response = await api.post('/agr/voice', { command: normalized }, { timeout: 30000 })
-    const payload = response?.data || {}
-    const answer = payload?.data?.message ?? payload?.message ?? payload?.data?.data?.message ?? 'No tengo una respuesta disponible todavía.'
-    const answerText = String(answer)
+    // Comandos: el motor local de AGR vive en DashboardController?agr=...
+    // No mezclarlo con /agr/voice, que está reservado exclusivamente para TTS.
+    const response = await api.get('/dashboard', { params: { agr: normalized }, timeout: 30000 })
+    const payload = extractPayload(response)
+    const answerText = String(extractAnswer(payload))
 
     messages.value.push({ role: 'assistant', text: answerText })
-    state.value = ['critical', 'attention'].includes(String(payload?.health || '')) ? 'attention' : 'online'
+    state.value = ['critical', 'attention'].includes(String(payload?.health || payload?.data?.health || '')) ? 'attention' : 'online'
 
-    await executeAction(payload?.data?.action ?? payload?.action)
+    // Ejecutamos solo acciones explícitamente autorizadas por el motor.
+    await executeAction(extractAction(payload))
     await speakWith006(answerText)
   } catch (error: any) {
     const status = Number(error?.response?.status || 0)
@@ -126,7 +146,7 @@ async function executeAction(action: AgrAction | null | undefined) {
       await router.back()
       break
     default:
-      // Las acciones mutables quedan para el orquestador seguro/confirmación.
+      // Las acciones mutables quedan protegidas por el flujo de confirmación del backend.
       break
   }
 }
