@@ -40,7 +40,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref } from 'vue'
 
-interface Message { role: 'user' | '006'; text: string }
+interface Message { role: 'user' | 'assistant'; text: string }
 type State = 'online' | 'thinking' | 'attention' | 'critical'
 
 const open = ref(false)
@@ -69,12 +69,12 @@ async function ask(message: string) {
     if (!response.ok) throw new Error('006 no pudo consultar VITI')
     const payload = await response.json()
     const answer = payload?.data?.message ?? payload?.message ?? payload?.data?.data?.message ?? 'No tengo una respuesta disponible todavía.'
-    messages.value.push({ role: '006', text: String(answer) })
+    messages.value.push({ role: 'assistant', text: String(answer) })
     state.value = 'online'
     speakIfEnabled(String(answer))
   } catch (error) {
     state.value = 'attention'
-    messages.value.push({ role: '006', text: 'No pude consultar VITI en este momento. Revisa la conexión del sistema.' })
+    messages.value.push({ role: 'assistant', text: 'No pude consultar VITI en este momento. Revisa la conexión del sistema.' })
   }
 }
 
@@ -87,11 +87,11 @@ function sendText() {
 
 function toggle() {
   open.value = !open.value
-  if (open.value && messages.value.length === 0) messages.value.push({ role: '006', text: '006 online. Estoy conectado al núcleo de VITI. ¿Qué necesitas?' })
+  if (open.value && messages.value.length === 0) messages.value.push({ role: 'assistant', text: '006 online. Estoy conectado al núcleo de VITI. ¿Qué necesitas?' })
 }
 
 function toggleVoice() {
-  if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) return
+  if (!(('webkitSpeechRecognition' in window) || ('SpeechRecognition' in window))) return
   if (listening.value) {
     recognition?.stop()
     return
@@ -137,7 +137,7 @@ onBeforeUnmount(() => {
 .state-thinking .agr006-status-dot{background:#ffe680;box-shadow:0 0 12px #ffe680;animation:pulse .8s infinite}.state-attention .agr006-status-dot{background:#ffbf66;box-shadow:0 0 12px #ffbf66}.state-critical .agr006-status-dot{background:#ff6565;box-shadow:0 0 13px #ff6565;animation:pulse .7s infinite}
 .agr006-panel{position:absolute;right:0;bottom:92px;width:min(380px,calc(100vw - 32px));max-height:560px;overflow:hidden;border:1px solid rgba(130,220,255,.2);border-radius:20px;background:linear-gradient(180deg,rgba(8,23,37,.96),rgba(3,12,22,.97));backdrop-filter:blur(18px);box-shadow:0 20px 70px rgba(0,0,0,.45),0 0 50px rgba(53,200,255,.12)}
 .agr006-header{display:flex;justify-content:space-between;align-items:center;padding:16px 18px;border-bottom:1px solid rgba(255,255,255,.07)}.agr006-header strong{display:block;font-size:18px;letter-spacing:.18em}.agr006-header small{display:block;margin-top:2px;color:#86a8b8;font-size:11px}.agr006-close{background:transparent;border:0;color:#92aebd;font-size:24px;cursor:pointer}
-.agr006-body{padding:16px}.agr006-presence{margin:0 0 12px;color:#a9cedd;font-size:13px}.agr006-messages{display:flex;flex-direction:column;gap:9px;max-height:360px;overflow:auto;margin-bottom:12px}.agr006-message{max-width:88%;padding:10px 12px;border-radius:14px;font-size:13px;line-height:1.4}.agr006-message.user{align-self:flex-end;background:rgba(58,157,214,.17);border:1px solid rgba(98,197,244,.15)}.agr006-message.006{align-self:flex-start;background:rgba(255,255,255,.045);border:1px solid rgba(255,255,255,.07)}
+.agr006-body{padding:16px}.agr006-presence{margin:0 0 12px;color:#a9cedd;font-size:13px}.agr006-messages{display:flex;flex-direction:column;gap:9px;max-height:360px;overflow:auto;margin-bottom:12px}.agr006-message{max-width:88%;padding:10px 12px;border-radius:14px;font-size:13px;line-height:1.4}.agr006-message.user{align-self:flex-end;background:rgba(58,157,214,.17);border:1px solid rgba(98,197,244,.15)}.agr006-message.assistant{align-self:flex-start;background:rgba(255,255,255,.045);border:1px solid rgba(255,255,255,.07)}
 .agr006-input{display:flex;gap:8px}.agr006-input input{min-width:0;flex:1;border:1px solid rgba(133,220,255,.18);border-radius:12px;background:rgba(255,255,255,.035);color:#fff;padding:11px 12px;outline:none}.agr006-input input:focus{border-color:rgba(133,220,255,.5)}.agr006-input button{width:40px;border:1px solid rgba(133,220,255,.18);border-radius:12px;background:rgba(77,180,239,.14);color:#dff7ff;cursor:pointer}.agr006-input button:disabled{opacity:.35;cursor:not-allowed}.voice-btn.listening{background:rgba(255,92,92,.2);border-color:rgba(255,112,112,.4)}
 @keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-7px)}}@keyframes spin{to{transform:rotate(382deg)}}@keyframes spinReverse{to{transform:rotate(-382deg)}}@keyframes pulse{50%{opacity:.35}}
 @media (max-width:640px){.agr006-root{right:14px;bottom:14px}.agr006-orb{width:68px;height:68px}.agr006-panel{bottom:82px}}
