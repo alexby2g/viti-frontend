@@ -1,6 +1,6 @@
 <script setup>
 import { onMounted, onBeforeUnmount, ref } from 'vue'
-import Agr006FloatingAssistant from './components/agr/Agr006FloatingAssistantV3.vue'
+import Agr006FloatingAssistant from './components/agr/Agr006FloatingAssistantV2.vue'
 
 const STORAGE_KEY = 'viti006.enabled'
 const assistantEnabled = ref(localStorage.getItem(STORAGE_KEY) !== '0')
@@ -12,7 +12,8 @@ function setAssistantEnabled(value) {
 }
 
 function onPowerEvent(event) {
-  setAssistantEnabled(Boolean(event?.detail))
+  const value = Boolean(event?.detail)
+  if (assistantEnabled.value !== value) assistantEnabled.value = value
 }
 
 function onShortcut(event) {
