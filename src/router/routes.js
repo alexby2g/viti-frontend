@@ -91,7 +91,7 @@ export default [
       {path:'',redirect:'/apps/electrofrio/inicio'},
       {path:'inicio',name:'electro-home',component:electroHomePage,meta:{requiresAuth:true,adminOnly:true,appShell:'electrofrio',electroSection:'inicio'}},
       {path:'agenda',name:'electro-agenda',component:electroAgendaPage,meta:{requiresAuth:true,adminOnly:true,appShell:'electrofrio',electroSection:'agenda'}},
-      {path:'ordenes',name:'electro-orders',component:electroOrdersPage,meta:{requiresAuth:true,adminOnly:true,appShell:'electrofrio',electroSection:'agenda'}},
+      {path:'ordenes',name:'electro-orders',component:electroOrdersPage,meta:{requiresAuth:true,adminOnly:true,appShell:'electrofrio',electroSection:'ordenes'}},
       {path:'clientes',name:'electro-clients',component:electroClientsPage,meta:{requiresAuth:true,adminOnly:true,appShell:'electrofrio',electroSection:'clientes'}},
       {path:'equipos',name:'electro-equipment',component:electroEquipmentPage,meta:{requiresAuth:true,adminOnly:true,appShell:'electrofrio',electroSection:'equipos'}},
       {path:'tecnicos',name:'electro-technicians',component:electroPage,meta:{requiresAuth:true,adminOnly:true,appShell:'electrofrio',electroSection:'tecnicos'}},
