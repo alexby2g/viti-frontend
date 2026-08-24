@@ -14,7 +14,7 @@
       <q-badge color="orange" outline label="CONFIRMACIÓN REQUERIDA" />
       <q-space />
       <q-btn flat no-caps label="Cancelar" @click="$emit('cancel')" />
-      <q-btn color="primary" unelevated no-caps icon="business" label="Confirmar empresa" type="submit" :loading="loading" :disable="!form.nombre_comercial.trim()" />
+      <q-btn color="primary" unelevated no-caps icon="business" label="Confirmar empresa" type="submit" :loading="loading.value" :disable="!form.nombre_comercial.trim()" />
     </div>
   </q-form>
 </template>
@@ -26,14 +26,26 @@ import { api } from '../boot/axios'
 const props = defineProps({ draft: { type: Object, default: () => ({}) } })
 const emit = defineEmits(['success','cancel'])
 const loading = reactive({ value: false })
-const form = reactive({ nombre_comercial: props.draft.nombre_comercial || '', razon_social: props.draft.razon_social || '', actividad: props.draft.actividad || '', telefono: props.draft.telefono || '', whatsapp: props.draft.whatsapp || '', ciudad: props.draft.ciudad || '', direccion: props.draft.direccion || '' })
+const form = reactive({
+  nombre_comercial: props.draft.nombre_comercial || '',
+  razon_social: props.draft.razon_social || '',
+  actividad: props.draft.actividad || '',
+  telefono: props.draft.telefono || '',
+  whatsapp: props.draft.whatsapp || '',
+  ciudad: props.draft.ciudad || '',
+  direccion: props.draft.direccion || ''
+})
 
 async function submit() {
   if (!form.nombre_comercial.trim() || loading.value) return
   loading.value = true
   try {
-    const response = (await api.post('/agr/acciones/crear-cliente', { ...form, tipo: 'empresa' })).data
+    const response = (await api.post('/empresas', { ...form })).data
     emit('success', response)
-  } finally { loading.value = false }
+  } catch (error) {
+    emit('success', { message: error?.response?.data?.message || 'No pude registrar la empresa.' })
+  } finally {
+    loading.value = false
+  }
 }
 </script>
