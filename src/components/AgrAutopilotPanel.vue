@@ -15,6 +15,18 @@
       <q-card-section class="row q-col-gutter-md">
         <div v-for="metric in metrics" :key="metric.key" class="col-6 col-sm-3"><div class="metric-card"><div class="text-caption text-grey-7">{{ metric.label }}</div><div class="text-h5 text-weight-bold">{{ metric.value }}</div></div></div>
       </q-card-section>
+
+      <q-card-section v-if="recommendations.length">
+        <div class="text-subtitle1 text-weight-medium q-mb-sm">Siguientes pasos detectados</div>
+        <q-list separator>
+          <q-item v-for="item in recommendations" :key="item.key">
+            <q-item-section avatar><q-icon name="auto_awesome" :color="item.severity === 'high' ? 'negative' : 'warning'" /></q-item-section>
+            <q-item-section><q-item-label>{{ item.title }}</q-item-label><q-item-label caption>{{ item.message }}</q-item-label></q-item-section>
+            <q-item-section side><q-btn flat dense label="Revisar" @click="$router.push(item.route)" /></q-item-section>
+          </q-item>
+        </q-list>
+      </q-card-section>
+
       <q-card-section v-if="priorities.length">
         <div class="text-subtitle1 text-weight-medium q-mb-sm">Prioridades detectadas</div>
         <q-list separator>
@@ -25,7 +37,8 @@
           </q-item>
         </q-list>
       </q-card-section>
-      <q-card-section v-else class="text-grey-7">AGR no detectó una prioridad crítica con la información disponible.</q-card-section>
+
+      <q-card-section v-if="!priorities.length && !recommendations.length" class="text-grey-7">AGR no detectó incidencias ni procesos detenidos con la información disponible.</q-card-section>
       <q-card-actions align="between"><div class="text-caption text-grey-6">{{ message }}</div><q-btn outline color="primary" icon="refresh" label="Revisar ahora" :loading="refreshing" @click="refresh" /></q-card-actions>
     </template>
   </q-card>
@@ -39,45 +52,36 @@ const props = defineProps({ dashboardData: { type: Object, default: () => ({}) }
 const loading = ref(false)
 const refreshing = ref(false)
 const error = ref('')
-const agrSnapshot = ref(null)
-const merged = computed(() => agrSnapshot.value?.data || props.dashboardData?.resumen || {})
+const agrSnapshot = ref(props.dashboardData?.agr_autopilot || null)
+
+const snapshot = computed(() => agrSnapshot.value || {})
+const data = computed(() => snapshot.value.metrics || {})
 const metrics = computed(() => [
-  { key: 'clients', label: 'Clientes', value: agrSnapshot.value?.data?.clients ?? 0 },
-  { key: 'companies', label: 'Empresas activas', value: agrSnapshot.value?.data?.companies ?? 0 },
-  { key: 'requests', label: 'Solicitudes', value: agrSnapshot.value?.data?.requests ?? merged.value.solicitudes_activas ?? 0 },
-  { key: 'support', label: 'Soportes abiertos', value: agrSnapshot.value?.data?.support ?? merged.value.mantenimientos_abiertos ?? 0 }
+  { key: 'clients', label: 'Clientes', value: data.value.clients ?? 0 },
+  { key: 'companies', label: 'Empresas activas', value: data.value.companies ?? 0 },
+  { key: 'requests', label: 'Solicitudes', value: data.value.requests_pending ?? 0 },
+  { key: 'support', label: 'Soportes abiertos', value: data.value.support_open ?? 0 }
 ])
-const priorities = computed(() => {
-  const m = agrSnapshot.value?.data || {}
-  const result = []
-  const requests = m.requests ?? merged.value.solicitudes_activas ?? 0
-  const payments = m.payments ?? merged.value.pagos_vencidos ?? 0
-  const support = m.support ?? merged.value.mantenimientos_abiertos ?? 0
-  if (requests > 0) result.push({ key: 'requests', severity: requests >= 5 ? 'high' : 'medium', title: 'Solicitudes pendientes', message: `${requests} solicitud(es) requieren revisión.`, route: '/solicitudes' })
-  if (payments > 0) result.push({ key: 'payments', severity: 'high', title: 'Situaciones de pago', message: `${payments} cuenta(s) requieren atención.`, route: '/pagos' })
-  if (support > 0) result.push({ key: 'support', severity: support >= 5 ? 'high' : 'medium', title: 'Soporte abierto', message: `${support} atención(es) técnica(s) siguen abiertas.`, route: '/mantenimientos' })
-  return result
-})
-const health = computed(() => priorities.value.some(item => item.severity === 'high') ? 'attention' : priorities.value.length ? 'watch' : 'stable')
-const healthLabel = computed(() => ({ stable: 'Estable', watch: 'Vigilar', attention: 'Atención' }[health.value]))
-const healthColor = computed(() => ({ stable: 'positive', watch: 'warning', attention: 'negative' }[health.value]))
-const message = computed(() => health.value === 'stable' ? 'AGR mantiene el sistema bajo observación local.' : `AGR encontró ${priorities.value.length} punto(s) que conviene revisar.`)
+const priorities = computed(() => snapshot.value.priorities || [])
+const recommendations = computed(() => snapshot.value.workflow_recommendations || [])
+const health = computed(() => snapshot.value.health || 'stable')
+const healthLabel = computed(() => ({ stable: 'Estable', watch: 'Vigilar', attention: 'Atención' }[health.value] || 'Estable'))
+const healthColor = computed(() => ({ stable: 'positive', watch: 'warning', attention: 'negative' }[health.value] || 'positive'))
+const message = computed(() => snapshot.value.message || 'AGR mantiene el sistema bajo observación local.')
 
 async function refresh() {
   if (refreshing.value) return
   refreshing.value = true
   error.value = ''
   try {
-    const response = await api.get('/dashboard', { params: { agr: 'resumen' } })
-    agrSnapshot.value = response.data
+    const response = await api.get('/dashboard', { params: { agr_autopilot: true } })
+    agrSnapshot.value = response.data?.agr_autopilot || null
   } catch (err) {
     error.value = err?.response?.data?.message || 'AGR no pudo actualizar su análisis.'
   } finally {
     refreshing.value = false
   }
 }
-
-refresh()
 </script>
 
 <style scoped>
