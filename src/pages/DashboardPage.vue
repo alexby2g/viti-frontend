@@ -84,69 +84,76 @@ onMounted(async () => {
     <q-card flat class="viti-card q-mt-lg agr-card">
       <q-card-section>
         <div class="row items-center q-col-gutter-md">
-          <div class="col-auto">
-            <q-avatar color="primary" text-color="white" icon="auto_awesome" size="52px" />
-          </div>
+          <div class="col-auto"><q-avatar color="primary" text-color="white" icon="auto_awesome" size="52px" /></div>
           <div class="col">
             <div class="text-h6 text-weight-bold">AGR Assistant</div>
-            <div class="text-caption text-grey-6">
-              Asistente local de VITI. Esta primera versión funciona con reglas y datos reales del sistema, sin API externa.
-            </div>
+            <div class="text-caption text-grey-6">Asistente local de VITI. Funciona con reglas y datos reales del sistema, sin API externa.</div>
           </div>
-          <div class="col-12 col-md-auto">
-            <q-badge color="positive" outline label="LOCAL · SIN API" />
-          </div>
+          <div class="col-12 col-md-auto"><q-badge color="positive" outline label="LOCAL · SIN API" /></div>
         </div>
       </q-card-section>
 
       <q-separator />
 
       <q-card-section>
-        <q-input
-          v-model="agrMessage"
-          outlined
-          rounded
-          dense
-          placeholder="Escribe una orden para AGR..."
-          @keyup.enter="askAgr()"
-        >
-          <template #prepend>
-            <q-icon name="chat" />
-          </template>
+        <q-input v-model="agrMessage" outlined rounded dense placeholder="Escribe una orden para AGR..." @keyup.enter="askAgr()">
+          <template #prepend><q-icon name="chat" /></template>
           <template #append>
-            <q-btn
-              round
-              flat
-              dense
-              icon="send"
-              color="primary"
-              :loading="agrLoading"
-              @click="askAgr()"
-            />
+            <q-btn round flat dense icon="send" color="primary" :loading="agrLoading" @click="askAgr()" />
           </template>
         </q-input>
 
         <div class="row q-gutter-sm q-mt-md">
-          <q-btn outline no-caps size="sm" label="¿Cuántos clientes tengo?" @click="useExample('cuántos clientes tengo')" />
-          <q-btn outline no-caps size="sm" label="Solicitudes pendientes" @click="useExample('solicitudes pendientes')" />
+          <q-btn outline no-caps size="sm" label="Resumen" @click="useExample('resumen')" />
+          <q-btn outline no-caps size="sm" label="Clientes" @click="useExample('cuántos clientes tengo')" />
+          <q-btn outline no-caps size="sm" label="Pagos vencidos" @click="useExample('pagos vencidos')" />
+          <q-btn outline no-caps size="sm" label="Soportes abiertos" @click="useExample('soportes abiertos')" />
           <q-btn outline no-caps size="sm" label="Buscar cliente" @click="agrMessage = 'buscar cliente '" />
+          <q-btn outline no-caps size="sm" label="Buscar empresa" @click="agrMessage = 'buscar empresa '" />
         </div>
       </q-card-section>
 
       <q-card-section v-if="agrResponse" class="q-pt-none">
         <div class="agr-response">
-          <div class="text-caption text-grey-6 q-mb-xs">AGR</div>
+          <div class="text-caption text-grey-6 q-mb-xs">AGR · {{ pretty(agrResponse.intent) }}</div>
           <div class="text-body1">{{ agrResponse.message }}</div>
 
-          <q-list v-if="agrResponse.data?.results?.length" separator class="q-mt-md rounded-borders">
+          <div v-if="agrResponse.data?.clients !== undefined" class="row q-col-gutter-sm q-mt-md">
+            <div v-for="item in [
+              { key: 'clients', label: 'Clientes' },
+              { key: 'companies', label: 'Empresas' },
+              { key: 'requests', label: 'Solicitudes' },
+              { key: 'projects', label: 'Proyectos' },
+              { key: 'payments', label: 'Pagos' },
+              { key: 'support', label: 'Soportes' }
+            ]" :key="item.key" class="col-6 col-sm-4 col-md-2">
+              <q-card flat bordered class="summary-chip">
+                <q-card-section class="text-center q-pa-sm">
+                  <div class="text-h6 text-weight-bold">{{ agrResponse.data[item.key] ?? 0 }}</div>
+                  <div class="text-caption text-grey-6">{{ item.label }}</div>
+                </q-card-section>
+              </q-card>
+            </div>
+          </div>
+
+          <q-list v-if="agrResponse.intent === 'search_client' && agrResponse.data?.results?.length" separator class="q-mt-md rounded-borders">
             <q-item v-for="client in agrResponse.data.results" :key="client.id">
               <q-item-section>
                 <q-item-label class="text-weight-bold">{{ client.nombre }}</q-item-label>
                 <q-item-label caption>{{ client.telefono || 'Sin teléfono' }} · {{ client.correo || 'Sin correo' }}</q-item-label>
               </q-item-section>
-              <q-item-section side>
-                <q-badge :label="client.estado || 'sin estado'" />
+              <q-item-section side><q-badge :label="client.estado || 'sin estado'" /></q-item-section>
+            </q-item>
+          </q-list>
+
+          <q-list v-if="agrResponse.intent === 'search_company' && agrResponse.data?.results?.length" separator class="q-mt-md rounded-borders">
+            <q-item v-for="company in agrResponse.data.results" :key="company.id">
+              <q-item-section avatar><q-avatar color="primary" text-color="white" icon="business" /></q-item-section>
+              <q-item-section>
+                <q-item-label class="text-weight-bold">{{ company.nombre_comercial }}</q-item-label>
+                <q-item-label caption>{{ company.codigo || 'Sin código' }} · {{ company.ciudad || 'Sin ciudad' }} · {{ company.telefono || 'Sin teléfono' }}</q-item-label>
               </q-item-section>
+              <q-item-section side><q-badge :label="company.estado || 'sin estado'" /></q-item-section>
             </q-item>
           </q-list>
 
@@ -164,23 +171,14 @@ onMounted(async () => {
       <div class="col-12 col-lg-6">
         <q-card flat class="viti-card full-height">
           <q-card-section class="row items-center">
-            <div>
-              <div class="text-h6 text-weight-bold">Necesitan atención</div>
-              <div class="text-caption text-grey-6">Entregas, vencimientos y suspensiones detectadas por VITI.</div>
-            </div>
-            <q-space />
-            <q-btn flat dense no-caps color="primary" label="Centro SaaS" to="/saas" />
+            <div><div class="text-h6 text-weight-bold">Necesitan atención</div><div class="text-caption text-grey-6">Entregas, vencimientos y suspensiones detectadas por VITI.</div></div>
+            <q-space /><q-btn flat dense no-caps color="primary" label="Centro SaaS" to="/saas" />
           </q-card-section>
           <q-separator />
           <q-list v-if="data.requieren_atencion?.length" separator>
             <q-item v-for="row in data.requieren_atencion" :key="row.app.id" clickable to="/saas">
-              <q-item-section avatar>
-                <q-avatar color="orange-1" text-color="orange-9" :icon="row.ciclo.estado === 'lista_entrega' ? 'key' : row.ciclo.estado === 'suspendida' ? 'block' : 'schedule'" />
-              </q-item-section>
-              <q-item-section>
-                <q-item-label class="text-weight-bold">{{ row.app.nombre }}</q-item-label>
-                <q-item-label caption>{{ row.app.empresa?.nombre_comercial }} · {{ row.ciclo.mensaje }}</q-item-label>
-              </q-item-section>
+              <q-item-section avatar><q-avatar color="orange-1" text-color="orange-9" :icon="row.ciclo.estado === 'lista_entrega' ? 'key' : row.ciclo.estado === 'suspendida' ? 'block' : 'schedule'" /></q-item-section>
+              <q-item-section><q-item-label class="text-weight-bold">{{ row.app.nombre }}</q-item-label><q-item-label caption>{{ row.app.empresa?.nombre_comercial }} · {{ row.ciclo.mensaje }}</q-item-label></q-item-section>
               <q-item-section side><q-badge :color="row.ciclo.estado === 'suspendida' ? 'negative' : 'orange'">{{ pretty(row.ciclo.estado) }}</q-badge></q-item-section>
             </q-item>
           </q-list>
@@ -190,10 +188,7 @@ onMounted(async () => {
 
       <div class="col-12 col-lg-6">
         <q-card flat class="viti-card">
-          <q-card-section>
-            <div class="text-h6 text-weight-bold">Operación de hoy</div>
-            <div class="text-caption text-grey-6">Lo que todavía requiere trabajo humano, ese componente que insiste en seguir siendo necesario.</div>
-          </q-card-section>
+          <q-card-section><div class="text-h6 text-weight-bold">Operación de hoy</div><div class="text-caption text-grey-6">Lo que todavía requiere trabajo humano, ese componente que insiste en seguir siendo necesario.</div></q-card-section>
           <q-separator />
           <q-list>
             <q-item clickable to="/solicitudes"><q-item-section avatar><q-avatar color="orange-1" text-color="orange-8" icon="assignment" /></q-item-section><q-item-section>Solicitudes activas</q-item-section><q-item-section side><strong>{{ data.resumen.solicitudes_activas || 0 }}</strong></q-item-section></q-item>
@@ -212,4 +207,5 @@ onMounted(async () => {
 .action-card:hover{transform:translateY(-2px);box-shadow:0 10px 24px rgba(12,35,64,.08)}
 .agr-card{overflow:hidden}
 .agr-response{border-radius:16px;background:rgba(25,118,210,.05);padding:16px}
+.summary-chip{height:100%}
 </style>
