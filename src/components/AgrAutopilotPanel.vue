@@ -38,6 +38,17 @@
         </q-list>
       </q-card-section>
 
+      <q-card-section v-if="activity.length">
+        <div class="text-subtitle1 text-weight-medium q-mb-sm">Actividad reciente</div>
+        <q-list separator>
+          <q-item v-for="item in activity" :key="item.id">
+            <q-item-section avatar><q-avatar size="32px" :color="activityColor(item.type)" text-color="white" :icon="activityIcon(item.type)" /></q-item-section>
+            <q-item-section><q-item-label>{{ item.title }}</q-item-label><q-item-label caption>{{ item.message }}</q-item-label></q-item-section>
+            <q-item-section side><span class="text-caption text-grey-6">{{ formatDate(item.at) }}</span></q-item-section>
+          </q-item>
+        </q-list>
+      </q-card-section>
+
       <q-card-section v-if="!priorities.length && !recommendations.length" class="text-grey-7">AGR no detectó incidencias ni procesos detenidos con la información disponible.</q-card-section>
       <q-card-actions align="between"><div class="text-caption text-grey-6">{{ message }}</div><q-btn outline color="primary" icon="refresh" label="Revisar ahora" :loading="refreshing" @click="refresh" /></q-card-actions>
     </template>
@@ -53,6 +64,7 @@ const loading = ref(false)
 const refreshing = ref(false)
 const error = ref('')
 const agrSnapshot = ref(props.dashboardData?.agr_autopilot || null)
+const activity = ref(props.dashboardData?.agr_activity || [])
 
 const snapshot = computed(() => agrSnapshot.value || {})
 const data = computed(() => snapshot.value.metrics || {})
@@ -69,6 +81,10 @@ const healthLabel = computed(() => ({ stable: 'Estable', watch: 'Vigilar', atten
 const healthColor = computed(() => ({ stable: 'positive', watch: 'warning', attention: 'negative' }[health.value] || 'positive'))
 const message = computed(() => snapshot.value.message || 'AGR mantiene el sistema bajo observación local.')
 
+function activityIcon(type) { return ({ autopilot_review: 'auto_awesome', priority_detected: 'priority_high', workflow_recommendation: 'route' }[type] || 'history') }
+function activityColor(type) { return ({ autopilot_review: 'primary', priority_detected: 'negative', workflow_recommendation: 'warning' }[type] || 'grey-7') }
+function formatDate(value) { try { return new Date(value).toLocaleString('es-BO', { dateStyle: 'short', timeStyle: 'short' }) } catch { return value || '' } }
+
 async function refresh() {
   if (refreshing.value) return
   refreshing.value = true
@@ -76,6 +92,7 @@ async function refresh() {
   try {
     const response = await api.get('/dashboard', { params: { agr_autopilot: true } })
     agrSnapshot.value = response.data?.agr_autopilot || null
+    activity.value = response.data?.agr_activity || []
   } catch (err) {
     error.value = err?.response?.data?.message || 'AGR no pudo actualizar su análisis.'
   } finally {
