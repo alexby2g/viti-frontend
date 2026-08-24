@@ -1,7 +1,5 @@
 import { boot } from 'quasar/wrappers'
-import { h, render } from 'vue'
 import axios from 'axios'
-import Agr006FloatingAssistant from '../components/agr/Agr006FloatingAssistant.vue'
 
 const baseURL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1'
 const backendRoot = baseURL.replace(/\/api\/v1\/?$/, '')
@@ -142,20 +140,4 @@ api.interceptors.response.use(
   },
 )
 
-function mount006Assistant() {
-  if (typeof document === 'undefined') return
-  if (document.getElementById('agr-006-root')) return
-
-  const host = document.createElement('div')
-  host.id = 'agr-006-root'
-  document.body.appendChild(host)
-  render(h(Agr006FloatingAssistant), host)
-}
-
-export default boot(({ app }) => {
-  app.config.globalProperties.$api = api
-  if (typeof window !== 'undefined') {
-    if (document.readyState === 'loading') window.addEventListener('DOMContentLoaded', mount006Assistant, { once: true })
-    else queueMicrotask(mount006Assistant)
-  }
-})
+export default boot(({ app }) => { app.config.globalProperties.$api = api })
