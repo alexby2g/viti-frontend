@@ -26,6 +26,16 @@ export default defineRouter(({ store }) => {
   router.addRoute({ path:'/portal/aires/:pathMatch(.*)*', redirect:to => redirectAlias(to, '/portal/electrofrio') })
   router.addRoute({ path:'/aires/acceso', redirect:'/electrofrio/acceso' })
 
+  // Revisión administrativa limpia de solicitudes VITI.
+  // El detalle antiguo queda como compatibilidad interna, pero el flujo oficial
+  // entra por la pantalla de revisión separada.
+  router.addRoute({
+    path:'/solicitudes/:id/revision',
+    name:'solicitud-revision',
+    component:() => import('../pages/SolicitudRevisionPage.vue'),
+    meta:{requiresAuth:true,adminOnly:true},
+  })
+
   const homeFor = (user) => {
     if (user?.rol === 'cliente_negocio') return { name:'electro-customer-home' }
     if (user?.rol === 'cliente') return { name:'client-portal' }
@@ -37,6 +47,12 @@ export default defineRouter(({ store }) => {
     // La presentación y los planes deben abrir incluso si el API está dormido, en mantenimiento o
     // todavía no fue configurado. Son páginas públicas de producto, no parte del panel.
     if (to.meta.publicLanding || to.name === 'viti-landing' || to.name === 'viti-plans') return true
+
+    // La ruta anterior sigue existiendo para no romper enlaces ya emitidos,
+    // pero todas las revisiones administrativas pasan por el flujo limpio.
+    if (to.name === 'solicitud-detalle' && to.params.id) {
+      return { name:'solicitud-revision', params:{ id:to.params.id } }
+    }
 
     const auth = useAuthStore(store)
     if (auth.setupRequired === null) await auth.checkSetup()
