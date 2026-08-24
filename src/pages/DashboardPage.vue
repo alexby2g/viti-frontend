@@ -21,6 +21,13 @@ const cards = [
 
 function pretty(v) { return String(v || '').replaceAll('_', ' ').replace(/\b\w/g, c => c.toUpperCase()) }
 
+function applyClientDraft(draft = {}) {
+  agrClientForm.value = {
+    nombre: draft.nombre || '', telefono: draft.telefono || '', whatsapp: draft.whatsapp || '', correo: draft.correo || '',
+    ciudad: draft.ciudad || '', direccion: draft.direccion || '', observaciones: draft.observaciones || ''
+  }
+}
+
 async function askAgr(message = agrMessage.value) {
   const text = String(message || '').trim()
   if (!text || agrLoading.value) return
@@ -29,7 +36,10 @@ async function askAgr(message = agrMessage.value) {
   try {
     const response = (await api.get('/dashboard', { params: { agr: text } })).data
     agrResponse.value = response
-    if (response?.intent === 'create_client') agrClientForm.value = { nombre: '', telefono: '', whatsapp: '', correo: '', ciudad: '', direccion: '', observaciones: '' }
+    if (['create_client', 'create_client_workflow', 'create_client_ready'].includes(response?.intent)) {
+      if (response?.data?.draft) applyClientDraft(response.data.draft)
+      if (response?.intent === 'create_client') applyClientDraft()
+    }
   } catch (error) {
     agrResponse.value = { intent: 'error', message: error?.response?.data?.message || 'No pude comunicarme con AGR Assistant.' }
   } finally { agrLoading.value = false }
@@ -85,8 +95,9 @@ onMounted(async () => { try { data.value = (await api.get('/dashboard')).data } 
       </q-card-section>
 
       <q-card-section v-if="agrResponse" class="q-pt-none"><div class="agr-response"><div class="text-caption text-grey-6 q-mb-xs">AGR · {{ pretty(agrResponse.intent) }}</div><div class="text-body1">{{ agrResponse.message }}</div>
-        <q-form v-if="agrResponse.intent === 'create_client'" class="q-mt-md" @submit.prevent="confirmCreateClient">
-          <div class="text-subtitle2 text-weight-bold q-mb-md">Completa los datos del cliente</div>
+        <div v-if="agrResponse.intent === 'create_client_workflow'" class="q-mt-md"><q-badge color="primary" outline :label="`Paso ${agrResponse.data?.step || 1}`" /><div class="text-caption text-grey-6 q-mt-sm">AGR mantiene el borrador mientras avanzas. Puedes escribir “cancelar” para detener la operación.</div></div>
+        <q-form v-if="['create_client','create_client_ready'].includes(agrResponse.intent)" class="q-mt-md" @submit.prevent="confirmCreateClient">
+          <div class="text-subtitle2 text-weight-bold q-mb-md">Revisa los datos del cliente</div>
           <div class="row q-col-gutter-sm">
             <div class="col-12 col-md-6"><q-input v-model="agrClientForm.nombre" outlined dense label="Nombre completo *" /></div>
             <div class="col-12 col-md-3"><q-input v-model="agrClientForm.telefono" outlined dense label="Teléfono" /></div>
