@@ -48,6 +48,9 @@ export default defineRouter(({ store }) => {
     // todavía no fue configurado. Son páginas públicas de producto, no parte del panel.
     if (to.meta.publicLanding || to.name === 'viti-landing' || to.name === 'viti-plans') return true
 
+    // Los enlaces del formulario público anterior ya no deben abrir un formulario retirado.
+    if (to.name === 'public-request') return { path:'/solicitud', query:to.query, hash:to.hash }
+
     // La ruta anterior sigue existiendo para no romper enlaces ya emitidos,
     // pero todas las revisiones administrativas pasan por el flujo limpio.
     if (to.name === 'solicitud-detalle' && to.params.id) {
