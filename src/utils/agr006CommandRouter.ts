@@ -25,6 +25,17 @@ export function resolveAgr006LocalAction(input: string): Agr006LocalAction {
     return { type: 'browser_back', label: 'Volviendo atrás.' }
   }
 
+  // Acciones seguras que abren directamente formularios existentes en VITI.
+  if (hasAny(text, ['crear cliente', 'crear un cliente', 'registrar cliente', 'nuevo cliente', 'nuevo registro de cliente'])) {
+    return { type: 'navigate', to: '/empresas?new=1', label: 'Abriendo el formulario para registrar un cliente.' }
+  }
+  if (hasAny(text, ['crear empresa', 'crear una empresa', 'registrar empresa', 'nueva empresa', 'nueva cuenta'])) {
+    return { type: 'navigate', to: '/empresas?new=1', label: 'Abriendo el formulario para registrar una empresa.' }
+  }
+  if (hasAny(text, ['crear solicitud', 'crear una solicitud', 'nueva solicitud', 'registrar solicitud'])) {
+    return { type: 'navigate', to: '/solicitudes?new=1', label: 'Abriendo el formulario para crear una solicitud.' }
+  }
+
   const openVerb = hasAny(text, [
     'abre', 'abrir', 'habre', 'habrir', 'entra', 'entrar', 'ir a',
     've a', 'vamos a', 'llevame', 'llevarme', 'quiero ver', 'quiero entrar',
@@ -34,7 +45,6 @@ export function resolveAgr006LocalAction(input: string): Agr006LocalAction {
 
   if (!openVerb) return null
 
-  // Núcleo VITI
   if (hasAny(text, ['cliente', 'clientes', 'registro de clientes', 'registros de clientes'])) {
     return { type: 'navigate', to: '/empresas', label: 'Abriendo clientes.' }
   }
