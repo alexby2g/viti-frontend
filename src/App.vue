@@ -1,5 +1,5 @@
 <script setup>
-import Agr006FloatingAssistant from './components/agr/Agr006FloatingAssistantV2.vue'
+import Agr006FloatingAssistant from './components/agr/Agr006FloatingAssistantV3.vue'
 </script>
 
 <template>
