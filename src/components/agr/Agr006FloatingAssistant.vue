@@ -11,9 +11,9 @@
       <header class="agr006-header">
         <div>
           <strong>006</strong>
-          <small>VITI Intelligence Core · Voz Carolina</small>
+          <small>VITI Intelligence Core · Carolina</small>
         </div>
-        <button type="button" class="agr006-close" @click="open = false">×</button>
+        <button class="agr006-close" type="button" aria-label="Cerrar 006" @click="open = false">×</button>
       </header>
 
       <div class="agr006-body">
@@ -21,7 +21,7 @@
 
         <div v-if="messages.length" class="agr006-messages" aria-live="polite">
           <div v-for="(item, index) in messages" :key="index" :class="['agr006-message', item.role]">
-            <span>{{ item.text }}</span>
+            {{ item.text }}
           </div>
         </div>
 
@@ -33,7 +33,7 @@
 
         <form class="agr006-input" @submit.prevent="sendText">
           <input v-model="text" type="text" autocomplete="off" placeholder="Habla con 006..." />
-          <button type="button" :class="['voice-btn', { listening }]" :aria-label="listening ? 'Detener voz' : 'Hablar con 006'" @click="toggleVoice">
+          <button type="button" :class="['voice-btn', { listening }]" @click="toggleVoice" :aria-label="listening ? 'Detener' : 'Hablar'">
             {{ listening ? '■' : '●' }}
           </button>
           <button type="submit" :disabled="!text.trim()">→</button>
@@ -59,30 +59,39 @@ const messages = ref<Message[]>([])
 const state = ref<State>('online')
 const listening = ref(false)
 
-const presenceMessage = computed(() => {
-  if (state.value === 'thinking') return 'Analizando VITI...'
-  if (state.value === 'attention') return 'He detectado algo que merece tu atención.'
-  if (state.value === 'critical') return 'Hay una incidencia importante en VITI.'
-  return 'Estoy activo y vigilando VITI.'
-})
-
 let recognition: any = null
 let activeAudio: HTMLAudioElement | null = null
 let activeAudioUrl: string | null = null
 
+const presenceMessage = computed(() => {
+  if (state.value === 'thinking') return 'Analizando VITI...'
+  if (state.value === 'attention') return 'He detectado algo que merece tu atención.'
+  if (state.value === 'critical') return 'Hay una incidencia importante en VITI.'
+  return '006 está activo y vigilando VITI.'
+})
+
+function toggle() {
+  open.value = !open.value
+  if (open.value && messages.value.length === 0) {
+    messages.value.push({ role: 'assistant', text: '006 online. VITI está operativo. ¿Qué necesitas?' })
+  }
+}
+
 async function ask(message: string) {
-  const normalized = String(message || '').trim()
-  if (!normalized) return
-  if (!visible.value) return
+  const normalized = message.trim()
+  if (!normalized || !visible.value) return
   state.value = 'thinking'
   messages.value.push({ role: 'user', text: normalized })
+
   try {
     const response = await api.get('/dashboard', { params: { agr: normalized } })
     const payload = response?.data || {}
     const answer = payload?.data?.message ?? payload?.message ?? payload?.data?.data?.message ?? 'No tengo una respuesta disponible todavía.'
-    messages.value.push({ role: 'assistant', text: String(answer) })
+    const answerText = String(answer)
+
+    messages.value.push({ role: 'assistant', text: answerText })
     state.value = ['critical', 'attention'].includes(String(payload?.health || '')) ? 'attention' : 'online'
-    await speakIfEnabled(String(answer))
+    await speakWithCarolina(answerText)
   } catch (error: any) {
     const status = Number(error?.response?.status || 0)
     state.value = status === 401 || status === 419 ? 'attention' : 'critical'
@@ -106,23 +115,18 @@ function runCommand(command: string) {
   void ask(command)
 }
 
-function toggle() {
-  open.value = !open.value
-  if (open.value && messages.value.length === 0) {
-    messages.value.push({ role: 'assistant', text: '006 online. Estoy conectado al núcleo de VITI. ¿Qué necesitas?' })
-  }
-}
-
 function toggleVoice() {
-  if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+  if (!(('webkitSpeechRecognition' in window) || ('SpeechRecognition' in window))) {
     state.value = 'attention'
-    messages.value.push({ role: 'assistant', text: 'Este navegador no expone reconocimiento de voz. Puedes escribirme aquí.' })
+    messages.value.push({ role: 'assistant', text: 'Este navegador no expone reconocimiento de voz. Puedes escribirme.' })
     return
   }
+
   if (listening.value) {
     recognition?.stop()
     return
   }
+
   const Recognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
   recognition = new Recognition()
   recognition.lang = 'es-BO'
@@ -138,39 +142,40 @@ function toggleVoice() {
   recognition.start()
 }
 
-async function speakIfEnabled(textToSpeak: string) {
+async function speakWithCarolina(textToSpeak: string) {
   if (!textToSpeak.trim()) return
+  stopAudio()
 
   try {
-    stopActiveAudio()
-    const response = await api.get('/dashboard', {
-      params: { agr_voice: textToSpeak },
+    const response = await api.post('/agr/voice', { text: textToSpeak }, {
       responseType: 'blob',
-      headers: { Accept: 'audio/mpeg, application/json' },
+      headers: { Accept: 'audio/mpeg' },
+      timeout: 30000,
     })
-    const contentType = String(response.headers?.['content-type'] || '')
-    if (!contentType.includes('audio/')) throw new Error('006 voice service unavailable')
+
+    const contentType = String(response.headers?.['content-type'] || '').toLowerCase()
+    if (!contentType.includes('audio/')) throw new Error('006 TTS did not return audio')
 
     activeAudioUrl = URL.createObjectURL(response.data)
     activeAudio = new Audio(activeAudioUrl)
     activeAudio.volume = 1
-    activeAudio.onended = stopActiveAudio
+    activeAudio.onended = stopAudio
     await activeAudio.play()
     return
   } catch {
-    // Fallback local so 006 never stays silent.
+    // Fallback: solo si ElevenLabs no está disponible.
   }
 
   if (!('speechSynthesis' in window)) return
-  const utterance = new SpeechSynthesisUtterance(textToSpeak)
-  utterance.lang = 'es-MX'
-  utterance.rate = 0.92
-  utterance.pitch = 0.86
+  const fallback = new SpeechSynthesisUtterance(textToSpeak)
+  fallback.lang = 'es-MX'
+  fallback.rate = 0.90
+  fallback.pitch = 0.78
   window.speechSynthesis.cancel()
-  window.speechSynthesis.speak(utterance)
+  window.speechSynthesis.speak(fallback)
 }
 
-function stopActiveAudio() {
+function stopAudio() {
   if (activeAudio) {
     activeAudio.pause()
     activeAudio.src = ''
@@ -184,7 +189,7 @@ function stopActiveAudio() {
 
 onBeforeUnmount(() => {
   recognition?.stop()
-  stopActiveAudio()
+  stopAudio()
   window.speechSynthesis?.cancel()
 })
 </script>
