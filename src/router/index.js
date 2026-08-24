@@ -36,6 +36,14 @@ export default defineRouter(({ store }) => {
     meta:{requiresAuth:true,adminOnly:true},
   })
 
+  // Centro de Monitoreo administrativo.
+  router.addRoute({
+    path:'/monitor',
+    name:'monitor',
+    component:() => import('../pages/MonitorPage.vue'),
+    meta:{requiresAuth:true,adminOnly:true},
+  })
+
   const homeFor = (user) => {
     if (user?.rol === 'cliente_negocio') return { name:'electro-customer-home' }
     if (user?.rol === 'cliente') return { name:'client-portal' }
