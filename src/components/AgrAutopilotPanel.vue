@@ -47,6 +47,17 @@
         </q-list>
       </q-card-section>
 
+      <q-card-section v-if="eventRuleAlerts.length" class="rules-card">
+        <div class="row items-center q-mb-sm"><div><div class="text-subtitle1 text-weight-medium">Reglas automáticas</div><div class="text-caption text-grey-7">AGR reaccionó a eventos sin necesidad de una IA externa.</div></div><q-space /><q-badge color="deep-orange" :label="`${eventRuleAlerts.length}`" /></div>
+        <q-list separator>
+          <q-item v-for="rule in eventRuleAlerts" :key="`${rule.key}:${rule.event_id}`">
+            <q-item-section avatar><q-icon name="rule" :color="rule.severity === 'critical' ? 'negative' : 'warning'" /></q-item-section>
+            <q-item-section><q-item-label class="text-weight-medium">{{ rule.title }}</q-item-label><q-item-label caption>{{ rule.message }}</q-item-label><q-item-label caption>Evento: {{ rule.event_id || '—' }}</q-item-label></q-item-section>
+            <q-item-section side><q-badge outline :color="rule.severity === 'critical' ? 'negative' : 'warning'" :label="prettySeverity(rule.severity)" /></q-item-section>
+          </q-item>
+        </q-list>
+      </q-card-section>
+
       <q-card-section v-if="incidents.length" class="incidents-card">
         <div class="row items-center q-mb-sm"><div><div class="text-subtitle1 text-weight-medium">Incidentes activos</div><div class="text-caption text-grey-7">AGR agrupa señales relacionadas y propone recuperaciones seguras.</div></div><q-space /><q-badge color="negative" :label="`${incidents.length}`" /></div>
         <q-list separator>
@@ -65,22 +76,13 @@
         </q-list>
       </q-card-section>
 
-      <q-card-section v-if="recommendations.length">
-        <div class="text-subtitle1 text-weight-medium q-mb-sm">Siguientes pasos detectados</div>
-        <q-list separator><q-item v-for="item in recommendations" :key="item.key"><q-item-section avatar><q-icon name="auto_awesome" :color="item.severity === 'high' ? 'negative' : 'warning'" /></q-item-section><q-item-section><q-item-label>{{ item.title }}</q-item-label><q-item-label caption>{{ item.message }}</q-item-label></q-item-section><q-item-section side><q-btn flat dense label="Revisar" @click="$router.push(item.route)" /></q-item-section></q-item></q-list>
-      </q-card-section>
+      <q-card-section v-if="recommendations.length"><div class="text-subtitle1 text-weight-medium q-mb-sm">Siguientes pasos detectados</div><q-list separator><q-item v-for="item in recommendations" :key="item.key"><q-item-section avatar><q-icon name="auto_awesome" :color="item.severity === 'high' ? 'negative' : 'warning'" /></q-item-section><q-item-section><q-item-label>{{ item.title }}</q-item-label><q-item-label caption>{{ item.message }}</q-item-label></q-item-section><q-item-section side><q-btn flat dense label="Revisar" @click="$router.push(item.route)" /></q-item-section></q-item></q-list></q-card-section>
 
-      <q-card-section v-if="priorities.length">
-        <div class="text-subtitle1 text-weight-medium q-mb-sm">Prioridades detectadas</div>
-        <q-list separator><q-item v-for="item in priorities" :key="item.key"><q-item-section avatar><q-icon :name="item.severity === 'high' ? 'priority_high' : 'visibility'" :color="item.severity === 'high' ? 'negative' : 'warning'" /></q-item-section><q-item-section><q-item-label>{{ item.title }}</q-item-label><q-item-label caption>{{ item.message }}</q-item-label></q-item-section><q-item-section side><q-btn flat dense label="Revisar" @click="$router.push(item.route)" /></q-item-section></q-item></q-list>
-      </q-card-section>
+      <q-card-section v-if="priorities.length"><div class="text-subtitle1 text-weight-medium q-mb-sm">Prioridades detectadas</div><q-list separator><q-item v-for="item in priorities" :key="item.key"><q-item-section avatar><q-icon :name="item.severity === 'high' ? 'priority_high' : 'visibility'" :color="item.severity === 'high' ? 'negative' : 'warning'" /></q-item-section><q-item-section><q-item-label>{{ item.title }}</q-item-label><q-item-label caption>{{ item.message }}</q-item-label></q-item-section><q-item-section side><q-btn flat dense label="Revisar" @click="$router.push(item.route)" /></q-item-section></q-item></q-list></q-card-section>
 
-      <q-card-section v-if="activity.length">
-        <div class="text-subtitle1 text-weight-medium q-mb-sm">Actividad reciente</div>
-        <q-list separator><q-item v-for="item in activity" :key="item.id"><q-item-section avatar><q-avatar size="32px" :color="activityColor(item.type)" text-color="white" :icon="activityIcon(item.type)" /></q-item-section><q-item-section><q-item-label>{{ item.title }}</q-item-label><q-item-label caption>{{ item.message }}</q-item-label></q-item-section><q-item-section side><span class="text-caption text-grey-6">{{ formatDate(item.at) }}</span></q-item-section></q-item></q-list>
-      </q-card-section>
+      <q-card-section v-if="activity.length"><div class="text-subtitle1 text-weight-medium q-mb-sm">Actividad reciente</div><q-list separator><q-item v-for="item in activity" :key="item.id"><q-item-section avatar><q-avatar size="32px" :color="activityColor(item.type)" text-color="white" :icon="activityIcon(item.type)" /></q-item-section><q-item-section><q-item-label>{{ item.title }}</q-item-label><q-item-label caption>{{ item.message }}</q-item-label></q-item-section><q-item-section side><span class="text-caption text-grey-6">{{ formatDate(item.at) }}</span></q-item-section></q-item></q-list></q-card-section>
 
-      <q-card-section v-if="!priorities.length && !recommendations.length && !incidents.length && !anomalies.length && !warnings.length" class="text-grey-7">AGR no detectó incidencias, procesos detenidos ni anomalías técnicas con la información disponible.</q-card-section>
+      <q-card-section v-if="!priorities.length && !recommendations.length && !incidents.length && !eventRuleAlerts.length && !anomalies.length && !warnings.length" class="text-grey-7">AGR no detectó incidencias, procesos detenidos ni anomalías técnicas con la información disponible.</q-card-section>
       <q-card-actions align="between"><div class="text-caption text-grey-6">{{ message }}</div><div class="row q-gutter-sm"><q-btn flat color="primary" icon="health_and_safety" label="Ronda completa" :loading="guardLoading" @click="runGuard" /><q-btn outline color="primary" icon="refresh" label="Revisar ahora" :loading="refreshing" @click="refresh" /></div></q-card-actions>
     </template>
   </q-card>
@@ -100,6 +102,7 @@ const agrSnapshot = ref(props.dashboardData?.agr_autopilot || null)
 const activity = ref(props.dashboardData?.agr_activity || [])
 const guardSnapshot = ref(agrSnapshot.value?.system_guard || null)
 const watchdog = ref(props.dashboardData?.agr_watchdog || agrSnapshot.value?.watchdog || {})
+const eventRules = ref(props.dashboardData?.agr_event_rules || agrSnapshot.value?.agr_events?.rules || [])
 
 const snapshot = computed(() => agrSnapshot.value || {})
 const data = computed(() => snapshot.value.metrics || {})
@@ -108,6 +111,7 @@ const anomalies = computed(() => systemHealth.value.anomalies || [])
 const warnings = computed(() => systemHealth.value.warnings || [])
 const incidents = computed(() => snapshot.value.incidents || [])
 const recoveryPlans = computed(() => snapshot.value.incident_recovery || [])
+const eventRuleAlerts = computed(() => snapshot.value.agr_events?.rules || eventRules.value || [])
 const metrics = computed(() => [
   { key: 'clients', label: 'Clientes', value: data.value.clients ?? 0 },
   { key: 'companies', label: 'Empresas activas', value: data.value.companies ?? 0 },
@@ -131,8 +135,8 @@ const message = computed(() => snapshot.value.message || 'AGR mantiene el sistem
 
 function recoveryFor(incidentId) { return recoveryPlans.value.find(item => item.incident_id === incidentId)?.plans || [] }
 function prettySeverity(value) { return ({ critical: 'Crítico', high: 'Alto', medium: 'Medio' }[value] || value) }
-function activityIcon(type) { return ({ autopilot_review: 'auto_awesome', priority_detected: 'priority_high', workflow_recommendation: 'route', system_guard_scan: 'health_and_safety', system_anomaly: 'bug_report', incident_detected: 'warning', recovery_action: 'build' }[type] || 'history') }
-function activityColor(type) { return ({ autopilot_review: 'primary', priority_detected: 'negative', workflow_recommendation: 'warning', system_guard_scan: 'teal', system_anomaly: 'negative', incident_detected: 'deep-orange', recovery_action: 'positive' }[type] || 'grey-7') }
+function activityIcon(type) { return ({ autopilot_review: 'auto_awesome', priority_detected: 'priority_high', workflow_recommendation: 'route', system_guard_scan: 'health_and_safety', system_anomaly: 'bug_report', incident_detected: 'warning', recovery_action: 'build', event_rule_alert: 'rule' }[type] || 'history') }
+function activityColor(type) { return ({ autopilot_review: 'primary', priority_detected: 'negative', workflow_recommendation: 'warning', system_guard_scan: 'teal', system_anomaly: 'negative', incident_detected: 'deep-orange', recovery_action: 'positive', event_rule_alert: 'deep-orange' }[type] || 'grey-7') }
 function formatDate(value) { if (!value) return '—'; try { return new Date(value).toLocaleString('es-BO', { dateStyle: 'short', timeStyle: 'short' }) } catch { return value || '—' } }
 
 async function executeRecovery(incident, plan) {
@@ -174,6 +178,7 @@ async function refresh() {
     agrSnapshot.value = response.data?.agr_autopilot || null
     guardSnapshot.value = agrSnapshot.value?.system_guard || null
     watchdog.value = response.data?.agr_watchdog || agrSnapshot.value?.watchdog || {}
+    eventRules.value = response.data?.agr_event_rules || agrSnapshot.value?.agr_events?.rules || []
     activity.value = response.data?.agr_activity || []
   } catch (err) {
     error.value = err?.response?.data?.message || 'AGR no pudo actualizar su análisis.'
@@ -184,5 +189,5 @@ async function refresh() {
 <style scoped>
 .agr-autopilot-panel { border-radius: 20px; }
 .metric-card { min-height: 74px; padding: 12px; border-radius: 14px; background: rgba(0, 0, 0, .03); }
-.system-health-card, .incidents-card, .watchdog-card { border-radius: 16px; background: rgba(25, 118, 210, .04); }
+.system-health-card, .incidents-card, .watchdog-card, .rules-card { border-radius: 16px; background: rgba(25, 118, 210, .04); }
 </style>
