@@ -11,7 +11,7 @@
       <header class="agr006-header">
         <div>
           <strong>006</strong>
-          <small>VITI Intelligence Core</small>
+          <small>VITI Intelligence Core · Voz Carolina</small>
         </div>
         <button type="button" class="agr006-close" @click="open = false">×</button>
       </header>
@@ -67,6 +67,8 @@ const presenceMessage = computed(() => {
 })
 
 let recognition: any = null
+let activeAudio: HTMLAudioElement | null = null
+let activeAudioUrl: string | null = null
 
 async function ask(message: string) {
   const normalized = String(message || '').trim()
@@ -80,7 +82,7 @@ async function ask(message: string) {
     const answer = payload?.data?.message ?? payload?.message ?? payload?.data?.data?.message ?? 'No tengo una respuesta disponible todavía.'
     messages.value.push({ role: 'assistant', text: String(answer) })
     state.value = ['critical', 'attention'].includes(String(payload?.health || '')) ? 'attention' : 'online'
-    speakIfEnabled(String(answer))
+    await speakIfEnabled(String(answer))
   } catch (error: any) {
     const status = Number(error?.response?.status || 0)
     state.value = status === 401 || status === 419 ? 'attention' : 'critical'
@@ -136,18 +138,53 @@ function toggleVoice() {
   recognition.start()
 }
 
-function speakIfEnabled(textToSpeak: string) {
+async function speakIfEnabled(textToSpeak: string) {
+  if (!textToSpeak.trim()) return
+
+  try {
+    stopActiveAudio()
+    const response = await api.get('/dashboard', {
+      params: { agr_voice: textToSpeak },
+      responseType: 'blob',
+      headers: { Accept: 'audio/mpeg, application/json' },
+    })
+    const contentType = String(response.headers?.['content-type'] || '')
+    if (!contentType.includes('audio/')) throw new Error('006 voice service unavailable')
+
+    activeAudioUrl = URL.createObjectURL(response.data)
+    activeAudio = new Audio(activeAudioUrl)
+    activeAudio.volume = 1
+    activeAudio.onended = stopActiveAudio
+    await activeAudio.play()
+    return
+  } catch {
+    // Fallback local so 006 never stays silent.
+  }
+
   if (!('speechSynthesis' in window)) return
   const utterance = new SpeechSynthesisUtterance(textToSpeak)
-  utterance.lang = 'es-BO'
-  utterance.rate = 1
-  utterance.pitch = 0.95
+  utterance.lang = 'es-MX'
+  utterance.rate = 0.92
+  utterance.pitch = 0.86
   window.speechSynthesis.cancel()
   window.speechSynthesis.speak(utterance)
 }
 
+function stopActiveAudio() {
+  if (activeAudio) {
+    activeAudio.pause()
+    activeAudio.src = ''
+    activeAudio = null
+  }
+  if (activeAudioUrl) {
+    URL.revokeObjectURL(activeAudioUrl)
+    activeAudioUrl = null
+  }
+}
+
 onBeforeUnmount(() => {
   recognition?.stop()
+  stopActiveAudio()
   window.speechSynthesis?.cancel()
 })
 </script>
