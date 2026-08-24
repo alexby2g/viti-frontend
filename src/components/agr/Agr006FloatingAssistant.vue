@@ -11,7 +11,7 @@
       <header class="agr006-header">
         <div>
           <strong>006</strong>
-          <small>VITI Intelligence Core · Carolina</small>
+          <small>VITI Intelligence Core · Voz propia</small>
         </div>
         <button class="agr006-close" type="button" aria-label="Cerrar 006" @click="open = false">×</button>
       </header>
@@ -45,13 +45,21 @@
 
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { api } from '../../boot/axios'
 
 interface Message { role: 'user' | 'assistant'; text: string }
 type State = 'online' | 'thinking' | 'attention' | 'critical'
 
+type AgrAction = {
+  type?: string
+  to?: string
+  label?: string
+  target?: string
+}
+
 const route = useRoute()
+const router = useRouter()
 const visible = computed(() => route.meta?.requiresAuth === true)
 const open = ref(false)
 const text = ref('')
@@ -73,7 +81,7 @@ const presenceMessage = computed(() => {
 function toggle() {
   open.value = !open.value
   if (open.value && messages.value.length === 0) {
-    messages.value.push({ role: 'assistant', text: '006 online. VITI está operativo. ¿Qué necesitas?' })
+    messages.value.push({ role: 'assistant', text: '006 en línea. VITI está operativo. ¿Qué necesitas?' })
   }
 }
 
@@ -84,14 +92,16 @@ async function ask(message: string) {
   messages.value.push({ role: 'user', text: normalized })
 
   try {
-    const response = await api.get('/dashboard', { params: { agr: normalized } })
+    const response = await api.post('/agr/voice', { command: normalized }, { timeout: 30000 })
     const payload = response?.data || {}
     const answer = payload?.data?.message ?? payload?.message ?? payload?.data?.data?.message ?? 'No tengo una respuesta disponible todavía.'
     const answerText = String(answer)
 
     messages.value.push({ role: 'assistant', text: answerText })
     state.value = ['critical', 'attention'].includes(String(payload?.health || '')) ? 'attention' : 'online'
-    await speakWithCarolina(answerText)
+
+    await executeAction(payload?.data?.action ?? payload?.action)
+    await speakWith006(answerText)
   } catch (error: any) {
     const status = Number(error?.response?.status || 0)
     state.value = status === 401 || status === 419 ? 'attention' : 'critical'
@@ -101,6 +111,23 @@ async function ask(message: string) {
         ? 'La sesión de VITI no está lista. Mantén abierta la sesión e inténtalo de nuevo.'
         : 'No pude consultar VITI en este momento. Revisa la conexión del sistema.'
     })
+  }
+}
+
+async function executeAction(action: AgrAction | null | undefined) {
+  if (!action?.type) return
+
+  switch (action.type) {
+    case 'navigate':
+      if (!action.to) return
+      await router.push(action.to)
+      break
+    case 'browser_back':
+      await router.back()
+      break
+    default:
+      // Las acciones mutables quedan para el orquestador seguro/confirmación.
+      break
   }
 }
 
@@ -142,7 +169,7 @@ function toggleVoice() {
   recognition.start()
 }
 
-async function speakWithCarolina(textToSpeak: string) {
+async function speakWith006(textToSpeak: string) {
   if (!textToSpeak.trim()) return
   stopAudio()
 
@@ -163,7 +190,7 @@ async function speakWithCarolina(textToSpeak: string) {
     await activeAudio.play()
     return
   } catch {
-    // Fallback: solo si ElevenLabs no está disponible.
+    // Fallback only if the dedicated 006 voice is temporarily unavailable.
   }
 
   if (!('speechSynthesis' in window)) return
