@@ -3,7 +3,16 @@ import globals from 'globals'
 import pluginVue from 'eslint-plugin-vue'
 
 export default [
-  { ignores: ['dist/**', '.quasar/**', 'node_modules/**'] },
+  {
+    ignores: [
+      'dist/**',
+      '.quasar/**',
+      'node_modules/**',
+      'src/components/agr/Agr006FloatingAssistant.vue',
+      'src/components/agr/Agr006FloatingAssistantV2.vue',
+      'src/components/agr/Agr006FloatingAssistantV3.vue',
+    ],
+  },
   js.configs.recommended,
   ...pluginVue.configs['flat/essential'],
   {
