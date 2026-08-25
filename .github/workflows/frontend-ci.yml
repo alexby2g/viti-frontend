@@ -29,5 +29,11 @@ jobs:
       - name: Lint
         run: npm run lint -- --max-warnings=50
 
+      - name: VITI stability smoke
+        run: npm run test:viti-stability
+
+      - name: VITI public presentation smoke
+        run: npm run test:viti-public
+
       - name: Production build
         run: npm run build
