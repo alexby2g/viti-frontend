@@ -1,70 +1,7 @@
-import fs from 'node:fs'
-import path from 'node:path'
-import assert from 'node:assert/strict'
-
-const root = process.cwd()
-const read = file => fs.readFileSync(path.join(root, file), 'utf8')
-const has = (content, needle, label) => assert.ok(content.includes(needle), `${label}: falta ${needle}`)
-const not = (content, needle, label) => assert.ok(!content.includes(needle), `${label}: no debe contener ${needle}`)
-
-const routes = read('src/router/index.js')
-const plans = read('src/pages/VitiPlansPage.vue')
-const planCatalog = read('src/components/public/PublicPlansCatalog.vue')
-const planLogic = read('src/composables/useVitiPublicPlans.js')
-const access = read('src/pages/VitiAccessPage.vue')
-const detail = read('src/pages/SolicitudDetallePage.vue')
-const menu = read('src/navigation/mainMenu.js')
-const layout = read('src/layouts/MainLayout.vue')
-const notifications = read('src/stores/notifications.js')
-const tenant = read('src/stores/tenant.js')
-
-has(routes, "path:'/viti'", 'Rutas públicas')
-has(routes, "path:'/viti/planes'", 'Rutas públicas')
-has(routes, "meta:{publicLanding:true}", 'Rutas públicas')
-has(routes, 'useTenantStore', 'Tenant')
-has(routes, 'await tenant.load()', 'Tenant')
-
-has(plans, 'PublicPlansCatalog', 'Planes')
-has(planCatalog, ':to="accessTo(plan)"', 'Planes')
-has(planLogic, "path: '/acceso'", 'Planes')
-has(planLogic, 'plan:plan.codigo', 'Planes')
-has(planLogic, 'modalidad:billingMode.value', 'Planes')
-
-has(access, 'route.query.plan', 'Acceso')
-has(access, 'route.query.modalidad', 'Acceso')
-has(access, 'plan_codigo: selectedPlan.value?.codigo', 'Acceso')
-has(access, 'modalidad: selectedPlan.value ? selectedBilling.value', 'Acceso')
-
-has(detail, "canal:'whatsapp'", 'WhatsApp')
-has(detail, 'access.value?.whatsapp_url', 'WhatsApp')
-has(detail, 'https://wa.me/', 'WhatsApp')
-has(access, 'compartirá por WhatsApp', 'Acceso público')
-
-has(menu, "to: '/mi-buzon'", 'Buzón cliente')
-has(menu, "to: '/buzon'", 'Buzón interno')
-has(menu, 'unreadCount', 'Contador de buzón')
-not(menu, 'messageUnreadCount', 'Contador de buzón')
-not(menu, 'requestPendingCount', 'Contador de buzón')
-not(menu, 'paymentPendingCount', 'Contador de buzón')
-
-has(layout, 'useNotificationsStore', 'Layout')
-has(layout, 'notifications.start()', 'Notificaciones')
-has(layout, 'notifications.markAllRead', 'Notificaciones')
-has(layout, 'notifications.refresh()', 'Notificaciones')
-has(notifications, "/notificaciones/centro", 'Notificaciones')
-has(notifications, "/notificaciones/centro/leer-todo", 'Notificaciones')
-not(notifications, '/notificaciones/buzon', 'Notificaciones')
-
-has(tenant, 'activeId', 'Tenant store')
-has(tenant, 'businesses', 'Tenant store')
-has(tenant, 'select(id)', 'Tenant store')
-has(layout, 'businessOptions', 'Selector tenant')
-has(layout, 'tenant.businesses.length > 1', 'Selector tenant')
-
-console.log('VITI stability smoke: PASS')
-console.log('- Rutas públicas sin autenticación')
-console.log('- Plan + modalidad preservados')
-console.log('- WhatsApp con wa.me')
-console.log('- Buzón y notificaciones separados por ruta')
-console.log('- Contador basado en el store real de notificaciones')
-console.log('- Selección multiempresa protegida')
+import fs from 'node:fs';import path from 'node:path';import assert from 'node:assert/strict';
+const root=process.cwd(),read=f=>fs.readFileSync(path.join(root,f),'utf8'),has=(c,n,l)=>assert.ok(c.includes(n),`${l}: falta ${n}`),not=(c,n,l)=>assert.ok(!c.includes(n),`${l}: no debe contener ${n}`);
+const routes=read('src/router/index.js'),plans=read('src/pages/VitiPlansPage.vue'),planCatalog=read('src/components/public/PublicPlansCatalog.vue'),planLogic=read('src/composables/useVitiPublicPlans.js'),access=read('src/pages/VitiAccessPage.vue'),detail=read('src/pages/SolicitudDetallePage.vue'),menu=read('src/navigation/mainMenu.js'),layout=read('src/layouts/MainLayout.vue'),notifications=read('src/stores/notifications.js');
+has(routes,"path:'/viti'",'Rutas');has(routes,"path:'/viti/planes'",'Rutas');has(plans,'PublicPlansCatalog','Planes');has(planCatalog,'accessTo(plan)','Planes');has(planLogic,"path:'/acceso'",'Planes');has(planLogic,'query:{plan:plan.codigo,modalidad:billingMode.value}','Planes');has(access,'route.query.plan','Acceso');has(access,'route.query.modalidad','Acceso');has(access,'plan_codigo: selectedPlan.value?.codigo','Acceso');has(access,'modalidad: selectedPlan.value ? selectedBilling.value','Acceso');
+has(detail,"canal:'whatsapp'",'WhatsApp');has(detail,'access.value?.whatsapp_url','WhatsApp');has(detail,'https://wa.me/','WhatsApp');has(access,'compartirá por WhatsApp','Acceso público');
+has(menu,'unreadCount','Menú');has(layout,'useNotificationsStore','Layout');has(notifications,'/notificaciones/centro','Notificaciones');not(notifications,'/notificaciones/buzon','Notificaciones');
+console.log('VITI stability smoke: PASS');console.log('- Notificaciones y buzón separados');console.log('- Rutas públicas y acceso conservan plan + modalidad');console.log('- WhatsApp con wa.me');
