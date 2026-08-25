@@ -34,3 +34,5 @@ jobs:
 
       - name: Chrome authenticated tenant smoke
         run: bash scripts/browser-auth-smoke.sh
+
+      # Keep this workflow explicitly tied to the current public-flow smoke contract.
