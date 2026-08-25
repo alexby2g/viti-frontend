@@ -1,41 +1,52 @@
 <script setup>
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { Dark, useQuasar } from 'quasar'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { api } from '../boot/axios'
 import { useAuthStore } from '../stores/auth'
+import { useTenantStore } from '../stores/tenant'
+import { filterPeluqueriaMenu, peluqueriaModuleForPath } from '../utils/peluqueriaModules'
 
 const $q = useQuasar()
+const route = useRoute()
 const router = useRouter()
 const auth = useAuthStore()
+const tenant = useTenantStore()
 const drawer = ref(false)
 const loading = ref(true)
 const appInfo = ref(null)
 const previousDark = ref(false)
 const businessName = computed(() => appInfo.value?.empresa?.nombre_comercial || 'Mi peluquería')
-const menu = [
-  { label:'Inicio', icon:'dashboard', to:'/mi-apps/peluqueria/inicio' },
-  { label:'Agenda', icon:'event', to:'/mi-apps/peluqueria/agenda' },
-  { label:'Clientes', icon:'groups', to:'/mi-apps/peluqueria/clientes' },
-  { label:'Servicios', icon:'content_cut', to:'/mi-apps/peluqueria/servicios' },
-  { label:'Productos', icon:'inventory_2', to:'/mi-apps/peluqueria/productos' },
-  { label:'Personal', icon:'badge', to:'/mi-apps/peluqueria/personal' },
-  { label:'Atenciones', icon:'point_of_sale', to:'/mi-apps/peluqueria/atenciones' },
-  { label:'Caja', icon:'payments', to:'/mi-apps/peluqueria/caja' },
-  { label:'Historial', icon:'history', to:'/mi-apps/peluqueria/historial' },
-  { label:'Reportes', icon:'analytics', to:'/mi-apps/peluqueria/reportes' },
-]
+const menu = computed(() => filterPeluqueriaMenu(module => tenant.hasModule(module)))
+const firstAllowedPath = computed(() => menu.value[0]?.to || '/mi-aplicaciones')
+
+function ensureAllowedRoute(){
+  if(loading.value || !tenant.loaded) return
+  const module = peluqueriaModuleForPath(route.path)
+  if(module && !tenant.hasModule(module)){
+    const target = firstAllowedPath.value
+    if(target === '/mi-aplicaciones') sessionStorage.setItem('viti-app-explicit-exit','1')
+    router.replace(target)
+  }
+}
+
 function leaveTo(path){sessionStorage.setItem('viti-app-explicit-exit','1');router.push(path)}
+
 async function loadState(){
   loading.value=true
-  try{appInfo.value=(await api.get('/mi/apps/peluqueria/estado')).data.data}
-  catch(e){
+  try{
+    if(!tenant.loaded) await tenant.load()
+    appInfo.value=(await api.get('/mi/apps/peluqueria/estado')).data.data
+    ensureAllowedRoute()
+  }catch(e){
     $q.notify({type:'negative',message:e.response?.data?.message||'No se pudo abrir Peluquería.'})
     sessionStorage.setItem('viti-app-explicit-exit','1')
     router.replace(e.response?.status===402?'/mi-pagos':'/mi-aplicaciones')
-  }finally{loading.value=false}
+  }finally{loading.value=false;ensureAllowedRoute()}
 }
+
 onMounted(()=>{previousDark.value=Dark.isActive;Dark.set(false);drawer.value=$q.screen.gt.sm;loadState()})
+watch(()=>route.fullPath,ensureAllowedRoute)
 onBeforeUnmount(()=>Dark.set(previousDark.value))
 </script>
 <template><q-layout view="hHh LpR fFf" class="hair-app-shell"><q-header class="hair-header text-dark"><q-toolbar class="q-px-md q-px-lg-xl"><q-btn flat round dense icon="menu" @click="drawer=!drawer"/><q-avatar size="38px" color="primary" text-color="white" icon="content_cut" class="q-ml-sm"/><div class="q-ml-md"><div class="text-weight-bold">Peluquería</div><div class="text-caption text-grey-7">{{businessName}}</div></div><q-space/><q-btn flat no-caps icon="support_agent" label="Atención VITI" class="gt-xs" @click="leaveTo('/mi-buzon')"/><q-btn outline color="primary" no-caps icon="apps" label="Volver a VITI" class="q-ml-sm" @click="leaveTo('/mi-aplicaciones')"/></q-toolbar></q-header>
