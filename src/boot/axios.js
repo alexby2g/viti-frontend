@@ -1,7 +1,8 @@
 import { boot } from 'quasar/wrappers'
 import axios from 'axios'
 
-const baseURL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1'
+const isDevelopment = import.meta.env.DEV
+const baseURL = import.meta.env.VITE_API_URL || (isDevelopment ? 'http://localhost:8000/api/v1' : '/api/v1')
 const backendRoot = baseURL.replace(/\/api\/v1\/?$/, '')
 const authRequestTimeout = 30000
 const backendWakeTimeout = 75000
