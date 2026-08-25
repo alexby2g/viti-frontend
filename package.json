@@ -6,7 +6,9 @@
   "scripts": {
     "dev": "quasar dev",
     "build": "quasar build",
-    "lint": "eslint ."
+    "lint": "eslint .",
+    "test:viti-stability": "node scripts/check-viti-stability.mjs",
+    "test:viti-public": "node scripts/check-viti-public-presentation.mjs"
   },
   "dependencies": {
     "@quasar/extras": "^1.16.17",

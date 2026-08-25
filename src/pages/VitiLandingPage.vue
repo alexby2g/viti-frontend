@@ -1,33 +1,35 @@
 <script setup>
 import AppBrand from '../components/AppBrand.vue'
+import PublicPlansCatalog from '../components/public/PublicPlansCatalog.vue'
 
-const benefits = [
-  { icon:'groups', title:'Clientes', text:'Registra a cada cliente una sola vez y conserva sus datos para futuras atenciones.' },
-  { icon:'construction', title:'Equipos y servicios', text:'Relaciona equipos, citas, diagnósticos, trabajos realizados y evidencias dentro de un mismo historial.' },
-  { icon:'event_available', title:'Citas y seguimiento', text:'Organiza visitas, estados del servicio y próximos pasos sin depender de llamadas, notas o mensajes dispersos.' },
-  { icon:'payments', title:'Control del servicio', text:'Según la solución contratada, VITI puede integrar pagos, garantías, inventario e historial técnico.' },
+const audiences = [
+  { icon:'handyman', title:'Servicios técnicos', text:'Negocios que realizan instalaciones, mantenimiento, reparaciones o atención técnica y necesitan ordenar su operación.' },
+  { icon:'storefront', title:'Micro y pequeñas empresas', text:'Equipos que quieren dejar atrás hojas sueltas, mensajes dispersos y procesos difíciles de seguir.' },
+  { icon:'business', title:'Empresas en crecimiento', text:'Organizaciones que necesitan una plataforma configurable para clientes, servicios, pagos y seguimiento.' },
 ]
-
+const modules = [
+  ['groups','Clientes','Centraliza datos, contactos y seguimiento.'],['devices_other','Equipos','Registra equipos, características e historial.'],['engineering','Técnicos','Organiza responsables y trabajo técnico.'],['event','Agenda','Gestiona citas y actividades.'],['assignment','Órdenes','Controla servicios desde la solicitud hasta el cierre.'],['payments','Pagos','Registra anticipos, abonos, saldos y estados.'],['verified_user','Garantías','Da seguimiento a garantías y reingresos.'],['history','Historial','Conserva el historial de atención y equipos.'],['inventory_2','Inventario','Controla recursos relacionados con la operación.'],['forum','Comunicaciones','Mantén conversaciones dentro de la plataforma.'],['notifications','Notificaciones','Recibe eventos y alertas del sistema.'],
+]
 const steps = [
-  { number:'01', title:'La empresa solicita su acceso', text:'Si todavía no tiene invitación, envía una solicitud breve. AGR Studio la revisa antes de habilitar el registro personal.' },
-  { number:'02', title:'Se registra la necesidad', text:'La empresa explica qué servicio brinda, qué problema desea resolver y qué información necesita organizar.' },
-  { number:'03', title:'VITI asigna la solución', text:'La solución se configura para el negocio, conservando su identidad, usuarios, datos y flujo de trabajo.' },
-  { number:'04', title:'El negocio trabaja desde VITI', text:'Clientes, equipos, citas y servicios quedan centralizados para consultar qué ocurrió, qué falta y qué sigue.' },
+  { number:'01', title:'Conoce VITI', text:'Explora la plataforma y descubre qué puede resolver para tu negocio.' },
+  { number:'02', title:'Elige un plan', text:'Compara capacidades, modalidades y costos según tus necesidades.' },
+  { number:'03', title:'Solicita acceso', text:'Envía la información básica de tu empresa y la solución que necesitas.' },
+  { number:'04', title:'Revisamos tu solicitud', text:'Analizamos tu necesidad y confirmamos el alcance del servicio.' },
+  { number:'05', title:'Recibes tu invitación', text:'Una vez aprobada, recibes un enlace personal para comenzar.' },
+  { number:'06', title:'Completa tu registro', text:'Registra al responsable, negocio y datos necesarios para iniciar.' },
+  { number:'07', title:'Ingresa a VITI', text:'Accede a tu espacio de trabajo y empieza a gestionar tu operación.' },
 ]
 </script>
 
 <template>
   <div class="landing-page">
     <header class="landing-nav">
-      <div class="landing-container row items-center no-wrap">
-        <AppBrand />
-        <q-space />
-        <nav class="gt-sm row items-center q-gutter-sm">
-          <q-btn flat no-caps label="Qué es VITI" href="#que-es" />
-          <q-btn flat no-caps label="Cómo funciona" href="#como-funciona" />
-          <q-btn flat no-caps label="Guía rápida" href="#guia" />
+      <div class="landing-container nav-inner">
+        <router-link to="/viti" class="brand-link"><AppBrand /></router-link>
+        <nav class="nav-links" aria-label="Navegación pública">
+          <a href="#que-es">¿Qué es?</a><a href="#funciones">Funciones</a><a href="#como-funciona">Cómo funciona</a><a href="#planes">Planes</a>
         </nav>
-        <q-btn outline color="primary" no-caps icon="login" label="Ingresar" to="/login" class="q-ml-md" />
+        <div class="nav-actions"><q-btn outline color="primary" no-caps label="Ver planes" to="/viti/planes" /><q-btn color="primary" unelevated no-caps label="Ingresar" to="/login" /></div>
       </div>
     </header>
 
@@ -35,136 +37,52 @@ const steps = [
       <section class="hero-section">
         <div class="landing-container hero-grid">
           <div class="hero-copy">
-            <div class="hero-eyebrow">VITI · una solución de AGR Studio</div>
-            <h1>La información de tus servicios, organizada en un solo lugar.</h1>
-            <p class="hero-lead">
-              VITI ayuda a las microempresas de servicios a registrar, organizar y controlar digitalmente la información de sus clientes, equipos, citas y trabajos realizados.
-            </p>
-            <div class="row q-gutter-sm q-mt-xl">
-              <q-btn color="primary" unelevated no-caps size="lg" icon="person_add" label="Solicitar acceso" to="/acceso" />
-              <q-btn outline color="primary" no-caps size="lg" icon="login" label="Ya tengo acceso" to="/login?tipo=cliente" />
-            </div>
-            <div class="hero-trust q-mt-xl">
-              <q-icon name="verified_user" />
-              <span>Cada empresa trabaja con su propia información y acceso dentro de VITI.</span>
-            </div>
+            <div class="eyebrow"><q-icon name="auto_awesome" /> Plataforma de gestión para empresas de servicios</div>
+            <h1>Organiza tu negocio. <span>VITI se encarga del resto.</span></h1>
+            <p class="hero-lead">VITI es una plataforma que reúne clientes, equipos, técnicos, servicios, agenda, pagos, garantías e historial en un solo lugar para que tu empresa trabaje con más orden y seguimiento.</p>
+            <div class="hero-actions"><q-btn color="primary" unelevated no-caps size="lg" label="Conocer VITI" href="#que-es" /><q-btn flat color="primary" no-caps size="lg" label="Ver planes" to="/viti/planes" /><q-btn flat color="dark" no-caps size="lg" label="Ingresar" to="/login" /></div>
+            <div class="hero-trust"><q-icon name="verified" color="positive" /> Plataforma configurable <span>•</span> <q-icon name="lock" color="positive" /> Acceso controlado <span>•</span> <q-icon name="history" color="positive" /> Información trazable</div>
           </div>
-
-          <div class="hero-demo" aria-label="Vista resumida del flujo de VITI">
-            <div class="demo-window">
-              <div class="demo-topbar">
-                <div class="demo-logo"><q-icon name="hub" /></div>
-                <div><strong>VITI</strong><span>Gestión de servicios</span></div>
-                <q-space />
-                <q-badge color="positive" label="Activo" />
-              </div>
-              <div class="demo-body">
-                <div class="demo-sidebar">
-                  <div class="active"><q-icon name="home" /> Inicio</div>
-                  <div><q-icon name="groups" /> Clientes</div>
-                  <div><q-icon name="event" /> Servicios</div>
-                  <div><q-icon name="history" /> Historial</div>
-                </div>
-                <div class="demo-content">
-                  <div class="text-caption text-grey-6">Atención de hoy</div>
-                  <div class="demo-title">Qué necesita atención</div>
-                  <div class="demo-cards">
-                    <div><q-icon name="event_available" /><strong>4</strong><span>Citas</span></div>
-                    <div><q-icon name="troubleshoot" /><strong>2</strong><span>Diagnósticos</span></div>
-                    <div><q-icon name="build" /><strong>3</strong><span>Servicios</span></div>
-                  </div>
-                  <div class="demo-service q-mt-md">
-                    <div class="row items-center"><q-avatar color="blue-1" text-color="primary" icon="person" /><div class="q-ml-sm"><strong>Cliente registrado</strong><div class="text-caption">Equipo → cita → servicio → historial</div></div></div>
-                    <q-icon name="arrow_forward" color="primary" />
-                  </div>
-                </div>
+          <div class="product-preview" aria-label="Vista ilustrativa de VITI">
+            <div class="preview-window">
+              <div class="preview-top"><div class="preview-dots"><i></i><i></i><i></i></div><span>VITI · Panel de gestión</span><q-icon name="more_horiz" /></div>
+              <div class="preview-body">
+                <aside class="preview-sidebar"><div class="preview-logo">V</div><div class="side-line active"></div><div class="side-line"></div><div class="side-line"></div><div class="side-line"></div><div class="side-line"></div></aside>
+                <div class="preview-main"><div class="preview-heading"><div><small>RESUMEN OPERATIVO</small><strong>Todo tu negocio en un vistazo.</strong></div><div class="preview-avatar">A</div></div><div class="preview-stats"><div><small>CLIENTES</small><b>128</b><span>+12 este mes</span></div><div><small>SERVICIOS</small><b>24</b><span>8 en proceso</span></div><div><small>PAGOS</small><b>Bs 8.420</b><span>6 pendientes</span></div></div><div class="preview-chart"><div class="chart-head"><b>Actividad de servicios</b><small>Últimos 7 días</small></div><div class="chart-bars"><i style="height:38%"></i><i style="height:58%"></i><i style="height:46%"></i><i style="height:78%"></i><i style="height:62%"></i><i style="height:91%"></i><i style="height:72%"></i></div></div></div>
               </div>
             </div>
+            <div class="floating-card floating-one"><q-icon name="check_circle" color="positive"/><div><small>Servicio actualizado</small><b>Orden #V-1048</b></div></div>
+            <div class="floating-card floating-two"><q-icon name="event_available" color="primary"/><div><small>Agenda</small><b>3 citas para hoy</b></div></div>
           </div>
         </div>
       </section>
 
-      <section id="que-es" class="landing-section">
-        <div class="landing-container">
-          <div class="section-heading">
-            <div class="section-kicker">¿De qué se encarga VITI?</div>
-            <h2>Ayuda a convertir información dispersa en un proceso fácil de seguir.</h2>
-            <p>En lugar de depender únicamente de llamadas, mensajes, cuadernos o archivos separados, VITI concentra la información que una microempresa necesita para atender y dar seguimiento a sus servicios.</p>
-          </div>
-          <div class="benefit-grid q-mt-xl">
-            <article v-for="item in benefits" :key="item.title" class="benefit-card">
-              <q-avatar size="50px" color="blue-1" text-color="primary" :icon="item.icon" />
-              <h3>{{ item.title }}</h3>
-              <p>{{ item.text }}</p>
-            </article>
-          </div>
+      <section id="que-es" class="landing-section intro-section">
+        <div class="landing-container two-col">
+          <div><div class="section-kicker">¿Qué es VITI?</div><h2>Una sola plataforma para entender y controlar tu operación.</h2></div>
+          <div><p class="section-lead">VITI transforma procesos cotidianos de una empresa de servicios en un flujo digital organizado. La información queda conectada para que puedas saber qué cliente atendiste, qué equipo tiene, qué servicio recibió, quién lo realizó, cuánto se pagó y qué sigue después.</p><p>La plataforma está pensada para crecer contigo: los módulos y capacidades pueden configurarse según el tipo de negocio y el plan contratado.</p></div>
         </div>
       </section>
 
-      <section id="como-funciona" class="landing-section soft-section">
-        <div class="landing-container">
-          <div class="section-heading compact">
-            <div class="section-kicker">Cómo funciona</div>
-            <h2>Desde el acceso de la empresa hasta el uso diario del sistema.</h2>
-          </div>
-          <div class="steps-grid q-mt-xl">
-            <article v-for="step in steps" :key="step.number" class="step-card">
-              <span class="step-number">{{ step.number }}</span>
-              <h3>{{ step.title }}</h3>
-              <p>{{ step.text }}</p>
-            </article>
-          </div>
-        </div>
-      </section>
+      <section class="landing-section soft-section"><div class="landing-container"><div class="section-heading"><div class="section-kicker">¿Para quién?</div><h2>Hecho para negocios que necesitan orden.</h2><p>VITI está orientado principalmente a empresas y equipos que prestan servicios y necesitan conectar personas, trabajo e información.</p></div><div class="audience-grid q-mt-xl"><article v-for="item in audiences" :key="item.title" class="audience-card"><q-icon :name="item.icon" size="32px" color="primary"/><h3>{{ item.title }}</h3><p>{{ item.text }}</p></article></div></div></section>
 
-      <section id="guia" class="landing-section">
-        <div class="landing-container guide-grid">
-          <div>
-            <div class="section-kicker">Guía rápida</div>
-            <h2>¿Es tu primera vez en VITI?</h2>
-            <p class="guide-lead">El acceso a una empresa se habilita mediante un enlace personal. Ese enlace permite registrar de forma segura los datos del responsable, del negocio y la necesidad que se desea resolver.</p>
-            <q-list class="guide-list q-mt-lg">
-              <q-item><q-item-section avatar><q-icon name="looks_one" color="primary" /></q-item-section><q-item-section><q-item-label>Abre el enlace personal enviado por AGR Studio.</q-item-label></q-item-section></q-item>
-              <q-item><q-item-section avatar><q-icon name="looks_two" color="primary" /></q-item-section><q-item-section><q-item-label>Completa tus datos y los de tu negocio.</q-item-label></q-item-section></q-item>
-              <q-item><q-item-section avatar><q-icon name="looks_3" color="primary" /></q-item-section><q-item-section><q-item-label>Revisa la información y continúa con la solución asignada.</q-item-label></q-item-section></q-item>
-            </q-list>
-          </div>
-          <q-card flat bordered class="access-card">
-            <q-card-section>
-              <q-icon name="login" size="48px" color="primary" />
-              <div class="text-h5 text-weight-bold q-mt-md">¿Ya tienes una cuenta?</div>
-              <div class="text-body2 text-grey-7 q-mt-sm">Ingresa con tu usuario, teléfono o CI y continúa trabajando desde tu espacio de VITI.</div>
-              <q-btn color="primary" unelevated no-caps size="lg" icon="login" label="Ingresar a VITI" to="/login" class="full-width q-mt-lg" />
-              <q-separator class="q-my-lg" />
-              <div class="text-body2 text-weight-medium">¿Todavía no tienes acceso?</div>
-              <div class="text-caption text-grey-7 q-mt-xs">Envíanos una solicitud breve. AGR Studio revisará tu negocio antes de generar una invitación personal.</div>
-              <q-btn color="primary" unelevated no-caps icon="person_add" label="Solicitar acceso a VITI" to="/acceso" class="full-width q-mt-md" />
-              <q-btn flat color="primary" no-caps icon="info" label="Cómo funciona el registro" to="/registro" class="full-width q-mt-sm" />
-            </q-card-section>
-          </q-card>
-        </div>
-      </section>
+      <section id="funciones" class="landing-section"><div class="landing-container"><div class="section-heading"><div class="section-kicker">¿Qué puedo gestionar?</div><h2>Las piezas importantes de tu operación, conectadas.</h2><p>VITI reúne herramientas que normalmente están repartidas entre hojas de cálculo, mensajes y diferentes sistemas.</p></div><div class="module-grid q-mt-xl"><article v-for="item in modules" :key="item[1]" class="module-card"><div class="module-icon"><q-icon :name="item[0]" size="24px"/></div><div><h3>{{ item[1] }}</h3><p>{{ item[2] }}</p></div></article></div></div></section>
 
-      <section class="cta-section">
-        <div class="landing-container cta-card">
-          <div>
-            <div class="section-kicker">VITI</div>
-            <h2>Organiza el servicio. Conserva el historial. Sabe qué sigue.</h2>
-          </div>
-          <q-btn color="white" text-color="primary" unelevated no-caps size="lg" icon="login" label="Entrar a la plataforma" to="/login" />
-        </div>
-      </section>
+      <section id="como-funciona" class="landing-section soft-section"><div class="landing-container"><div class="section-heading compact"><div class="section-kicker">Cómo funciona</div><h2>Desde el acceso de la empresa hasta el uso diario del sistema.</h2></div><div class="steps-grid q-mt-xl"><article v-for="step in steps" :key="step.number" class="step-card"><span class="step-number">{{ step.number }}</span><h3>{{ step.title }}</h3><p>{{ step.text }}</p></article></div></div></section>
+
+      <section class="landing-section"><div class="landing-container process-banner"><div><div class="section-kicker">Tu operación conectada</div><h2>Empresa → Clientes → Equipos → Servicios → Seguimiento → Pagos → Historial</h2><p>La información acompaña al servicio en cada etapa para que tu equipo tenga contexto y pueda tomar mejores decisiones.</p></div><div class="process-flow"><div v-for="item in ['Empresa','Clientes','Equipos','Servicios','Seguimiento','Pagos','Historial']" :key="item"><span>{{ item }}</span><q-icon v-if="item !== 'Historial'" name="arrow_forward"/></div></div></div></section>
+
+      <section id="planes" class="landing-section soft-section"><div class="landing-container"><div class="section-heading"><div class="section-kicker">Planes y costos</div><h2>Empieza con el nivel que necesita tu empresa.</h2><p>La implementación cubre el desarrollo, configuración y puesta en marcha. La suscripción mantiene la plataforma y los servicios asociados según el plan contratado.</p></div><div class="q-mt-xl"><PublicPlansCatalog :embedded="true" :show-intro="false" /></div><div class="center-action q-mt-xl"><q-btn outline color="primary" no-caps size="lg" label="Ver detalle de todos los planes" to="/viti/planes" /></div></div></section>
+
+      <section class="landing-section"><div class="landing-container guide-grid"><div><div class="section-kicker">¿Cómo empiezo?</div><h2>Un camino claro desde la primera visita hasta tu empresa.</h2><p class="guide-lead">No necesitas conocer VITI antes de empezar. Primero entiendes la plataforma, eliges la modalidad que te conviene y luego solicitas acceso.</p></div><div class="guide-card"><div v-for="step in steps" :key="step.number" class="guide-row"><span>{{ step.number }}</span><div><b>{{ step.title }}</b><p>{{ step.text }}</p></div></div></div></div></section>
+
+      <section class="cta-section"><div class="landing-container cta-inner"><div><div class="section-kicker">VITI</div><h2>Tu negocio merece una operación más ordenada.</h2><p>Conoce la plataforma, revisa los planes y solicita el acceso que necesitas.</p></div><div class="cta-actions"><q-btn color="primary" unelevated no-caps size="lg" label="Solicitar acceso" to="/acceso"/><q-btn outline color="primary" no-caps size="lg" label="Ver planes" to="/viti/planes"/><q-btn flat color="dark" no-caps size="lg" label="Ingresar" to="/login"/></div></div></section>
     </main>
 
-    <footer class="landing-footer">
-      <div class="landing-container row items-center justify-between q-col-gutter-md">
-        <div><strong>VITI</strong> · desarrollado y administrado por AGR Studio</div>
-        <div class="text-caption">Plataforma para digitalizar y organizar la gestión de servicios.</div>
-      </div>
-    </footer>
+    <footer class="landing-footer"><div class="landing-container footer-inner"><div><AppBrand/><p>Soluciones informáticas para negocios de servicios.</p></div><div class="footer-links"><a href="#que-es">¿Qué es VITI?</a><a href="#funciones">Funciones</a><a href="#planes">Planes</a><router-link to="/acceso">Solicitar acceso</router-link><router-link to="/login">Ingresar</router-link></div></div></footer>
   </div>
 </template>
 
 <style scoped>
-.landing-page{min-height:100vh;background:#f6f9fc;color:#102a43}.landing-container{width:min(1180px,calc(100% - 40px));margin:0 auto}.landing-nav{position:sticky;top:0;z-index:20;background:rgba(246,249,252,.94);backdrop-filter:blur(16px);border-bottom:1px solid rgba(16,42,67,.08)}.landing-nav>.landing-container{min-height:76px}.hero-section{padding:82px 0 92px;background:radial-gradient(circle at 85% 18%,rgba(18,184,200,.18),transparent 28%),linear-gradient(180deg,#f8fcff,#eef6fb)}.hero-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(420px,.9fr);gap:64px;align-items:center}.hero-eyebrow,.section-kicker{font-size:12px;font-weight:900;letter-spacing:.14em;text-transform:uppercase;color:#0b7593}.hero-copy h1{font-size:clamp(42px,5vw,68px);line-height:1.02;letter-spacing:-.045em;margin:14px 0 22px;max-width:780px}.hero-lead{font-size:20px;line-height:1.65;color:#526d82;max-width:720px}.hero-trust{display:flex;align-items:center;gap:10px;color:#526d82;font-size:14px}.hero-trust .q-icon{color:#16835b;font-size:22px}.demo-window{border:1px solid rgba(11,95,122,.12);background:#fff;border-radius:26px;overflow:hidden;box-shadow:0 30px 80px rgba(17,58,84,.18);transform:rotate(1.2deg)}.demo-topbar{height:74px;padding:0 20px;display:flex;align-items:center;border-bottom:1px solid #e5edf3}.demo-logo{width:42px;height:42px;border-radius:13px;display:grid;place-items:center;background:linear-gradient(135deg,#0b5f7a,#12b8c8);color:#fff;font-size:22px}.demo-topbar>div:nth-child(2){display:flex;flex-direction:column;margin-left:10px}.demo-topbar span{font-size:11px;color:#78909c}.demo-body{display:grid;grid-template-columns:145px 1fr;min-height:340px}.demo-sidebar{padding:18px 12px;background:#0b2436;color:#afc3d0}.demo-sidebar div{display:flex;gap:8px;align-items:center;padding:11px 10px;border-radius:10px;font-size:12px}.demo-sidebar .active{background:rgba(18,184,200,.16);color:#fff}.demo-content{padding:26px}.demo-title{font-size:22px;font-weight:800;margin-top:4px}.demo-cards{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:18px}.demo-cards>div{padding:16px 12px;border:1px solid #e2ebf1;border-radius:16px;display:flex;flex-direction:column;gap:4px}.demo-cards .q-icon{color:#0b7593;font-size:22px}.demo-cards strong{font-size:25px}.demo-cards span{font-size:10px;color:#78909c}.demo-service{display:flex;justify-content:space-between;align-items:center;border:1px solid #e2ebf1;border-radius:16px;padding:14px}.landing-section{padding:90px 0}.soft-section{background:#edf5f9}.section-heading{max-width:800px}.section-heading.compact{max-width:680px}.section-heading h2,.guide-grid h2,.cta-card h2{font-size:clamp(32px,4vw,48px);line-height:1.1;letter-spacing:-.035em;margin:12px 0 18px}.section-heading p,.guide-lead{font-size:17px;line-height:1.7;color:#5f788a}.benefit-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:18px}.benefit-card,.step-card{background:#fff;border:1px solid rgba(16,42,67,.09);border-radius:20px;padding:25px}.benefit-card h3,.step-card h3{font-size:19px;margin:18px 0 9px}.benefit-card p,.step-card p{color:#60788a;line-height:1.65;margin:0}.steps-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:18px}.step-number{display:inline-flex;font-size:13px;font-weight:900;color:#0b7593;background:#e4f6f8;padding:7px 10px;border-radius:999px}.guide-grid{display:grid;grid-template-columns:1.15fr .85fr;gap:70px;align-items:center}.guide-list{border-left:3px solid #12b8c8}.access-card{border-radius:24px;padding:12px;box-shadow:0 20px 50px rgba(17,58,84,.08)}.cta-section{padding:24px 0 80px}.cta-card{background:linear-gradient(135deg,#0b5f7a,#12a9b8);color:#fff;border-radius:28px;padding:42px;display:flex;justify-content:space-between;gap:30px;align-items:center}.cta-card .section-kicker{color:#b8f6fa}.cta-card h2{margin-bottom:0;max-width:760px}.landing-footer{border-top:1px solid rgba(16,42,67,.08);padding:28px 0;color:#61788a}.body--dark .landing-page{background:#061725;color:#f3fbff}.body--dark .landing-nav{background:rgba(6,23,37,.94);border-color:rgba(255,255,255,.08)}.body--dark .hero-section{background:radial-gradient(circle at 85% 18%,rgba(18,184,200,.14),transparent 28%),#071c2d}.body--dark .hero-lead,.body--dark .section-heading p,.body--dark .guide-lead,.body--dark .benefit-card p,.body--dark .step-card p,.body--dark .hero-trust{color:#aac1cf}.body--dark .demo-window,.body--dark .benefit-card,.body--dark .step-card,.body--dark .access-card{background:#0d2940;color:#f3fbff;border-color:rgba(255,255,255,.1)}.body--dark .soft-section{background:#081f31}.body--dark .demo-topbar,.body--dark .demo-cards>div,.body--dark .demo-service{border-color:rgba(255,255,255,.09)}.body--dark .demo-content{background:#0d2940}.body--dark .landing-footer{border-color:rgba(255,255,255,.08);color:#9fb7c5}@media(max-width:1000px){.hero-grid,.guide-grid{grid-template-columns:1fr}.hero-demo{max-width:700px}.benefit-grid,.steps-grid{grid-template-columns:repeat(2,1fr)}}@media(max-width:650px){.landing-container{width:min(100% - 24px,1180px)}.landing-nav>.landing-container{min-height:66px}.hero-section{padding:55px 0 65px}.hero-copy h1{font-size:39px}.hero-lead{font-size:17px}.hero-copy .row{flex-direction:column;align-items:stretch}.hero-copy .q-btn{width:100%}.hero-demo{display:none}.landing-section{padding:64px 0}.benefit-grid,.steps-grid{grid-template-columns:1fr}.cta-card{padding:28px;align-items:stretch;flex-direction:column}.cta-card .q-btn{width:100%}}
+.landing-page{min-height:100vh;background:#f7fafc;color:#102a43}.landing-container{width:min(1180px,calc(100% - 40px));margin:0 auto}.landing-nav{position:sticky;top:0;z-index:50;background:rgba(247,250,252,.9);backdrop-filter:blur(18px);border-bottom:1px solid rgba(16,42,67,.08)}.nav-inner{min-height:76px;display:flex;align-items:center;gap:28px}.brand-link{display:flex;text-decoration:none;color:inherit}.nav-links{display:flex;gap:24px;margin-left:auto}.nav-links a,.footer-links a{color:#526b7c;text-decoration:none;font-size:14px;font-weight:700}.nav-links a:hover,.footer-links a:hover{color:#0b7593}.nav-actions{display:flex;gap:8px}.hero-section{padding:86px 0 105px;background:radial-gradient(circle at 78% 28%,rgba(11,117,147,.13),transparent 34%),linear-gradient(180deg,#f7fafc 0%,#eef7fa 100%);overflow:hidden}.hero-grid{display:grid;grid-template-columns:1fr 1fr;gap:70px;align-items:center}.eyebrow,.section-kicker{font-size:12px;font-weight:900;letter-spacing:.13em;text-transform:uppercase;color:#0b7593}.eyebrow{display:inline-flex;align-items:center;gap:7px;padding:8px 11px;border-radius:999px;background:#e3f3f6}.hero-copy h1{font-size:clamp(46px,5.8vw,76px);line-height:.98;letter-spacing:-.055em;margin:20px 0}.hero-copy h1 span{color:#0b7593}.hero-lead{font-size:19px;line-height:1.72;color:#5c7485;max-width:650px}.hero-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:28px}.hero-trust{display:flex;flex-wrap:wrap;gap:7px;align-items:center;margin-top:20px;color:#60798a;font-size:12px}.product-preview{position:relative;min-height:480px;display:flex;align-items:center;justify-content:center}.preview-window{width:100%;max-width:560px;background:#fff;border:1px solid rgba(16,42,67,.1);border-radius:24px;box-shadow:0 30px 90px rgba(19,58,83,.14);overflow:hidden;transform:rotate(1deg)}.preview-top{height:48px;border-bottom:1px solid #e8eef2;display:flex;align-items:center;gap:12px;padding:0 17px;color:#78909c;font-size:11px}.preview-dots{display:flex;gap:4px}.preview-dots i{width:7px;height:7px;border-radius:50%;background:#d4e0e6}.preview-top .q-icon{margin-left:auto}.preview-body{display:grid;grid-template-columns:62px 1fr;min-height:390px}.preview-sidebar{background:#102a43;padding:18px 13px;display:flex;flex-direction:column;align-items:center;gap:18px}.preview-logo{width:34px;height:34px;border-radius:10px;background:#0b7593;color:#fff;display:grid;place-items:center;font-weight:900}.side-line{width:30px;height:7px;border-radius:10px;background:rgba(255,255,255,.18)}.side-line.active{background:#63c3d1}.preview-main{padding:27px;background:#f7fafc}.preview-heading{display:flex;align-items:center;justify-content:space-between}.preview-heading small{display:block;font-size:9px;letter-spacing:.12em;color:#7b919f;font-weight:800}.preview-heading strong{display:block;font-size:17px;margin-top:4px}.preview-avatar{width:34px;height:34px;border-radius:50%;display:grid;place-items:center;background:#dceff3;color:#0b7593;font-weight:900}.preview-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:9px;margin-top:24px}.preview-stats>div{background:#fff;border:1px solid #e7edf1;border-radius:13px;padding:13px}.preview-stats small{font-size:8px;display:block;color:#8095a2;font-weight:900}.preview-stats b{display:block;font-size:20px;margin:6px 0}.preview-stats span{font-size:8px;color:#25835f}.preview-chart{margin-top:12px;background:#fff;border:1px solid #e7edf1;border-radius:13px;padding:16px}.chart-head{display:flex;justify-content:space-between;font-size:10px}.chart-head small{color:#879aa7}.chart-bars{height:160px;display:flex;align-items:end;justify-content:space-around;gap:12px;padding:18px 10px 5px}.chart-bars i{display:block;width:8%;min-height:18px;border-radius:7px 7px 2px 2px;background:#0b7593}.floating-card{position:absolute;display:flex;align-items:center;gap:10px;background:#fff;border:1px solid rgba(16,42,67,.1);border-radius:14px;padding:11px 14px;box-shadow:0 15px 40px rgba(19,58,83,.13)}.floating-card small,.floating-card b{display:block}.floating-card small{font-size:9px;color:#78909c}.floating-card b{font-size:11px;margin-top:3px}.floating-one{left:-18px;bottom:56px}.floating-two{right:-16px;top:64px}.landing-section{padding:100px 0}.soft-section{background:#eef7fa}.two-col{display:grid;grid-template-columns:.9fr 1.1fr;gap:90px}.landing-section h2{font-size:clamp(34px,4vw,54px);line-height:1.06;letter-spacing:-.045em;margin:12px 0}.section-heading{max-width:820px}.section-heading p,.two-col p{color:#61798a;line-height:1.75;font-size:17px}.section-lead{font-size:20px!important}.audience-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:18px}.audience-card,.module-card,.step-card,.guide-card{background:#fff;border:1px solid rgba(16,42,67,.09);border-radius:20px;box-shadow:0 14px 35px rgba(19,58,83,.05)}.audience-card{padding:28px}.audience-card h3,.module-card h3,.step-card h3{margin:15px 0 7px;font-size:20px}.audience-card p,.module-card p,.step-card p{color:#6b8190;line-height:1.6;margin:0}.module-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}.module-card{padding:20px;display:flex;gap:15px}.module-icon{width:46px;height:46px;flex:0 0 46px;border-radius:14px;background:#e4f3f6;color:#0b7593;display:grid;place-items:center}.module-card h3{margin:1px 0 6px}.module-card p{font-size:13px}.steps-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:15px}.step-card{padding:24px}.step-number{display:inline-grid;place-items:center;width:42px;height:42px;border-radius:12px;background:#102a43;color:#fff;font-weight:900}.step-card h3{font-size:18px}.process-banner{background:#102a43;color:#fff;border-radius:28px;padding:45px;display:grid;grid-template-columns:.8fr 1.2fr;gap:45px;align-items:center}.process-banner h2{font-size:34px;margin-top:10px}.process-banner p{color:#c1d1da;line-height:1.7}.process-flow{display:flex;flex-wrap:wrap;gap:9px;align-items:center}.process-flow>div{display:flex;align-items:center;gap:8px}.process-flow span{padding:11px 13px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.1);border-radius:12px;font-size:12px;font-weight:800}.process-flow .q-icon{color:#63c3d1}.center-action{text-align:center}.guide-grid{display:grid;grid-template-columns:.9fr 1.1fr;gap:55px;align-items:start}.guide-lead{font-size:18px;line-height:1.75;color:#61798a}.guide-card{padding:8px}.guide-row{display:flex;gap:17px;padding:19px;border-bottom:1px solid #edf1f3}.guide-row:last-child{border-bottom:0}.guide-row>span{width:34px;height:34px;flex:0 0 34px;border-radius:10px;background:#e4f3f6;color:#0b7593;display:grid;place-items:center;font-size:11px;font-weight:900}.guide-row b{font-size:15px}.guide-row p{margin:5px 0 0;color:#718693;font-size:13px;line-height:1.55}.cta-section{padding:90px 0;background:#e4f3f6}.cta-inner{display:flex;justify-content:space-between;gap:35px;align-items:center}.cta-inner h2{max-width:650px}.cta-inner p{color:#61798a;font-size:17px}.cta-actions{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:8px}.landing-footer{padding:38px 0;border-top:1px solid rgba(16,42,67,.08);background:#fff}.footer-inner{display:flex;justify-content:space-between;gap:30px}.footer-inner p{margin:8px 0 0;color:#718693;font-size:13px}.footer-links{display:flex;flex-wrap:wrap;gap:18px;align-items:center}@media(max-width:1080px){.nav-links{display:none}.hero-grid,.two-col,.guide-grid,.process-banner{grid-template-columns:1fr}.hero-copy{max-width:800px}.product-preview{min-height:430px}.steps-grid{grid-template-columns:repeat(2,1fr)}.module-grid{grid-template-columns:repeat(2,1fr)}.audience-grid{grid-template-columns:1fr}.process-banner{padding:35px}}@media(max-width:760px){.landing-container{width:min(100% - 24px,1180px)}.nav-actions .q-btn:first-child{display:none}.hero-section{padding:55px 0 70px}.hero-copy h1{font-size:clamp(40px,13vw,62px)}.hero-lead{font-size:17px}.product-preview{min-height:330px}.preview-window{transform:none}.preview-body{min-height:280px}.preview-chart{display:none}.preview-stats{margin-top:15px}.preview-stats b{font-size:16px}.floating-one{left:-4px;bottom:30px}.floating-two{right:-4px;top:25px}.landing-section{padding:72px 0}.module-grid,.steps-grid{grid-template-columns:1fr}.process-banner{padding:28px;border-radius:20px}.process-banner h2{font-size:28px}.cta-inner,.footer-inner{flex-direction:column;align-items:flex-start}.cta-actions{justify-content:flex-start}.footer-links{gap:12px}}@media(max-width:480px){.hero-actions{align-items:stretch}.hero-actions .q-btn{width:100%}.hero-trust span{display:none}.preview-main{padding:16px}.preview-sidebar{width:52px;padding:13px 9px}.preview-body{grid-template-columns:52px 1fr}.preview-stats{grid-template-columns:1fr}.preview-stats>div:nth-child(3){display:none}.floating-card{transform:scale(.88)}.floating-one{left:-9px}.floating-two{right:-9px}}
 </style>
