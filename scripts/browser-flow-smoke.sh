@@ -79,11 +79,11 @@ check_page(){
 }
 
 check_page viti-landing "$BASE/viti" \
-  "La información de tus servicios, organizada en un solo lugar." \
-  "¿De qué se encarga VITI?" \
+  "Organiza tu negocio." \
+  "¿Qué es VITI?" \
   "Cómo funciona" \
-  "Guía rápida" \
-  "Ingresar a VITI"
+  "Ver planes" \
+  "Ingresar"
 
 check_page public-1 "$BASE/solicitar/e2e-token-viti?paso=1" "Solicitud VITI" "VITI Inicial" "Continuar" "Registro completado"
 check_page public-2 "$BASE/solicitar/e2e-token-viti?paso=2" "Configuración de VITI Inicial" "Saltar configuración" "¿Cuántas personas usarán el sistema?"
