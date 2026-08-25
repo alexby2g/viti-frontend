@@ -85,7 +85,13 @@ check_page viti-landing "$BASE/viti" \
   "Ver planes" \
   "Ingresar"
 
-check_page public-1 "$BASE/solicitar/e2e-token-viti?paso=1" "Solicitud VITI" "VITI Inicial" "Continuar" "Registro completado"
+check_page public-1 "$BASE/solicitar/e2e-token-viti?paso=1" \
+  "Solicitud VITI" \
+  "Cuéntanos qué necesitas. Nosotros evaluamos cómo hacerlo." \
+  "Antes de pedir tu sistema, conoce cómo trabajamos." \
+  "Conocer los planes" \
+  "Importante:"
+
 check_page public-2 "$BASE/solicitar/e2e-token-viti?paso=2" "Configuración de VITI Inicial" "Saltar configuración" "¿Cuántas personas usarán el sistema?"
 check_page public-3 "$BASE/solicitar/e2e-token-viti?paso=3" "Forma de pago de la implementación" "Enviar a revisión" "Suscripción"
 
