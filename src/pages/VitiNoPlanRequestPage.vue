@@ -5,6 +5,7 @@ import { api } from '../boot/axios'
 
 const $q = useQuasar()
 const loading = ref(true)
+const apiUnavailable = ref(false)
 const sending = ref(false)
 const submitted = ref(false)
 const result = ref(null)
@@ -77,12 +78,15 @@ function validate() {
 
 async function load() {
   loading.value = true
+  apiUnavailable.value = false
   try {
     const { data } = await api.get('/publico/solicitud/catalogo')
     questionnaire.value = data.data?.cuestionario || null
     if (!questionnaire.value) throw new Error('No hay cuestionario activo')
   } catch (error) {
-    $q.notify({ type: 'negative', message: error.response?.data?.message || 'No se pudo cargar el cuestionario.' })
+    apiUnavailable.value = true
+    questionnaire.value = null
+    $q.notify({ type: 'negative', message: error.response?.data?.message || 'El backend todavía no está disponible. Puedes reintentar en unos segundos.' })
   } finally {
     loading.value = false
   }
@@ -111,7 +115,7 @@ onMounted(load)
 </script>
 
 <template>
-  <q-page class="q-pa-md bg-grey-1">
+  <div class="q-pa-md bg-grey-1 no-plan-page">
     <div class="q-mx-auto" style="max-width: 980px">
       <q-card flat bordered class="q-pa-lg">
         <div class="text-overline text-primary">VITI · EVALUACIÓN SIN PLAN</div>
@@ -125,7 +129,16 @@ onMounted(load)
           <b>Plan no seleccionado.</b> Esto es intencional: primero definimos el sistema, luego la propuesta comercial.
         </q-banner>
 
-        <div v-if="submitted" class="text-center q-py-xl">
+        <div v-if="apiUnavailable" class="q-py-xl text-center">
+          <q-icon name="cloud_off" size="72px" color="warning" />
+          <div class="text-h6 text-weight-bold q-mt-md">Backend temporalmente no disponible</div>
+          <div class="text-body2 text-grey-7 q-mt-sm q-mb-lg">
+            La interfaz está funcionando. Render puede estar iniciando la instancia o todavía no tiene desplegado el endpoint de evaluación.
+          </div>
+          <q-btn color="primary" unelevated no-caps icon="refresh" label="Reintentar" @click="load" />
+        </div>
+
+        <div v-else-if="submitted" class="text-center q-py-xl">
           <q-icon name="task_alt" size="72px" color="positive" />
           <div class="text-h5 text-weight-bold q-mt-md">Evaluación recibida</div>
           <div class="text-body1 text-grey-7 q-mt-sm">Código: <b>{{ result?.codigo }}</b></div>
@@ -188,5 +201,9 @@ onMounted(load)
         </q-form>
       </q-card>
     </div>
-  </q-page>
+  </div>
 </template>
+
+<style scoped>
+.no-plan-page{min-height:100vh}
+</style>
