@@ -33,7 +33,7 @@ const primaryAttention = computed(() => {
     return {
       title: priorities.value[0].title,
       message: priorities.value[0].message,
-      route: priorities.value[0].route || '/dashboard',
+      route: priorities.value[0].route || '/',
       icon: priorities.value[0].severity === 'high' || priorities.value[0].severity === 'critical' ? 'priority_high' : 'visibility',
       badge: priorities.value[0].severity === 'critical' ? 'Crítica' : priorities.value[0].severity === 'high' ? 'Alta' : 'Revisar',
     }
@@ -53,6 +53,10 @@ const quickLinks = [
   { label: 'Empresas', icon: 'business', to: '/empresas' },
   { label: 'Soporte', icon: 'support_agent', to: '/mantenimientos' },
 ]
+
+function routeFor(route) {
+  return route === '/dashboard' ? '/' : (route || '/')
+}
 
 function prettyStatus(status) {
   return ({ lista_entrega: 'Lista para entrega', gracia: 'En gracia', suspendida: 'Suspendida' }[status] || status || 'Revisar')
@@ -87,7 +91,7 @@ function prettyStatus(status) {
               </div>
               <q-badge outline :color="healthColor" :label="primaryAttention.badge" />
             </div>
-            <q-btn class="q-mt-md" flat color="primary" no-caps icon="arrow_forward" label="Abrir prioridad" :to="primaryAttention.route" />
+            <q-btn class="q-mt-md" flat color="primary" no-caps icon="arrow_forward" label="Abrir prioridad" :to="routeFor(primaryAttention.route)" />
           </div>
         </div>
       </div>
@@ -134,7 +138,7 @@ function prettyStatus(status) {
           <div class="text-subtitle1 text-weight-bold">Lo que requiere atención</div>
           <div class="text-caption command-muted q-mb-sm">AGR ya detectó estos puntos usando la información real de VITI.</div>
           <q-list separator>
-            <q-item v-for="item in priorities" :key="item.key" clickable @click="$router.push(item.route || '/dashboard')">
+            <q-item v-for="item in priorities" :key="item.key" clickable @click="$router.push(routeFor(item.route))">
               <q-item-section avatar><q-icon :name="item.severity === 'critical' || item.severity === 'high' ? 'priority_high' : 'visibility'" :color="item.severity === 'critical' || item.severity === 'high' ? 'negative' : 'warning'" /></q-item-section>
               <q-item-section><q-item-label class="text-weight-medium">{{ item.title }}</q-item-label><q-item-label caption>{{ item.message }}</q-item-label></q-item-section>
               <q-item-section side><q-icon name="chevron_right" color="grey-5" /></q-item-section>
@@ -146,7 +150,7 @@ function prettyStatus(status) {
           <div class="text-subtitle1 text-weight-bold">Siguientes pasos</div>
           <div class="text-caption command-muted q-mb-sm">Recomendaciones que pueden convertirse en trabajo concreto.</div>
           <q-list separator>
-            <q-item v-for="item in recommendations" :key="item.key" clickable @click="$router.push(item.route || '/dashboard')">
+            <q-item v-for="item in recommendations" :key="item.key" clickable @click="$router.push(routeFor(item.route))">
               <q-item-section avatar><q-icon name="auto_awesome" :color="item.severity === 'high' ? 'negative' : 'warning'" /></q-item-section>
               <q-item-section><q-item-label class="text-weight-medium">{{ item.title }}</q-item-label><q-item-label caption>{{ item.message }}</q-item-label></q-item-section>
               <q-item-section side><q-icon name="arrow_forward" color="primary" /></q-item-section>
