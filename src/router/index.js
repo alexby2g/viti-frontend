@@ -8,7 +8,7 @@ export default defineRouter(({ store }) => {
   const publicRoutes = [
     { path:'/viti', name:'viti-landing', component:() => import('../pages/VitiPremiumLandingPage.vue'), meta:{publicLanding:true} },
     { path:'/viti/planes', name:'viti-plans', component:() => import('../pages/VitiPlansPage.vue'), meta:{publicLanding:true} },
-    { path:'/viti/acceso', name:'viti-access', component:() => import('../pages/VitiAccessPage.vue'), meta:{publicLanding:true} },
+    { path:'/viti/acceso', name:'viti-access-landing', component:() => import('../pages/VitiAccessPage.vue'), meta:{publicLanding:true} },
     { path:'/planes', redirect:'/viti/planes', meta:{publicLanding:true} },
     { path:'/acceso', redirect:'/viti/acceso', meta:{publicLanding:true} },
     { path:'/presentacion', redirect:'/viti', meta:{publicLanding:true} },
@@ -71,7 +71,7 @@ export default defineRouter(({ store }) => {
   }
 
   router.beforeEach(async (to, from) => {
-    if (to.meta.publicLanding || ['viti-landing','viti-plans','viti-access','public-no-plan-request'].includes(to.name)) return true
+    if (to.meta.publicLanding || ['viti-landing','viti-plans','viti-access-landing','public-no-plan-request'].includes(to.name)) return true
     if (to.name === 'public-request') return true
     if (to.name === 'solicitud-detalle' && to.params.id) return { name:'solicitud-revision', params:{id:to.params.id} }
 
