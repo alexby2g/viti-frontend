@@ -1,12 +1,13 @@
 <script setup>
-import { computed, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useQuasar } from 'quasar'
 import { api } from '../boot/axios'
 import AppBrand from '../components/AppBrand.vue'
 
 const route=useRoute(),router=useRouter(),$q=useQuasar()
-const token=computed(()=>String(route.query.token||''))
+const onboardingToken=ref('')
+const token=onboardingToken
 const isGoogleOnboarding=computed(()=>route.query.google==='created' && token.value.length===64)
 const loading=ref(false)
 const form=reactive({
@@ -19,27 +20,49 @@ const form=reactive({
   sistema_vision:'',
 })
 
+const storageKey='viti:google:onboarding-token'
+
 function continueWithGoogle(){
   const base=String(api.defaults.baseURL||'').replace(/\/api\/v1\/?$/,'')
   if(base) window.location.assign(`${base}/auth/google/redirect`)
 }
 
 async function complete(){
-  if(!token.value){$q.notify({type:'negative',message:'El enlace de onboarding no es válido.'});return}
+  if(!token.value){$q.notify({type:'negative',message:'El enlace de onboarding no es válido o expiró.'});return}
   if(!form.nombre||!form.sistema_nombre||!form.sistema_que_hara||!form.sistema_publico||!form.sistema_vision){
     $q.notify({type:'warning',message:'Completa los campos necesarios para que VITI entienda tu idea.'});return
   }
   loading.value=true
   try{
     await api.post('/auth/cliente/registro',{token:token.value,...form})
+    sessionStorage.removeItem(storageKey)
     $q.notify({type:'positive',message:'Listo. Tu espacio VITI ya está preparado.'})
     await router.replace('/mi-cuenta')
   }catch(error){
     const message=error?.response?.data?.message||'No pudimos completar tu alta. Vuelve a iniciar con Google.'
     $q.notify({type:'negative',message})
-    if(error?.response?.status===410) await router.replace('/login?tipo=cliente')
+    if(error?.response?.status===410){
+      sessionStorage.removeItem(storageKey)
+      await router.replace('/login?tipo=cliente')
+    }
   }finally{loading.value=false}
 }
+
+onMounted(async()=>{
+  const queryToken=String(route.query.token||'')
+  const storedToken=sessionStorage.getItem(storageKey)||''
+  onboardingToken.value=/^[A-Za-z0-9]{64}$/.test(queryToken)?queryToken:storedToken
+
+  if(onboardingToken.value && queryToken===onboardingToken.value){
+    sessionStorage.setItem(storageKey,onboardingToken.value)
+    await router.replace({path:'/registro',query:{google:'created'}})
+    return
+  }
+
+  if(!onboardingToken.value && route.query.google==='created'){
+    $q.notify({type:'warning',message:'Tu enlace de onboarding no está disponible. Inicia nuevamente con Google.'})
+  }
+})
 </script>
 
 <template>
