@@ -13,6 +13,13 @@ export default defineRouter(({ store }) => {
   ]
   const router = createRouter({ history: createWebHistory(), routes:[...publicRoutes, ...routes] })
 
+  if (router.hasRoute('public-request')) router.removeRoute('public-request')
+  router.addRoute({
+    path:'/solicitar/:token',
+    component:() => import('../layouts/AuthLayout.vue'),
+    children:[{ path:'', name:'public-request', component:() => import('../pages/IdeaBuilderPage.vue') }],
+  })
+
   const clientHubRoutes = [
     { name:'client-portal', path:'/mi-cuenta', component:() => import('../pages/ClientHubPage.vue') },
     { name:'client-apps', path:'/mi-aplicaciones', component:() => import('../pages/ClientAppsPage.vue') },
@@ -64,6 +71,8 @@ export default defineRouter(({ store }) => {
 
   router.beforeEach(async (to, from) => {
     if (to.meta.publicLanding || to.name === 'viti-landing' || to.name === 'viti-plans') return true
+
+    if (to.name === 'public-request') return true
 
     if (to.name === 'solicitud-detalle' && to.params.id) {
       return { name:'solicitud-revision', params:{ id:to.params.id } }
