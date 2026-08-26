@@ -55,6 +55,18 @@ async function load() {
   }
 }
 
+async function updateSolicitudEstado(id, estado) {
+  const payload = { estado }
+
+  try {
+    return await api.patch(`/solicitudes/${id}`, payload)
+  } catch (error) {
+    const status = Number(error?.response?.status || 0)
+    if (status !== 404 && status !== 405) throw error
+    return await api.put(`/solicitudes/${id}`, payload)
+  }
+}
+
 async function approveRequest() {
   if (!canApprove.value || !item.value?.id) return
   $q.dialog({
@@ -65,7 +77,7 @@ async function approveRequest() {
   }).onOk(async () => {
     actionLoading.value = true
     try {
-      await api.post(`/solicitudes/${item.value.id}/aprobar`)
+      await updateSolicitudEstado(item.value.id, 'aprobada')
       $q.notify({ type: 'positive', message: 'Solicitud aprobada correctamente.' })
       await load()
     } catch (error) {
