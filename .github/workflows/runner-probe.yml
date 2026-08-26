@@ -1,0 +1,29 @@
+name: VITI Runner Probe
+
+on:
+  push:
+    branches:
+      - runner-test-windows
+
+jobs:
+  probe:
+    runs-on: windows-latest
+    timeout-minutes: 5
+    steps:
+      - name: Runner acquired
+        shell: pwsh
+        run: |
+          Write-Host "RUNNER_OK"
+          Write-Host "OS=$env:RUNNER_OS"
+          Write-Host "ARCH=$env:RUNNER_ARCH"
+
+      - name: Node probe
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Tool versions
+        shell: pwsh
+        run: |
+          node --version
+          npm --version
