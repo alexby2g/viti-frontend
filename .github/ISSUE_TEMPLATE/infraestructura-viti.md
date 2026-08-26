@@ -1,6 +1,6 @@
 ---
 name: Infraestructura VITI
-aabout: Incidencias de CI, runners, Vercel y runtime
+about: Incidencias de CI, runners, Vercel y runtime
 ---
 
 ## Incidencia
