@@ -10,24 +10,11 @@ export function buildMainMenu({
 
   if (isClient) {
     const items = []
-    if (hasClientProfile) items.push({ label: 'Mi cuenta', icon: 'account_circle', to: '/mi-cuenta' })
-    items.push(
-      { label: 'Mi negocio', icon: 'storefront', to: '/mi-negocio' },
-      { label: 'Aplicaciones', icon: 'apps', children: [{ label: 'Instaladas', icon: 'grid_view', to: '/mi-aplicaciones' }] },
-    )
-    if (isManager) {
-      items.push({
-        label: 'Mi proyecto',
-        icon: 'account_tree',
-        children: [
-          { label: 'Avances y archivos', icon: 'timeline', to: '/mi-proyecto' },
-          { label: 'Pagos', icon: 'payments', to: '/mi-pagos' },
-        ],
-      })
-    }
-    if (hasClientProfile && isManager) items.push({ label: 'Nueva solicitud', icon: 'assignment_add', action: 'request' })
-    if (hasClientProfile) items.push({ label: 'Mi buzón', icon: 'forum', to: '/mi-buzon', badge: unreadCount })
-    items.push({ label: guideLabel, icon: 'help_center', to: '/guia-viti' })
+    if (hasClientProfile) items.push({ label: 'Mi espacio', icon: 'home', to: '/mi-cuenta' })
+    items.push({ label: 'Mi aplicación', icon: 'apps', to: '/mi-aplicaciones' })
+    if (isManager || hasClientProfile) items.push({ label: 'Mi proyecto', icon: 'account_tree', to: '/mi-proyecto' })
+    if (hasClientProfile) items.push({ label: 'Atención al cliente', icon: 'support_agent', to: '/mi-buzon', badge: unreadCount })
+    if (hasClientProfile) items.push({ label: 'Nueva solicitud', icon: 'add_circle', action: 'request' })
     return items
   }
 
