@@ -65,8 +65,6 @@ export default defineRouter(({ store }) => {
   router.beforeEach(async (to, from) => {
     if (to.meta.publicLanding || to.name === 'viti-landing' || to.name === 'viti-plans') return true
 
-    if (to.name === 'public-request') return { path:'/solicitud', query:to.query, hash:to.hash }
-
     if (to.name === 'solicitud-detalle' && to.params.id) {
       return { name:'solicitud-revision', params:{ id:to.params.id } }
     }
