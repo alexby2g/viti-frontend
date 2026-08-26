@@ -24,6 +24,35 @@ const estadoLabel = computed(() => {
   return String(estado).replaceAll('_', ' ')
 })
 
+const operationalHealth = computed(() => {
+  if (!empresa.value) return { label: 'Sin datos', color: 'grey-7', icon: 'help_outline', tone: 'neutral' }
+  if (empresa.value.estado === 'inactivo') return { label: 'Inactiva', color: 'negative', icon: 'pause_circle', tone: 'negative' }
+  if (counts.value.solicitudes > 0 && counts.value.proyectos === 0) return { label: 'Esperando ejecución', color: 'warning', icon: 'pending_actions', tone: 'warning' }
+  if (counts.value.proyectos > 0 && counts.value.aplicaciones === 0) return { label: 'En construcción', color: 'deep-purple', icon: 'build_circle', tone: 'primary' }
+  return { label: 'Operación activa', color: 'positive', icon: 'check_circle', tone: 'positive' }
+})
+
+const nextAction = computed(() => {
+  if (!empresa.value) return null
+  if (!counts.value.usuarios) return { title: 'Asignar usuarios', message: 'La empresa todavía no tiene usuarios vinculados.', to: '/usuarios', icon: 'group_add' }
+  if (counts.value.solicitudes && !counts.value.proyectos) return { title: 'Revisar solicitudes', message: 'Hay solicitudes registradas sin proyectos asociados visibles.', to: '/solicitudes', icon: 'assignment' }
+  if (counts.value.proyectos && !counts.value.aplicaciones) return { title: 'Revisar aplicaciones', message: 'La empresa tiene proyectos, pero todavía no aparecen aplicaciones asociadas.', to: '/aplicaciones', icon: 'apps' }
+  if (counts.value.aplicaciones && !counts.value.archivos) return { title: 'Completar documentación', message: 'Hay aplicaciones asociadas pero todavía no hay archivos visibles en esta cuenta.', to: '/archivos', icon: 'folder_open' }
+  return { title: 'Operación en orden', message: 'No se detecta un siguiente paso evidente a partir de los datos disponibles.', to: '/monitor', icon: 'check_circle' }
+})
+
+const activity = computed(() => {
+  if (!empresa.value) return []
+  const events = []
+  for (const item of empresa.value.solicitudes || []) events.push({ id: `s-${item.id}`, date: item.created_at, title: item.titulo || item.nombre || `Solicitud #${item.id}`, message: `Solicitud · ${item.estado || 'sin estado'}`, icon: 'assignment', color: 'primary', to: '/solicitudes' })
+  for (const item of empresa.value.proyectos || []) events.push({ id: `p-${item.id}`, date: item.created_at, title: item.nombre || item.codigo || `Proyecto #${item.id}`, message: `Proyecto · ${item.estado || 'sin estado'}`, icon: 'account_tree', color: 'deep-purple', to: '/proyectos' })
+  for (const item of empresa.value.aplicaciones || []) events.push({ id: `a-${item.id}`, date: item.created_at, title: item.nombre || `Aplicación #${item.id}`, message: `Aplicación · ${item.estado || 'sin estado'}`, icon: 'apps', color: 'teal', to: '/aplicaciones' })
+  return events
+    .filter(item => item.date)
+    .sort((a, b) => new Date(b.date) - new Date(a.date))
+    .slice(0, 8)
+})
+
 function metricCards() {
   return [
     { label: 'Usuarios', value: counts.value.usuarios, icon: 'group', to: '/usuarios' },
@@ -69,10 +98,10 @@ onMounted(load)
     </q-banner>
 
     <template v-if="empresa && !loading">
-      <q-card flat class="viti-card q-mb-lg">
-        <q-card-section>
-          <div class="row items-start q-col-gutter-lg">
-            <div class="col-12 col-md-7">
+      <div class="row q-col-gutter-lg q-mb-lg">
+        <div class="col-12 col-lg-8">
+          <q-card flat class="viti-card full-height">
+            <q-card-section>
               <div class="row items-center no-wrap">
                 <q-avatar color="primary" text-color="white" icon="business" size="58px" />
                 <div class="col q-ml-md min-width-0">
@@ -81,21 +110,41 @@ onMounted(load)
                 </div>
                 <q-badge outline color="primary" :label="estadoLabel" />
               </div>
-            </div>
-            <div class="col-12 col-md-5">
-              <div class="row q-col-gutter-sm">
-                <div class="col-6"><div class="text-caption text-grey-6">Código</div><div class="text-weight-bold">{{ empresa.codigo || '—' }}</div></div>
-                <div class="col-6"><div class="text-caption text-grey-6">Plan</div><div class="text-weight-bold">{{ empresa.plan_viti?.nombre || empresa.planViti?.nombre || 'Personalizado' }}</div></div>
-                <div class="col-6 q-mt-sm"><div class="text-caption text-grey-6">Teléfono</div><div class="text-weight-bold">{{ empresa.telefono || '—' }}</div></div>
-                <div class="col-6 q-mt-sm"><div class="text-caption text-grey-6">WhatsApp</div><div class="text-weight-bold">{{ empresa.whatsapp || '—' }}</div></div>
+            </q-card-section>
+            <q-separator />
+            <q-card-section>
+              <div class="row q-col-gutter-md">
+                <div class="col-6 col-md-3"><div class="text-caption text-grey-6">Código</div><div class="text-weight-bold">{{ empresa.codigo || '—' }}</div></div>
+                <div class="col-6 col-md-3"><div class="text-caption text-grey-6">Plan</div><div class="text-weight-bold">{{ empresa.plan_viti?.nombre || empresa.planViti?.nombre || 'Personalizado' }}</div></div>
+                <div class="col-6 col-md-3"><div class="text-caption text-grey-6">Teléfono</div><div class="text-weight-bold">{{ empresa.telefono || '—' }}</div></div>
+                <div class="col-6 col-md-3"><div class="text-caption text-grey-6">WhatsApp</div><div class="text-weight-bold">{{ empresa.whatsapp || '—' }}</div></div>
               </div>
-            </div>
-          </div>
-        </q-card-section>
-      </q-card>
+            </q-card-section>
+          </q-card>
+        </div>
+        <div class="col-12 col-lg-4">
+          <q-card flat class="viti-card full-height health-card">
+            <q-card-section>
+              <div class="text-caption text-grey-6">SALUD OPERATIVA</div>
+              <div class="row items-center q-mt-sm">
+                <q-avatar :color="operationalHealth.color" text-color="white" :icon="operationalHealth.icon" size="46px" />
+                <div class="q-ml-md">
+                  <div class="text-subtitle1 text-weight-bold">{{ operationalHealth.label }}</div>
+                  <div class="text-caption text-grey-6">Estado derivado de la información disponible.</div>
+                </div>
+              </div>
+              <q-separator class="q-my-md" />
+              <div class="text-caption text-grey-6">SIGUIENTE ACCIÓN</div>
+              <div class="text-subtitle2 text-weight-bold q-mt-xs">{{ nextAction.title }}</div>
+              <div class="text-caption text-grey-6 q-mt-xs">{{ nextAction.message }}</div>
+              <q-btn flat no-caps color="primary" class="q-mt-sm" :icon="nextAction.icon" label="Abrir acción" :to="nextAction.to" />
+            </q-card-section>
+          </q-card>
+        </div>
+      </div>
 
       <div class="row q-col-gutter-md q-mb-lg">
-        <div v-for="card in metricCards()" :key="card.label" class="col-6 col-md-2">
+        <div v-for="card in metricCards()" :key="card.label" class="col-6 col-sm-4 col-md-2">
           <q-card flat class="viti-card cursor-pointer metric-card" @click="router.push(card.to)">
             <q-card-section class="text-center">
               <q-avatar color="blue-1" text-color="primary" :icon="card.icon" size="42px" />
@@ -148,36 +197,83 @@ onMounted(load)
           </q-card>
         </div>
 
-        <div class="col-12 col-md-6">
+        <div class="col-12 col-lg-7">
           <q-card flat class="viti-card full-height">
-            <q-card-section class="row items-center"><div><div class="text-subtitle1 text-weight-bold">Solicitudes</div><div class="text-caption text-grey-6">Historial visible de requerimientos.</div></div><q-space /><q-btn flat dense no-caps color="primary" label="Ver todas" to="/solicitudes" /></q-card-section>
+            <q-card-section class="row items-center">
+              <div><div class="text-subtitle1 text-weight-bold">Actividad reciente</div><div class="text-caption text-grey-6">Una lectura rápida del movimiento de la cuenta.</div></div>
+              <q-space />
+              <q-chip dense outline color="grey-7" icon="history">{{ activity.length }} visibles</q-chip>
+            </q-card-section>
             <q-separator />
-            <q-list v-if="empresa.solicitudes?.length" separator>
-              <q-item v-for="item in empresa.solicitudes.slice(0,5)" :key="item.id">
-                <q-item-section avatar><q-icon name="assignment" color="primary" /></q-item-section>
-                <q-item-section><q-item-label class="text-weight-medium">{{ item.titulo || item.nombre || `Solicitud #${item.id}` }}</q-item-label><q-item-label caption>{{ item.estado || 'sin estado' }}</q-item-label></q-item-section>
-                <q-item-section side><q-badge outline color="grey-7" :label="formatDateTime(item.created_at)" /></q-item-section>
+            <q-list v-if="activity.length" separator>
+              <q-item v-for="item in activity" :key="item.id" clickable @click="router.push(item.to)">
+                <q-item-section avatar><q-avatar :color="item.color" text-color="white" :icon="item.icon" size="36px" /></q-item-section>
+                <q-item-section>
+                  <q-item-label class="text-weight-medium">{{ item.title }}</q-item-label>
+                  <q-item-label caption>{{ item.message }}</q-item-label>
+                </q-item-section>
+                <q-item-section side><div class="text-caption text-grey-6">{{ formatDateTime(item.date) }}</div></q-item-section>
               </q-item>
             </q-list>
-            <div v-else class="empty-state">No hay solicitudes registradas.</div>
+            <div v-else class="empty-state">Todavía no hay actividad temporal suficiente para mostrar una línea reciente.</div>
           </q-card>
         </div>
 
-        <div class="col-12 col-md-6">
+        <div class="col-12 col-lg-5">
           <q-card flat class="viti-card full-height">
-            <q-card-section class="row items-center"><div><div class="text-subtitle1 text-weight-bold">Proyectos y aplicaciones</div><div class="text-caption text-grey-6">Lo que VITI está construyendo o entregando.</div></div><q-space /></q-card-section>
+            <q-card-section>
+              <div class="text-subtitle1 text-weight-bold">AGR para esta cuenta</div>
+              <div class="text-caption text-grey-6">Una lectura contextual sin inventar datos nuevos.</div>
+            </q-card-section>
             <q-separator />
-            <q-list separator>
-              <q-item v-for="item in (empresa.proyectos || []).slice(0,4)" :key="`p-${item.id}`">
-                <q-item-section avatar><q-icon name="account_tree" color="deep-purple" /></q-item-section>
-                <q-item-section><q-item-label class="text-weight-medium">{{ item.nombre || item.codigo || `Proyecto #${item.id}` }}</q-item-label><q-item-label caption>{{ item.estado || 'sin estado' }} · {{ item.progreso ?? 0 }}%</q-item-label></q-item-section>
-              </q-item>
-              <q-item v-for="item in (empresa.aplicaciones || []).slice(0,4)" :key="`a-${item.id}`">
-                <q-item-section avatar><q-icon name="apps" color="teal" /></q-item-section>
-                <q-item-section><q-item-label class="text-weight-medium">{{ item.nombre || `Aplicación #${item.id}` }}</q-item-label><q-item-label caption>{{ item.estado || 'sin estado' }}</q-item-label></q-item-section>
-              </q-item>
-              <q-item v-if="!empresa.proyectos?.length && !empresa.aplicaciones?.length"><q-item-section class="text-grey-6">Todavía no hay proyectos ni aplicaciones asociados.</q-item-section></q-item>
-            </q-list>
+            <q-card-section>
+              <div class="agr-signal"><q-icon name="smart_toy" color="primary" size="26px" /><div><div class="text-weight-bold">AGR listo para analizar</div><div class="text-caption text-grey-6">La cuenta ya tiene suficientes entidades conectadas para enriquecer el análisis operativo.</div></div></div>
+              <div class="q-mt-md q-gutter-sm">
+                <q-chip dense outline color="primary">{{ counts.solicitudes }} solicitudes</q-chip>
+                <q-chip dense outline color="deep-purple">{{ counts.proyectos }} proyectos</q-chip>
+                <q-chip dense outline color="teal">{{ counts.aplicaciones }} apps</q-chip>
+              </div>
+              <q-btn flat no-caps color="primary" icon="open_in_new" label="Abrir Monitor AGR" class="q-mt-md" to="/monitor" />
+            </q-card-section>
+          </q-card>
+        </div>
+
+        <div class="col-12">
+          <q-card flat class="viti-card">
+            <q-card-section class="row items-center">
+              <div><div class="text-subtitle1 text-weight-bold">Solicitudes y proyectos</div><div class="text-caption text-grey-6">Los registros principales relacionados con la cuenta.</div></div>
+              <q-space />
+              <div class="row q-gutter-xs">
+                <q-btn flat dense no-caps color="primary" label="Solicitudes" to="/solicitudes" />
+                <q-btn flat dense no-caps color="primary" label="Proyectos" to="/proyectos" />
+              </div>
+            </q-card-section>
+            <q-separator />
+            <div class="row q-col-gutter-lg q-pa-md">
+              <div class="col-12 col-lg-6">
+                <q-list v-if="empresa.solicitudes?.length" separator>
+                  <q-item v-for="item in empresa.solicitudes.slice(0,5)" :key="item.id">
+                    <q-item-section avatar><q-icon name="assignment" color="primary" /></q-item-section>
+                    <q-item-section><q-item-label class="text-weight-medium">{{ item.titulo || item.nombre || `Solicitud #${item.id}` }}</q-item-label><q-item-label caption>{{ item.estado || 'sin estado' }}</q-item-label></q-item-section>
+                    <q-item-section side><q-badge outline color="grey-7" :label="formatDateTime(item.created_at)" /></q-item-section>
+                  </q-item>
+                </q-list>
+                <div v-else class="empty-state">No hay solicitudes registradas.</div>
+              </div>
+              <div class="col-12 col-lg-6">
+                <q-list v-if="empresa.proyectos?.length || empresa.aplicaciones?.length" separator>
+                  <q-item v-for="item in (empresa.proyectos || []).slice(0,4)" :key="`p-${item.id}`">
+                    <q-item-section avatar><q-icon name="account_tree" color="deep-purple" /></q-item-section>
+                    <q-item-section><q-item-label class="text-weight-medium">{{ item.nombre || item.codigo || `Proyecto #${item.id}` }}</q-item-label><q-item-label caption>{{ item.estado || 'sin estado' }} · {{ item.progreso ?? 0 }}%</q-item-label></q-item-section>
+                  </q-item>
+                  <q-item v-for="item in (empresa.aplicaciones || []).slice(0,4)" :key="`a-${item.id}`">
+                    <q-item-section avatar><q-icon name="apps" color="teal" /></q-item-section>
+                    <q-item-section><q-item-label class="text-weight-medium">{{ item.nombre || `Aplicación #${item.id}` }}</q-item-label><q-item-label caption>{{ item.estado || 'sin estado' }}</q-item-label></q-item-section>
+                  </q-item>
+                </q-list>
+                <div v-else class="empty-state">Todavía no hay proyectos ni aplicaciones asociados.</div>
+              </div>
+            </div>
           </q-card>
         </div>
       </div>
@@ -192,5 +288,6 @@ onMounted(load)
 <style scoped>
 .metric-card{height:100%;transition:transform .15s ease,box-shadow .15s ease}.metric-card:hover{transform:translateY(-2px);box-shadow:0 10px 24px rgba(12,35,64,.08)}
 .metric-number{font-size:28px;font-weight:800;margin-top:8px}.profile-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}.profile-grid span{display:block;font-size:12px;color:var(--viti-muted);margin-bottom:3px}.profile-grid strong{display:block;overflow-wrap:anywhere}
+.health-card{border:1px solid rgba(25,118,210,.12)}.agr-signal{display:flex;gap:12px;align-items:flex-start;border:1px solid var(--viti-border);border-radius:14px;padding:14px;background:color-mix(in srgb,var(--viti-card) 92%,var(--viti-bg))}
 @media(max-width:600px){.profile-grid{grid-template-columns:1fr}.metric-number{font-size:24px}}
 </style>
