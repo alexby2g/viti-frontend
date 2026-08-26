@@ -1,0 +1,18 @@
+name: Runner Probe
+
+on:
+  push:
+    branches:
+      - chore/ci-runner-probe
+  workflow_dispatch:
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Runner boot
+        run: |
+          echo "runner probe started"
+          uname -a
+          node --version || true
