@@ -21,7 +21,7 @@
   },
   "devDependencies": {
     "@quasar/app-vite": "^2.1.0",
-    "eslint": "^9.17.0",
+    "eslint": "^10.9.0",
     "eslint-plugin-vue": "^10.10.0",
     "globals": "^17.9.0",
     "sass": "^1.83.0"
