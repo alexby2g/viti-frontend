@@ -36,10 +36,13 @@ curl --fail --silent --show-error "$BASE_URL/" >/dev/null
 grep -Fq "Acceso a la plataforma" "$DOM_FILE"
 grep -Fq "Ingresar a VITI" "$DOM_FILE"
 grep -Fq "VITI · producto de AGR Studio" "$DOM_FILE"
+grep -Fq "Código secreto (solo superadministrador)" "$DOM_FILE"
+grep -Fq "Conocer VITI" "$DOM_FILE"
+grep -Fq "Desarrollado y administrado por" "$DOM_FILE"
 
 if grep -Fq '<div id="q-app"></div>' "$DOM_FILE"; then
   echo "La aplicación no llegó a renderizar contenido dentro de #q-app."
   exit 1
 fi
 
-echo "Smoke E2E OK: VITI compiló, abrió en Chrome headless y renderizó la pantalla de acceso."
+echo "Smoke E2E OK: VITI compiló, abrió en Chrome headless y renderizó la pantalla de acceso actual."
