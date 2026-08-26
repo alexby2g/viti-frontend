@@ -1,10 +1,12 @@
 <script setup>
-import { computed } from 'vue'
+import { computed, onMounted } from 'vue'
+import { useNotificationsStore } from '../stores/notifications'
 
 const props = defineProps({
   dashboardData: { type: Object, default: () => ({}) },
 })
 
+const notifications = useNotificationsStore()
 const data = computed(() => props.dashboardData || {})
 const summary = computed(() => data.value.resumen || {})
 const snapshot = computed(() => data.value.agr_autopilot || {})
@@ -13,6 +15,7 @@ const guard = computed(() => snapshot.value.system_guard || {})
 const priorities = computed(() => (snapshot.value.priorities || []).slice(0, 4))
 const recommendations = computed(() => (snapshot.value.workflow_recommendations || []).slice(0, 3))
 const attention = computed(() => (data.value.requieren_atencion || []).slice(0, 4))
+const activity = computed(() => (notifications.items || []).slice(0, 5))
 
 const health = computed(() => snapshot.value.health || (summary.value.pagos_vencidos > 0 ? 'attention' : 'stable'))
 const healthLabel = computed(() => ({
@@ -61,6 +64,42 @@ function routeFor(route) {
 function prettyStatus(status) {
   return ({ lista_entrega: 'Lista para entrega', gracia: 'En gracia', suspendida: 'Suspendida' }[status] || status || 'Revisar')
 }
+
+function activityTitle(item) {
+  return item?.titulo || item?.title || item?.mensaje || item?.message || 'Actividad de VITI'
+}
+
+function activityMessage(item) {
+  return item?.mensaje || item?.message || item?.descripcion || item?.description || 'Hay actividad nueva disponible.'
+}
+
+function activityRoute(item) {
+  return routeFor(item?.ruta || item?.route || item?.url || '/')
+}
+
+function activityIcon(item) {
+  const value = String(item?.tipo || item?.type || item?.categoria || '').toLowerCase()
+  if (value.includes('pago')) return 'payments'
+  if (value.includes('solicitud')) return 'assignment'
+  if (value.includes('proyecto')) return 'account_tree'
+  if (value.includes('soporte')) return 'support_agent'
+  if (value.includes('mensaje')) return 'chat'
+  return 'notifications'
+}
+
+function activityColor(item) {
+  const value = String(item?.tipo || item?.type || item?.categoria || '').toLowerCase()
+  if (value.includes('pago')) return 'teal'
+  if (value.includes('soporte')) return 'orange'
+  if (value.includes('solicitud')) return 'primary'
+  if (value.includes('proyecto')) return 'deep-purple'
+  if (value.includes('mensaje')) return 'blue'
+  return 'grey-7'
+}
+
+onMounted(() => {
+  notifications.refresh()
+})
 </script>
 
 <template>
@@ -158,6 +197,33 @@ function prettyStatus(status) {
           </q-list>
         </div>
       </div>
+    </q-card-section>
+
+    <q-card-section>
+      <div class="row items-center q-mb-sm">
+        <div>
+          <div class="text-subtitle1 text-weight-bold">Actividad de VITI</div>
+          <div class="text-caption command-muted">Notificaciones recientes, sin salir del centro de control.</div>
+        </div>
+        <q-space />
+        <q-badge v-if="notifications.unreadCount" color="negative" :label="`${notifications.unreadCount} sin leer`" />
+        <q-btn flat dense no-caps color="primary" icon="notifications" label="Buzón" to="/buzon" />
+      </div>
+      <q-list v-if="activity.length" separator>
+        <q-item v-for="(item, index) in activity" :key="item.id || `${activityTitle(item)}-${index}`" clickable @click="$router.push(activityRoute(item))">
+          <q-item-section avatar>
+            <q-avatar :color="activityColor(item)" text-color="white" :icon="activityIcon(item)" size="36px" />
+          </q-item-section>
+          <q-item-section>
+            <q-item-label class="text-weight-medium">{{ activityTitle(item) }}</q-item-label>
+            <q-item-label caption>{{ activityMessage(item) }}</q-item-label>
+          </q-item-section>
+          <q-item-section side>
+            <q-badge v-if="item.leida === false || item.read === false" outline color="negative" label="Nueva" />
+          </q-item-section>
+        </q-item>
+      </q-list>
+      <div v-else class="empty-state">No hay notificaciones recientes en este momento.</div>
     </q-card-section>
 
     <q-card-section v-if="attention.length">
