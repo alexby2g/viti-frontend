@@ -33,32 +33,18 @@ async function load(){
   }catch(error){ loadError.value=error?.response?.data?.message||error?.message||'No se pudo cargar la solicitud.' }
   finally{ loading.value=false }
 }
-async function updateSolicitud(id, estado){
-  const s=item.value
-  const payload={
-    empresa_id:s.empresa_id,
-    cliente_id:s.cliente_id,
-    cuestionario_id:s.cuestionario_id ?? null,
-    plan_viti_id:s.plan_viti_id ?? null,
-    asignado_a:s.asignado_a ?? null,
-    titulo:s.titulo,
-    resumen:s.resumen ?? null,
-    estado,
-    prioridad:s.prioridad || 'normal',
-    fecha_limite_deseada:s.fecha_limite_deseada ?? null,
-    presupuesto_estimado:s.presupuesto_estimado ?? null,
-    forma_pago_preferida:s.forma_pago_preferida ?? null,
-    frecuencia_suscripcion_preferida:s.frecuencia_suscripcion_preferida ?? null,
-  }
-  return api.put(`/solicitudes/${id}`,payload)
-}
 async function approveRequest(){
   if(!canApprove.value||!item.value?.id) return
-  $q.dialog({title:'Aprobar solicitud',message:'¿Confirmas que esta solicitud pasa a aprobada?',cancel:true,persistent:true}).onOk(async()=>{
+  $q.dialog({title:'Aprobar solicitud',message:'¿Confirmas la aprobación de esta solicitud y el envío de la orientación inicial al buzón del cliente?',cancel:true,persistent:true}).onOk(async()=>{
     actionLoading.value=true
-    try{ await updateSolicitud(item.value.id,'aprobada'); $q.notify({type:'positive',message:'Solicitud aprobada correctamente.'}); await load() }
-    catch(error){ $q.notify({type:'negative',message:error?.response?.data?.message||'No se pudo aprobar la solicitud.'}) }
-    finally{ actionLoading.value=false }
+    try{
+      const response=await api.post(`/solicitudes/${item.value.id}/aprobar`)
+      $q.notify({type:'positive',message:response?.data?.message||'Solicitud aprobada correctamente.'})
+      await load()
+    }catch(error){
+      const message=error?.response?.data?.message||'No se pudo aprobar la solicitud.'
+      $q.notify({type:'negative',message})
+    }finally{ actionLoading.value=false }
   })
 }
 function openReject(){ rejectForm.motivo=''; rejectDialog.value=true }
