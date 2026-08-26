@@ -54,6 +54,12 @@ export default defineRouter(({ store }) => {
 
   router.addRoute({ path:'/solicitudes/:id/revision', name:'solicitud-revision', component:() => import('../pages/SolicitudRevisionPage.vue'), meta:{requiresAuth:true,adminOnly:true} })
   router.addRoute({ path:'/monitor', name:'monitor', component:() => import('../pages/MonitorPage.vue'), meta:{requiresAuth:true,adminOnly:true} })
+  router.addRoute({
+    path:'/aplicaciones/:id/moldeador',
+    name:'aplicacion-moldeador',
+    component:() => import('../pages/MoldeadorAplicacionPage.vue'),
+    meta:{requiresAuth:true,adminOnly:true},
+  })
 
   router.addRoute({ path:'/solicitud/sin-plan', name:'public-no-plan-request', component:() => import('../pages/VitiNoPlanRequestPage.vue'), meta:{publicLanding:true} })
 
