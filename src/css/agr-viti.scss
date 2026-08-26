@@ -1,8 +1,9 @@
 /*
  * AGR Studio -> marca madre
  * VITI -> producto/plataforma
- * Esta capa se limita al panel VITI y a sus pantallas de acceso.
- * Las VITI Apps conservan su identidad local.
+ *
+ * Este archivo mantiene SOLO tokens y reglas propias de AGR/VITI auth.
+ * Los tokens visuales de VITI (bg/card/text/muted/border) viven en app.scss.
  */
 :root{
   --agr-ink:#0b0b0d;
@@ -14,24 +15,6 @@
   --agr-blue:#4b86d8;
   --agr-purple:#7566d6;
   --agr-purple-soft:#8a7be2;
-}
-
-body.viti-main-active,
-.agr-viti-auth{
-  --viti-bg:#f6f6f7;
-  --viti-card:#ffffff;
-  --viti-text:#1c1c21;
-  --viti-muted:#6f717a;
-  --viti-border:#e2e2e7;
-}
-
-body.body--dark.viti-main-active,
-.body--dark .agr-viti-auth{
-  --viti-bg:#0b0b0d;
-  --viti-card:#151519;
-  --viti-text:#f4f4f5;
-  --viti-muted:#a1a1aa;
-  --viti-border:#29292f;
 }
 
 body.viti-main-active,
@@ -57,14 +40,14 @@ body.body--dark.viti-main-active .q-page-container,
 
 body.viti-main-active .viti-header{
   background:rgba(255,255,255,.9);
-  color:#1c1c21;
-  border-color:#e6e6ea;
+  color:var(--viti-text);
+  border-color:var(--viti-border);
   backdrop-filter:blur(16px);
   -webkit-backdrop-filter:blur(16px);
 }
 body.body--dark.viti-main-active .viti-header{
   background:rgba(11,11,13,.91);
-  color:#f4f4f5;
+  color:var(--viti-text);
   border-color:#242429;
 }
 
@@ -145,7 +128,9 @@ body.viti-main-active .q-avatar.bg-accent,
 }
 
 body.viti-main-active .q-field--outlined .q-field__control:before,
-.agr-viti-auth .q-field--outlined .q-field__control:before{border-color:var(--viti-border)}
+.agr-viti-auth .q-field--outlined .q-field__control:before{
+  border-color:var(--viti-border)
+}
 body.body--dark.viti-main-active .q-field__label,
 body.body--dark.viti-main-active .q-field__native,
 body.body--dark.viti-main-active .q-field__input,
@@ -177,12 +162,8 @@ body.body--dark.viti-main-active .q-table tbody td{color:#efeff1}
   animation:agr006ThinkHead 1.6s ease-in-out infinite!important;
   transform-origin:210px 180px;
 }
-.agr006-root.state-thinking .holo-body{
-  animation:agr006ThinkBody 2.8s ease-in-out infinite!important;
-}
-.agr006-root.state-attention .holo-head{
-  animation:agr006AlertHead 1.2s ease-in-out infinite!important;
-}
+.agr006-root.state-thinking .holo-body{animation:agr006ThinkBody 2.8s ease-in-out infinite!important}
+.agr006-root.state-attention .holo-head{animation:agr006AlertHead 1.2s ease-in-out infinite!important}
 .agr006-root.state-attention .left-hand{
   animation:agr006AttentionLeft 1.1s ease-in-out infinite alternate!important;
   transform-origin:110px 462px;
@@ -191,18 +172,12 @@ body.body--dark.viti-main-active .q-table tbody td{color:#efeff1}
   animation:agr006AttentionRight 1.3s ease-in-out infinite alternate!important;
   transform-origin:310px 462px;
 }
-.agr006-root.state-critical .holo-aura{
-  animation:agr006CriticalAura .7s ease-in-out infinite!important;
-}
-.agr006-root.state-critical .holo-head{
-  animation:agr006CriticalHead .9s ease-in-out infinite!important;
-}
-.agr006-root.state-critical .holo-wave i{
-  background:#ff7d87!important;
-}
-.agr006-root.state-thinking .holo-caption span:last-child::after{content:' · procesando';}
-.agr006-root.state-attention .holo-caption span:last-child::after{content:' · atención';}
-.agr006-root.state-critical .holo-caption span:last-child::after{content:' · crítica';}
+.agr006-root.state-critical .holo-aura{animation:agr006CriticalAura .7s ease-in-out infinite!important}
+.agr006-root.state-critical .holo-head{animation:agr006CriticalHead .9s ease-in-out infinite!important}
+.agr006-root.state-critical .holo-wave i{background:#ff7d87!important}
+.agr006-root.state-thinking .holo-caption span:last-child::after{content:' · procesando'}
+.agr006-root.state-attention .holo-caption span:last-child::after{content:' · atención'}
+.agr006-root.state-critical .holo-caption span:last-child::after{content:' · crítica'}
 
 @keyframes agr006ThinkHead{
   0%,100%{transform:translate(-1px,-1px) rotate(-1deg)}
