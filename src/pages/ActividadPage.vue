@@ -40,21 +40,26 @@ onMounted(() => notifications.refresh())
 
 <template>
   <q-page class="viti-page">
-    <PageHeader eyebrow="Actividad" title="Centro de actividad" subtitle="Un solo lugar para revisar notificaciones, cambios y señales de VITI.">
+    <PageHeader eyebrow="Actividad" title="Centro de actividad" subtitle="Revisa aquí las notificaciones pendientes que alimentan el Command Center.">
       <q-btn outline no-caps icon="refresh" label="Actualizar" :loading="notifications.loading" @click="notifications.refresh" />
       <q-btn v-if="notifications.unreadCount" color="primary" unelevated no-caps icon="done_all" label="Marcar todo leído" @click="notifications.markAllRead" />
     </PageHeader>
 
     <div class="row q-col-gutter-md q-mb-lg">
-      <div class="col-6 col-md-3"><q-card flat class="viti-card"><q-card-section><div class="text-caption text-grey-6">Total</div><div class="metric">{{ activity.length }}</div><div class="text-caption">notificaciones visibles</div></q-card-section></q-card></div>
+      <div class="col-6 col-md-3"><q-card flat class="viti-card"><q-card-section><div class="text-caption text-grey-6">Pendientes</div><div class="metric">{{ activity.length }}</div><div class="text-caption">notificaciones disponibles</div></q-card-section></q-card></div>
       <div class="col-6 col-md-3"><q-card flat class="viti-card"><q-card-section><div class="text-caption text-grey-6">Sin leer</div><div class="metric" :class="unread ? 'text-negative' : ''">{{ unread }}</div><div class="text-caption">requieren revisión</div></q-card-section></q-card></div>
       <div class="col-6 col-md-3"><q-card flat class="viti-card"><q-card-section><div class="text-caption text-grey-6">Estado</div><div class="metric">{{ notifications.loading ? '...' : 'OK' }}</div><div class="text-caption">centro sincronizado</div></q-card-section></q-card></div>
-      <div class="col-6 col-md-3"><q-card flat class="viti-card"><q-card-section><div class="text-caption text-grey-6">Frecuencia</div><div class="metric">20 s</div><div class="text-caption">cuando el store está activo</div></q-card-section></q-card></div>
+      <div class="col-6 col-md-3"><q-card flat class="viti-card"><q-card-section><div class="text-caption text-grey-6">Actualización</div><div class="metric">20 s</div><div class="text-caption">cuando el store está activo</div></q-card-section></q-card></div>
     </div>
+
+    <q-banner rounded class="bg-blue-1 text-primary q-mb-lg">
+      <template #avatar><q-icon name="info" /></template>
+      Este centro muestra las notificaciones pendientes del buzón interno. No representa todavía un historial completo de auditoría.
+    </q-banner>
 
     <q-card flat class="viti-card">
       <q-card-section class="row items-center">
-        <div><div class="text-h6 text-weight-bold">Actividad reciente</div><div class="text-caption text-grey-6">Las mismas notificaciones que alimentan el Command Center.</div></div>
+        <div><div class="text-h6 text-weight-bold">Notificaciones pendientes</div><div class="text-caption text-grey-6">Abre una notificación para ir directamente a su contexto.</div></div>
         <q-space />
         <q-badge v-if="notifications.unreadCount" color="negative" :label="`${notifications.unreadCount} sin leer`" />
       </q-card-section>
@@ -72,7 +77,7 @@ onMounted(() => notifications.refresh())
           </q-item-section>
         </q-item>
       </q-list>
-      <div v-else class="empty-state q-pa-xl">No hay actividad disponible en este momento.</div>
+      <div v-else class="empty-state q-pa-xl">No hay notificaciones pendientes en este momento.</div>
     </q-card>
   </q-page>
 </template>
