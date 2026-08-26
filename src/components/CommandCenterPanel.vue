@@ -29,7 +29,7 @@ const healthColor = computed(() => ({
   attention: 'negative',
 }[health.value] || 'primary'))
 
-const priorityCount = computed(() => priorities.value.length + recommendations.value.length)
+const alertCount = computed(() => priorities.value.length)
 
 const primaryAttention = computed(() => {
   if (priorities.value[0]) {
@@ -150,7 +150,7 @@ onMounted(() => {
           <div class="command-metric"><div class="text-caption command-muted">Proyectos</div><div class="metric-number">{{ summary.proyectos_activos || 0 }}</div><div class="text-caption">Activos</div></div>
         </div>
         <div class="col-6 col-md-3">
-          <div class="command-metric"><div class="text-caption command-muted">Alertas</div><div class="metric-number" :class="priorityCount ? 'text-negative' : ''">{{ priorityCount }}</div><div class="text-caption">Para revisar</div></div>
+          <div class="command-metric"><div class="text-caption command-muted">Alertas AGR</div><div class="metric-number" :class="alertCount ? 'text-negative' : ''">{{ alertCount }}</div><div class="text-caption">Prioridades</div></div>
         </div>
       </div>
     </q-card-section>
