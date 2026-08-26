@@ -11,7 +11,8 @@ function normalizeItem(item = {}) {
     titulo: item.titulo || item.title || 'Actividad de VITI',
     mensaje: item.mensaje || item.message || '',
     ruta: item.ruta || item.path || item.route || null,
-    leida: item.leida ?? (item.read ?? Boolean(item.leido_at)),
+    // El endpoint del centro devuelve únicamente pendientes de lectura.
+    leida: item.leida ?? (item.read ?? (item.leido_at ? true : false)),
   }
 }
 
