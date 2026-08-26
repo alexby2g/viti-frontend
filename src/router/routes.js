@@ -118,6 +118,7 @@ export default [
       { path: 'mi-proyecto', name: 'client-project', component: () => import('../pages/ClientProjectPage.vue'), meta:{clientOnly:true} },
       { path: 'mi-buzon', name: 'client-messages', component: () => import('../pages/ClientMessagesPage.vue'), meta:{clientOnly:true} },
       { path: 'empresas', name: 'empresas', component: () => import('../pages/ClientesPage.vue'), meta:{adminOnly:true} },
+      { path: 'empresas/:id/360', name: 'empresa-360', component: () => import('../pages/Empresa360Page.vue'), meta:{adminOnly:true} },
       { path: 'clientes', redirect: '/empresas' },
       { path: 'solicitudes', name: 'solicitudes', component: () => import('../pages/SolicitudesPage.vue'), meta:{adminOnly:true} },
       { path: 'solicitudes/:id', name: 'solicitud-detalle', component: () => import('../pages/SolicitudDetallePage.vue'), meta:{adminOnly:true} },
