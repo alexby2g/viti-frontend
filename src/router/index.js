@@ -44,6 +44,16 @@ export default defineRouter(({ store }) => {
     meta:{requiresAuth:true,adminOnly:true},
   })
 
+  // Evaluación pública cuando todavía no se ha elegido un plan.
+  // Este camino permite entender el sistema primero y deja la propuesta comercial
+  // para después de revisar el cuestionario.
+  router.addRoute({
+    path:'/solicitud/sin-plan',
+    name:'public-no-plan-request',
+    component:() => import('../pages/VitiNoPlanRequestPage.vue'),
+    meta:{publicLanding:true},
+  })
+
   const homeFor = (user) => {
     if (user?.rol === 'cliente_negocio') return { name:'electro-customer-home' }
     if (user?.rol === 'cliente') return { name:'client-portal' }
@@ -52,9 +62,9 @@ export default defineRouter(({ store }) => {
   }
 
   router.beforeEach(async (to, from) => {
-    // La presentación y los planes deben abrir incluso si el API está dormido, en mantenimiento o
-    // todavía no fue configurado. Son páginas públicas de producto, no parte del panel.
-    if (to.meta.publicLanding || to.name === 'viti-landing' || to.name === 'viti-plans') return true
+    // La presentación, los planes y la evaluación sin plan deben abrir incluso si el API está dormido,
+    // en mantenimiento o todavía no fue configurado. Son páginas públicas de producto.
+    if (to.meta.publicLanding || to.name === 'viti-landing' || to.name === 'viti-plans' || to.name === 'public-no-plan-request') return true
 
     // Los enlaces del formulario público anterior ya no deben abrir un formulario retirado.
     if (to.name === 'public-request') return { path:'/solicitud', query:to.query, hash:to.hash }
