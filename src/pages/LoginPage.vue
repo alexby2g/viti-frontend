@@ -3,7 +3,7 @@ import { onMounted, reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useQuasar } from 'quasar'
 import { useAuthStore } from '../stores/auth'
-import { warmBackend } from '../boot/axios'
+import { api, warmBackend } from '../boot/axios'
 import { useFormErrors } from '../composables/useFormErrors'
 import AppBrand from '../components/AppBrand.vue'
 
@@ -17,8 +17,13 @@ function clearField(field){fieldErrors.clear(field)}
 function errorMessage(e){return fieldErrors.fromResponse(e,'No se pudo iniciar sesión. Revisa los datos marcados.')}
 
 function continueWithGoogle(){
-  googleNotice.value=true
-  $q.notify({type:'info',message:'Google OAuth está preparado para conectarse al proveedor de identidad de VITI.'})
+  const base=String(api.defaults.baseURL||'').replace(/\/api\/v1\/?$/,'')
+  if(!base){
+    googleNotice.value=true
+    $q.notify({type:'negative',message:'No se encontró la dirección del backend de VITI.'})
+    return
+  }
+  window.location.assign(`${base}/auth/google/redirect`)
 }
 
 async function submit(){
@@ -43,7 +48,15 @@ async function submit(){
   }
 }
 
-onMounted(()=>{warmBackend().catch(()=>{})})
+onMounted(()=>{
+  warmBackend().catch(()=>{})
+  const google=String(route.query.google||'')
+  if(google==='success')$q.notify({type:'positive',message:'Google conectado. Bienvenido a VITI.'})
+  if(google==='needs_access')$q.notify({type:'warning',message:'Esta cuenta de Google todavía no tiene acceso a VITI. Solicita acceso para continuar.'})
+  if(google==='not_configured')$q.notify({type:'warning',message:'Google todavía no está configurado en el servidor de VITI.'})
+  if(google==='cancelled')$q.notify({type:'info',message:'Inicio con Google cancelado.'})
+  if(google==='state_mismatch')$q.notify({type:'negative',message:'No pudimos validar la sesión de Google. Inténtalo nuevamente.'})
+})
 </script>
 
 <template>
@@ -73,7 +86,7 @@ onMounted(()=>{warmBackend().catch(()=>{})})
           <span class="google-mark">G</span>
           <span>Continuar con Google</span>
         </button>
-        <div v-if="googleNotice" class="google-note">La conexión OAuth de Google quedará activa cuando configuremos el cliente y callback seguros del backend.</div>
+        <div v-if="googleNotice" class="google-note">No se pudo iniciar el flujo de Google. Revisa la configuración del backend.</div>
 
         <div class="divider"><span>o continúa con tu cuenta VITI</span></div>
 
