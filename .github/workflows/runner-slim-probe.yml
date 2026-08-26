@@ -1,0 +1,15 @@
+name: VITI Slim Runner Probe
+
+on:
+  push:
+    branches: [runner-slim-direct]
+
+jobs:
+  probe:
+    runs-on: ubuntu-slim
+    timeout-minutes: 5
+    steps:
+      - name: Runner reached
+        run: echo "VITI_SLIM_RUNNER_OK"
+      - name: System
+        run: uname -a
