@@ -36,7 +36,7 @@ curl --fail --silent --show-error "$BASE_URL/" >/dev/null
 grep -Fq "Acceso a la plataforma" "$DOM_FILE"
 grep -Fq "Ingresar a VITI" "$DOM_FILE"
 grep -Fq "VITI · producto de AGR Studio" "$DOM_FILE"
-grep -Fq "¿Es tu primera vez?" "$DOM_FILE"
+grep -Fq "Código secreto (solo superadministrador)" "$DOM_FILE"
 grep -Fq "Conocer VITI" "$DOM_FILE"
 grep -Fq "Desarrollado y administrado por" "$DOM_FILE"
 
