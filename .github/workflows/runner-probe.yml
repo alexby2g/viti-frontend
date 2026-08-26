@@ -1,0 +1,28 @@
+name: VITI Runner Probe
+
+on:
+  push:
+    branches:
+      - runner-test
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Runner acquired
+        run: |
+          echo "RUNNER_OK"
+          echo "OS=$RUNNER_OS"
+          echo "ARCH=$RUNNER_ARCH"
+          echo "IMAGE=$ImageOS"
+
+      - name: Node probe
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Tool versions
+        run: |
+          node --version
+          npm --version
