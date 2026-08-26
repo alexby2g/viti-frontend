@@ -31,6 +31,7 @@ export function buildMainMenu({
       { label: 'Casos de soporte', icon: 'build_circle', to: '/mantenimientos' },
     ] },
     { label: 'Control', icon: 'analytics', children: [
+      { label: 'Centro de actividad', icon: 'notifications_active', to: '/actividad', badge: unreadCount },
       { label: 'Centro de monitoreo', icon: 'monitor_heart', to: '/monitor' },
       { label: 'Reportes', icon: 'picture_as_pdf', to: '/reportes' },
     ] },
