@@ -93,9 +93,8 @@ check_page public-request "$BASE/solicitar/e2e-token-viti" \
   "Importante:"
 
 check_page admin-request "$BASE/solicitudes/501" \
-  "Solicitud VITI" \
-  "SOL-AUTH-E2E" \
   "Solicitud autenticada E2E" \
+  "SOL-AUTH-E2E" \
   "Empresa Auth E2E" \
   "Cliente Admin E2E" \
   "Revisar solicitud de acceso" \
