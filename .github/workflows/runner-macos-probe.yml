@@ -1,0 +1,15 @@
+name: VITI macOS Runner Probe
+
+on:
+  push:
+    branches: [runner-test-macos]
+
+jobs:
+  probe:
+    runs-on: macos-latest
+    timeout-minutes: 5
+    steps:
+      - name: Runner reached
+        run: echo "VITI_MACOS_RUNNER_OK"
+      - name: System
+        run: uname -a
