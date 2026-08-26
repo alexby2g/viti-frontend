@@ -13,6 +13,30 @@ export default defineRouter(({ store }) => {
   ]
   const router = createRouter({ history: createWebHistory(), routes:[...publicRoutes, ...routes] })
 
+  if (router.hasRoute('public-request')) router.removeRoute('public-request')
+  router.addRoute({
+    path:'/solicitar/:token',
+    component:() => import('../layouts/AuthLayout.vue'),
+    children:[{ path:'', name:'public-request', component:() => import('../pages/IdeaBuilderPage.vue') }],
+  })
+
+  const clientHubRoutes = [
+    { name:'client-portal', path:'/mi-cuenta', component:() => import('../pages/ClientHubPage.vue') },
+    { name:'client-apps', path:'/mi-aplicaciones', component:() => import('../pages/ClientAppsPage.vue') },
+    { name:'client-project', path:'/mi-proyecto', component:() => import('../pages/ClientProjectPage.vue') },
+    { name:'client-messages', path:'/mi-buzon', component:() => import('../pages/ClientMessagesPage.vue') },
+    { name:'client-billing', path:'/mi-pagos', component:() => import('../pages/ClientBillingPage.vue') },
+  ]
+  clientHubRoutes.forEach(({ name, path, component }) => {
+    if (router.hasRoute(name)) router.removeRoute(name)
+    router.addRoute({
+      path,
+      component:() => import('../layouts/ClientHubLayout.vue'),
+      meta:{requiresAuth:true,clientOnly:true},
+      children:[{ path:'', name, component, meta:{requiresAuth:true,clientOnly:true} }],
+    })
+  })
+
   const redirectAlias = (to, targetBase, fallback='inicio') => {
     const raw = to.params.pathMatch
     const tail = Array.isArray(raw) ? raw.join('/') : String(raw || fallback)
@@ -48,7 +72,7 @@ export default defineRouter(({ store }) => {
   router.beforeEach(async (to, from) => {
     if (to.meta.publicLanding || to.name === 'viti-landing' || to.name === 'viti-plans') return true
 
-    if (to.name === 'public-request') return { path:'/solicitud', query:to.query, hash:to.hash }
+    if (to.name === 'public-request') return true
 
     if (to.name === 'solicitud-detalle' && to.params.id) {
       return { name:'solicitud-revision', params:{ id:to.params.id } }
