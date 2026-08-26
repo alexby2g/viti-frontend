@@ -74,7 +74,7 @@ onMounted(async () => { try { data.value = (await api.get('/dashboard')).data } 
   <q-page class="viti-page">
     <q-inner-loading :showing="loading" />
     <PageHeader eyebrow="SaaS" title="Panel VITI" subtitle="La plataforma en una mirada: negocios, aplicaciones, suscripciones y lo que requiere atención.">
-      <q-btn color="primary" unelevated icon="person_add" label="Registrar cliente" no-caps to="/clientes?new=1" />
+      <q-btn color="primary" unelevated icon="person_add" label="Registrar cliente" no-caps to="/empresas?new=1" />
     </PageHeader>
 
     <div class="row q-col-gutter-md">
