@@ -26,6 +26,12 @@ function continueWithGoogle(){
   window.location.assign(`${base}/auth/google/redirect`)
 }
 
+function googleTarget(){
+  const requested=typeof route.query.redirect==='string'?route.query.redirect:''
+  const safeClientTarget=requested.startsWith('/mi-')?requested:'/mi-aplicaciones'
+  return auth.user?.rol==='cliente'?safeClientTarget:auth.user?.rol==='soporte'?'/soporte':(requested||'/')
+}
+
 async function submit(){
   fieldErrors.clear()
   const valid=await formRef.value?.validate()
@@ -37,10 +43,7 @@ async function submit(){
   }
   try{
     await auth.login({...form,codigo_secreto:mode.value==='admin'&&form.codigo_secreto?form.codigo_secreto:null})
-    const requested=typeof route.query.redirect==='string'?route.query.redirect:''
-    const safeClientTarget=requested.startsWith('/mi-')?requested:'/mi-aplicaciones'
-    const target=auth.user?.rol==='cliente'?safeClientTarget:auth.user?.rol==='soporte'?'/soporte':(requested||'/')
-    await router.replace(target)
+    await router.replace(googleTarget())
   }catch(e){
     const message=errorMessage(e)
     fieldErrors.scrollToFirst()
@@ -48,10 +51,18 @@ async function submit(){
   }
 }
 
-onMounted(()=>{
-  warmBackend().catch(()=>{})
+onMounted(async()=>{
+  await warmBackend().catch(()=>{})
   const google=String(route.query.google||'')
-  if(google==='success')$q.notify({type:'positive',message:'Google conectado. Bienvenido a VITI.'})
+  if(google==='success'){
+    const logged=await auth.initialize(true)
+    if(logged){
+      $q.notify({type:'positive',message:'Google conectado. Bienvenido a VITI.'})
+      await router.replace(googleTarget())
+      return
+    }
+    $q.notify({type:'negative',message:'Google validó la cuenta, pero VITI no pudo recuperar la sesión. Inténtalo nuevamente.'})
+  }
   if(google==='needs_access')$q.notify({type:'warning',message:'Esta cuenta de Google todavía no tiene acceso a VITI. Solicita acceso para continuar.'})
   if(google==='not_configured')$q.notify({type:'warning',message:'Google todavía no está configurado en el servidor de VITI.'})
   if(google==='cancelled')$q.notify({type:'info',message:'Inicio con Google cancelado.'})
