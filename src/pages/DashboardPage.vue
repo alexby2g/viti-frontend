@@ -2,6 +2,7 @@
 import { onMounted, ref } from 'vue'
 import { api } from '../boot/axios'
 import PageHeader from '../components/PageHeader.vue'
+import CommandCenterPanel from '../components/CommandCenterPanel.vue'
 import AgrAutopilotPanel from '../components/AgrAutopilotPanel.vue'
 
 const data = ref({ resumen: {}, solicitudes_recientes: [], proyectos_recientes: [], requieren_atencion: [] })
@@ -83,6 +84,8 @@ onMounted(async () => { try { data.value = (await api.get('/dashboard')).data } 
         </q-card>
       </div>
     </div>
+
+    <div class="q-mt-lg"><CommandCenterPanel :dashboard-data="data" /></div>
 
     <div class="q-mt-lg"><AgrAutopilotPanel :dashboard-data="data" /></div>
 
