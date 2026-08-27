@@ -8,6 +8,7 @@ export default defineRouter(({ store }) => {
   const publicRoutes = [
     { path:'/viti', name:'viti-landing', component:() => import('../pages/VitiPremiumLandingPage.vue'), meta:{publicLanding:true} },
     { path:'/viti/planes', name:'viti-plans', component:() => import('../pages/VitiPlansPage.vue'), meta:{publicLanding:true} },
+    { path:'/viti/soluciones/fitfamily', name:'viti-fitfamily-solution', component:() => import('../pages/VitiSolutionFitFamilyPage.vue'), meta:{publicLanding:true} },
     { path:'/planes', redirect:'/viti/planes', meta:{publicLanding:true} },
     { path:'/presentacion', redirect:'/viti', meta:{publicLanding:true} },
   ]
@@ -53,7 +54,7 @@ export default defineRouter(({ store }) => {
   }
 
   router.beforeEach(async (to, from) => {
-    if (to.meta.publicLanding || to.name === 'viti-landing' || to.name === 'viti-plans' || to.name === 'public-no-plan-request') return true
+    if (to.meta.publicLanding || to.name === 'viti-landing' || to.name === 'viti-plans' || to.name === 'viti-fitfamily-solution' || to.name === 'public-no-plan-request') return true
     if (to.name === 'public-request') return true
     if (to.name === 'solicitud-detalle' && to.params.id) return { name:'solicitud-revision', params:{id:to.params.id} }
 
