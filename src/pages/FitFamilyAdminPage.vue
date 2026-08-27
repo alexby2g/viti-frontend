@@ -1,9 +1,12 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue'
 import { Notify } from 'quasar'
+import { useRoute } from 'vue-router'
 import { api } from '../boot/axios'
 
-const applicationId = ref(Number(localStorage.getItem('viti-fitfamily-app-id') || 0) || null)
+const route = useRoute()
+const routeApplicationId = Number(route.query.aplicacion_id || 0)
+const applicationId = ref(Number.isInteger(routeApplicationId) && routeApplicationId > 0 ? routeApplicationId : (Number(localStorage.getItem('viti-fitfamily-app-id') || 0) || null))
 const categories = ref([])
 const products = ref([])
 const loading = ref(false)
@@ -64,7 +67,10 @@ async function saveProduct() {
   finally { saving.value = false }
 }
 function money(value) { return Number(value || 0).toLocaleString('es-BO', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }
-onMounted(loadData)
+onMounted(() => {
+  if (hasApplication.value) localStorage.setItem('viti-fitfamily-app-id', String(applicationId.value))
+  loadData()
+})
 </script>
 
 <template>
