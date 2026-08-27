@@ -9,7 +9,8 @@
     "lint": "eslint .",
     "test:viti-stability": "node scripts/check-viti-stability.mjs",
     "test:viti-public": "node scripts/check-viti-public-presentation.mjs",
-    "test:viti-peluqueria-modules": "node scripts/check-viti-peluqueria-modules.mjs"
+    "test:viti-peluqueria-modules": "node scripts/check-viti-peluqueria-modules.mjs",
+    "test:viti-draft-sync": "node scripts/check-viti-draft-sync.mjs"
   },
   "dependencies": {
     "@quasar/extras": "^1.16.17",
