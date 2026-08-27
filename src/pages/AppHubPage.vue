@@ -8,7 +8,6 @@
       </div>
       <q-btn color="primary" icon="add" label="Nueva aplicación" @click="showNew = true" />
     </div>
-
     <div class="row q-col-gutter-md q-mb-lg">
       <div v-for="stat in stats" :key="stat.label" class="col-12 col-sm-4">
         <q-card flat bordered class="bg-dark"><q-card-section>
@@ -17,7 +16,6 @@
         </q-card-section></q-card>
       </div>
     </div>
-
     <q-card flat bordered class="bg-dark">
       <q-card-section class="row items-center q-gutter-sm">
         <q-input v-model="search" dense outlined class="col" placeholder="Buscar aplicación o plantilla..." clearable>
@@ -47,6 +45,7 @@
               </q-card-section>
               <q-separator dark />
               <q-card-actions align="right">
+                <q-btn v-if="isFitFamily(app)" flat color="positive" label="Administrar" icon="fitness_center" :to="{ name:'fitfamily-admin', query:{ aplicacion_id: app.id } }" />
                 <q-btn flat color="primary" label="Editar" icon="edit" @click="editApp(app)" />
                 <q-btn flat color="secondary" label="Usuarios" icon="group_add" @click="openUsers(app)" />
                 <q-btn flat color="accent" label="Clonar" icon="content_copy" @click="cloneApp(app)" />
@@ -188,6 +187,10 @@ const canCreateApp = computed(() => {
   return true
 })
 
+function isFitFamily (app) {
+  const haystack = `${app?.name || ''} ${app?.slug || ''} ${app?.description || ''}`.toLowerCase()
+  return haystack.includes('fitfamily')
+}
 function notifyError (error, fallback = 'No se pudo completar la operación.') {
   const status = error?.response?.status
   const message = error?.response?.data?.message || error?.response?.data?.error
@@ -197,15 +200,8 @@ function notifyError (error, fallback = 'No se pudo completar la operación.') {
   }
   Notify.create({ type: 'negative', timeout: 6000, message: message || fallback })
 }
-
-function isImageIcon (icon) {
-  return typeof icon === 'string' && /^(https?:\/\/|data:image\/|blob:)/i.test(icon)
-}
-
-function onIconError (event) {
-  event.target.style.display = 'none'
-}
-
+function isImageIcon (icon) { return typeof icon === 'string' && /^(https?:\/\/|data:image\/|blob:)/i.test(icon) }
+function onIconError (event) { event.target.style.display = 'none' }
 function prepareIconFile (file) {
   if (!file || !selected.value) return
   if (file.size > 1024 * 1024) {
@@ -214,13 +210,10 @@ function prepareIconFile (file) {
     return
   }
   const reader = new FileReader()
-  reader.onload = () => {
-    selected.value.icon = String(reader.result || '')
-  }
+  reader.onload = () => { selected.value.icon = String(reader.result || '') }
   reader.onerror = () => Notify.create({ type: 'negative', message: 'No se pudo leer la imagen seleccionada.' })
   reader.readAsDataURL(file)
 }
-
 function normalizeApp (row) {
   return {
     ...row,
@@ -236,7 +229,6 @@ function normalizeApp (row) {
     company_name: row.empresa?.nombre_comercial || ''
   }
 }
-
 async function loadApps () {
   try {
     const { data } = await api.get('/aplicaciones')
@@ -244,7 +236,6 @@ async function loadApps () {
     apps.value = Array.isArray(rows) ? rows.map(normalizeApp) : []
   } catch (e) { console.error(e); apps.value = [] }
 }
-
 async function loadCompanies () {
   try {
     const { data } = await api.get('/empresas')
@@ -252,12 +243,7 @@ async function loadCompanies () {
     companies.value = Array.isArray(rows) ? rows.map(c => ({ id: c.id, name: c.nombre_comercial })) : []
   } catch (e) { console.error(e); companies.value = [] }
 }
-
-async function editApp (app) {
-  selected.value = { ...app, modules: [...(app.modules || [])], configuracion: { ...(app.configuracion || {}) }, icon_file: null }
-  showEdit.value = true
-}
-
+async function editApp (app) { selected.value = { ...app, modules: [...(app.modules || [])], configuracion: { ...(app.configuracion || {}) }, icon_file: null }; showEdit.value = true }
 async function saveApp () {
   try {
     await api.put(`/aplicaciones/${selected.value.id}`, {
@@ -269,88 +255,47 @@ async function saveApp () {
       color_secundario: selected.value.secondary_color,
       modulos: selected.value.modules,
       es_plantilla: selected.value.is_template,
-      configuracion: { ...selected.value.configuracion, habilitada: selected.value.is_active }
+      configuracion: selected.value.configuracion,
     })
-    await loadApps(); showEdit.value = false
-    Notify.create({ type: 'positive', message: 'Aplicación actualizada correctamente.' })
-  } catch (e) { console.error(e); notifyError(e) }
+    Notify.create({ type: 'positive', message: 'Aplicación actualizada.' })
+    showEdit.value = false
+    await loadApps()
+  } catch (e) { notifyError(e, 'No se pudo actualizar la aplicación.') }
 }
-
-async function openUsers (app) {
-  selected.value = app
-  userSearch.value = ''
-  try {
-    const detailResponse = await api.get(`/aplicaciones/${app.id}`)
-    const integrated = detailResponse.data?.data?.usuarios ?? []
-    const integratedMap = new Map(integrated.map(u => [u.id, u]))
-
-    // /usuarios ya representa a los usuarios registrados en VITI. No filtramos por
-    // `negocios` porque ese campo no viene garantizado por este endpoint y hacía
-    // desaparecer usuarios válidos del buscador.
-    const usersResponse = await api.get('/usuarios', { params: { per_page: 100 } })
-    const payload = usersResponse.data?.data ?? usersResponse.data ?? []
-    const all = Array.isArray(payload) ? payload : []
-
-    users.value = all.map(u => {
-      const current = integratedMap.get(u.id)
-      const company = u.empresa?.nombre_comercial || u.empresa?.nombre || u.empresa_nombre || ''
-      return {
-        id: u.id,
-        name: `${u.nombre || ''} ${u.apellido || ''}`.trim() || u.usuario || u.username || 'Usuario VITI',
-        email: u.correo || u.email,
-        username: u.usuario || u.username,
-        phone: u.telefono || u.celular,
-        company_name: company,
-        role: current?.pivot?.rol || 'Consulta',
-        integrated: Boolean(current)
-      }
-    })
-  } catch (e) { console.error(e); users.value = []; notifyError(e, 'No se pudieron cargar los usuarios de VITI.') }
-  showUsers.value = true
-}
-
-async function integrateUser (user) {
-  try {
-    await api.put(`/aplicaciones/${selected.value.id}`, { integrar_usuario: true, user_id: user.id, role: user.role.toLowerCase() })
-    user.integrated = true
-    Notify.create({ type: 'positive', message: 'Usuario integrado correctamente.' })
-  } catch (e) { console.error(e); notifyError(e, 'No se pudo integrar el usuario.') }
-}
-
 async function cloneApp (app) {
   try {
-    await api.post('/aplicaciones', {
-      empresa_id: app.empresa_id,
-      nombre: `${app.name} — copia`,
-      descripcion: app.description,
-      clone_from_id: app.id
-    })
+    await api.post(`/aplicaciones/${app.id}/clonar`)
+    Notify.create({ type: 'positive', message: 'Aplicación clonada.' })
     await loadApps()
-    Notify.create({ type: 'positive', message: 'Aplicación clonada correctamente.' })
-  } catch (e) { console.error(e); notifyError(e, 'No se pudo clonar la aplicación.') }
+  } catch (e) { notifyError(e, 'No se pudo clonar la aplicación.') }
 }
-
-async function createApp () {
-  if (!canCreateApp.value) return
+async function loadUsers () {
   try {
-    const payload = {
-      empresa_id: newApp.value.company_id,
-      nombre: newApp.value.name,
-      descripcion: newApp.value.description
-    }
-    if (newApp.value.source === 'Desde plantilla') payload.clone_from_id = newApp.value.template_id
+    const { data } = await api.get('/usuarios')
+    const rows = data.data ?? data
+    users.value = Array.isArray(rows) ? rows : []
+  } catch (e) { console.error(e); users.value = [] }
+}
+async function openUsers (app) { selected.value = app; userSearch.value = ''; await loadUsers(); showUsers.value = true }
+async function integrateUser (user) {
+  if (!selected.value) return
+  try {
+    await api.post(`/aplicaciones/${selected.value.id}/usuarios/${user.id}`, { rol: user.role })
+    user.integrated = true
+    Notify.create({ type: 'positive', message: 'Usuario integrado.' })
+  } catch (e) { notifyError(e, 'No se pudo integrar al usuario.') }
+}
+async function createApp () {
+  try {
+    const payload = { empresa_id: newApp.value.company_id, nombre: newApp.value.name, descripcion: newApp.value.description }
+    if (newApp.value.source === 'Desde plantilla') payload.plantilla_id = newApp.value.template_id
     await api.post('/aplicaciones', payload)
-    newApp.value = { company_id: null, name: '', description: '', source: templates.value.length ? 'Desde plantilla' : 'Aplicación nueva', template_id: null }
+    Notify.create({ type: 'positive', message: 'Aplicación creada.' })
     showNew.value = false
+    newApp.value = { company_id: null, name: '', description: '', source: 'Aplicación nueva', template_id: null }
     await loadApps()
-    Notify.create({ type: 'positive', message: 'Aplicación creada correctamente.' })
-  } catch (e) { console.error(e); notifyError(e, 'No se pudo crear la aplicación.') }
+  } catch (e) { notifyError(e, 'No se pudo crear la aplicación.') }
 }
 
-onMounted(async () => { await Promise.all([loadApps(), loadCompanies()]) })
+onMounted(() => Promise.all([loadApps(), loadCompanies()]))
 </script>
-
-<style scoped>
-.app-card { transition: transform .15s ease, border-color .15s ease; }
-.app-card:hover { transform: translateY(-2px); border-color: rgba(126, 87, 255, .7); }
-</style>
