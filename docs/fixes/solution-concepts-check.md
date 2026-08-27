@@ -1,0 +1,1 @@
+Isolated fix checkpoint for public solution concept actions.
