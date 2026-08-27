@@ -2,6 +2,7 @@
 import { onMounted, ref } from 'vue'
 import { api } from '../boot/axios'
 import PageHeader from '../components/PageHeader.vue'
+import CommandCenterPanel from '../components/CommandCenterPanel.vue'
 import AgrAutopilotPanel from '../components/AgrAutopilotPanel.vue'
 
 const data = ref({ resumen: {}, solicitudes_recientes: [], proyectos_recientes: [], requieren_atencion: [] })
@@ -13,7 +14,7 @@ const agrCreateLoading = ref(false)
 const agrClientForm = ref({ nombre: '', telefono: '', whatsapp: '', correo: '', ciudad: '', direccion: '', observaciones: '' })
 
 const cards = [
-  { key: 'negocios_activos', label: 'Negocios activos', icon: 'business', color: 'blue', to: '/clientes' },
+  { key: 'negocios_activos', label: 'Negocios activos', icon: 'business', color: 'blue', to: '/empresas' },
   { key: 'aplicaciones_activas', label: 'Apps activas', icon: 'apps', color: 'teal', to: '/saas' },
   { key: 'suscripciones_activas', label: 'Suscripciones activas', icon: 'autorenew', color: 'green', to: '/pagos' },
   { key: 'pagos_vencidos', label: 'Pagos con atención', icon: 'schedule', color: 'orange', to: '/pagos' }
@@ -73,7 +74,7 @@ onMounted(async () => { try { data.value = (await api.get('/dashboard')).data } 
   <q-page class="viti-page">
     <q-inner-loading :showing="loading" />
     <PageHeader eyebrow="SaaS" title="Panel VITI" subtitle="La plataforma en una mirada: negocios, aplicaciones, suscripciones y lo que requiere atención.">
-      <q-btn color="primary" unelevated icon="person_add" label="Registrar cliente" no-caps to="/clientes?new=1" />
+      <q-btn color="primary" unelevated icon="person_add" label="Registrar cliente" no-caps to="/empresas?new=1" />
     </PageHeader>
 
     <div class="row q-col-gutter-md">
@@ -83,6 +84,8 @@ onMounted(async () => { try { data.value = (await api.get('/dashboard')).data } 
         </q-card>
       </div>
     </div>
+
+    <div class="q-mt-lg"><CommandCenterPanel :dashboard-data="data" /></div>
 
     <div class="q-mt-lg"><AgrAutopilotPanel :dashboard-data="data" /></div>
 
@@ -124,6 +127,5 @@ onMounted(async () => { try { data.value = (await api.get('/dashboard')).data } 
 </template>
 
 <style scoped>
-.action-card{height:100%;transition:transform .15s ease,box-shadow .15s ease}.action-card:hover{transform:translateY(-2px);box-shadow:0 10px 24px rgba(12,35,64,.08)}
-.agr-card{overflow:hidden}.agr-response{border-radius:16px;background:rgba(25,118,210,.05);padding:16px}.summary-chip{height:100%}
+.action-card{height:100%;transition:transform .15s ease,box-shadow .15s ease}.action-card:hover{transform:translateY(-2px);box-shadow:0 10px 24px rgba(10,40,70,.08)}.stat-value{font-size:30px;font-weight:800}.stat-label{color:var(--viti-muted)}.agr-card{border:1px solid rgba(13,71,161,.12)}.agr-response{border-radius:14px;padding:16px;background:rgba(13,71,161,.04)}.summary-chip{height:100%}
 </style>

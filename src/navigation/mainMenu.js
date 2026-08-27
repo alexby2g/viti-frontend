@@ -30,8 +30,12 @@ export function buildMainMenu({
       { label: 'Mensajes de empresas', icon: 'mark_chat_unread', to: '/buzon', badge: unreadCount },
       { label: 'Casos de soporte', icon: 'build_circle', to: '/mantenimientos' },
     ] },
+    { label: 'Control', icon: 'analytics', children: [
+      { label: 'Centro de actividad', icon: 'notifications_active', to: '/actividad', badge: unreadCount },
+      { label: 'Centro de monitoreo', icon: 'monitor_heart', to: '/monitor' },
+      { label: 'Reportes', icon: 'picture_as_pdf', to: '/reportes' },
+    ] },
     { label: 'Archivos', icon: 'folder', children: [{ label: 'Archivos de empresas', icon: 'folder_shared', to: '/archivos' }] },
-    { label: 'Control', icon: 'analytics', children: [{ label: 'Reportes', icon: 'picture_as_pdf', to: '/reportes' }] },
     { label: guideLabel, icon: 'help_center', to: '/guia-viti' },
   ]
 
@@ -47,15 +51,15 @@ export function buildMainMenu({
         { label: `Pagos ${productName}`, icon: 'payments', to: '/pagos' },
       ],
     })
-    const files = operational.find(item => item.label === 'Archivos')
-    if (files) files.children.push({ label: 'Salud del sistema', icon: 'health_and_safety', to: '/almacenamiento' })
     operational.push({
       label: 'Administración',
       icon: 'admin_panel_settings',
       children: [
         { label: 'Usuarios', icon: 'manage_accounts', to: '/usuarios' },
+        { label: 'Solicitudes de acceso', icon: 'person_add_alt_1', to: '/accesos' },
         { label: 'Auditoría', icon: 'history', to: '/auditoria' },
         { label: 'Marca y apariencia', icon: 'palette', action: 'branding' },
+        { label: 'Almacenamiento', icon: 'cloud_queue', to: '/almacenamiento' },
       ],
     })
   }
