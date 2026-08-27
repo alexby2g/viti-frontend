@@ -1,0 +1,1 @@
+Public concept links are tracked separately from draft-sync recovery.
