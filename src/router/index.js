@@ -5,7 +5,7 @@ import { useAuthStore } from '../stores/auth'
 
 export default defineRouter(({ store }) => {
   const publicRoutes = [
-    { path:'/viti', name:'viti-landing', component:() => import('../pages/VitiPremiumLandingPage.vue'), meta:{publicLanding:true} },
+    { path:'/viti', name:'viti-landing', component:() => import('../pages/VitiPlatformLandingPage.vue'), meta:{publicLanding:true} },
     { path:'/viti/planes', name:'viti-plans', component:() => import('../pages/VitiPlansPage.vue'), meta:{publicLanding:true} },
     { path:'/planes', redirect:'/viti/planes', meta:{publicLanding:true} },
     { path:'/presentacion', redirect:'/viti', meta:{publicLanding:true} },
@@ -34,7 +34,7 @@ export default defineRouter(({ store }) => {
     })
   })
 
-  router.beforeEach(async (to, from) => {
+  router.beforeEach(async (to) => {
     if (to.meta.publicLanding || to.name === 'viti-landing' || to.name === 'viti-plans') return true
 
     const auth = useAuthStore(store)
@@ -45,7 +45,6 @@ export default defineRouter(({ store }) => {
     if (to.meta.requiresAuth) {
       await auth.initialize()
       if (!auth.isAuthenticated) return { name:'login', query:{redirect:to.fullPath} }
-
       if (to.meta.adminOnly && !['superadmin','administrador'].includes(auth.user?.rol)) return { name:'dashboard' }
       if (to.meta.superAdminOnly && auth.user?.rol !== 'superadmin') return { name:'dashboard' }
       if (to.meta.clientOnly && auth.user?.rol !== 'cliente') return { name:'dashboard' }
