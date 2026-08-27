@@ -8,7 +8,7 @@ export default defineRouter(({ store }) => {
   const publicRoutes = [
     { path:'/viti', name:'viti-landing', component:() => import('../pages/VitiPremiumLandingPage.vue'), meta:{publicLanding:true} },
     { path:'/viti/planes', name:'viti-plans', component:() => import('../pages/VitiPlansPage.vue'), meta:{publicLanding:true} },
-    { path:'/viti/soluciones/fitfamily', name:'viti-fitfamily-solution', component:() => import('../pages/VitiSolutionFitFamilyPage.vue'), meta:{publicLanding:true} },
+    { path:'/viti/soluciones/fitfamily', name:'viti-fitfamily-solution', component:() => import('../pages/VitiFitFamilySolutionPage.vue'), meta:{publicLanding:true} },
     { path:'/planes', redirect:'/viti/planes', meta:{publicLanding:true} },
     { path:'/presentacion', redirect:'/viti', meta:{publicLanding:true} },
   ]
@@ -41,9 +41,7 @@ export default defineRouter(({ store }) => {
 
   router.addRoute({ path:'/solicitudes/:id/revision', name:'solicitud-revision', component:() => import('../pages/SolicitudRevisionPage.vue'), meta:{requiresAuth:true,adminOnly:true} })
   router.addRoute({ path:'/monitor', name:'monitor', component:() => import('../pages/MonitorPage.vue'), meta:{requiresAuth:true,adminOnly:true} })
-
   router.addRoute({ path:'/apps/fitfamily', name:'fitfamily-admin', component:() => import('../pages/FitFamilyAdminPage.vue'), meta:{requiresAuth:true,adminOnly:true,appShell:'fitfamily-admin'} })
-
   router.addRoute({ path:'/solicitud/sin-plan', name:'public-no-plan-request', component:() => import('../pages/VitiNoPlanRequestPage.vue'), meta:{publicLanding:true} })
 
   const homeFor = (user) => {
