@@ -1,0 +1,1 @@
+The public solution cards need real navigation.
