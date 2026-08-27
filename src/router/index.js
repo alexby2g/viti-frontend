@@ -92,7 +92,7 @@ export default defineRouter(({ store }) => {
       if (auth.user?.rol === 'cliente') {
         const tenant = useTenantStore(store)
         if (!tenant.loaded) {
-          try { await tenant.load() } catch { }
+          try { await tenant.load() } catch { /* la pantalla mostrará su error de disponibilidad */ }
         }
       }
       if (auth.user?.rol === 'soporte' && !to.meta.supportOnly) return { name:'support-internal-home' }
