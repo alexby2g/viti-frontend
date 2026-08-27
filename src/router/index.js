@@ -11,7 +11,7 @@ export default defineRouter(({ store }) => {
     { path:'/planes', redirect:'/viti/planes', meta:{publicLanding:true} },
     { path:'/presentacion', redirect:'/viti', meta:{publicLanding:true} },
   ]
-  const router = createRouter({ history: createWebHistory(), routes:[...publicRoutes, ...routes] })
+  const router = createRouter({ history:createWebHistory(), routes:[...publicRoutes, ...routes] })
 
   if (router.hasRoute('public-request')) router.removeRoute('public-request')
   router.addRoute({
@@ -27,26 +27,26 @@ export default defineRouter(({ store }) => {
     { name:'client-messages', path:'/mi-buzon', component:() => import('../pages/ClientMessagesPage.vue') },
     { name:'client-billing', path:'/mi-pagos', component:() => import('../pages/ClientBillingPage.vue') },
   ]
-  clientHubRoutes.forEach(({ name, path, component }) => {
+  clientHubRoutes.forEach(({name,path,component}) => {
     if (router.hasRoute(name)) router.removeRoute(name)
     router.addRoute({
       path,
       component:() => import('../layouts/ClientHubLayout.vue'),
       meta:{requiresAuth:true,clientOnly:true},
-      children:[{ path:'', name, component, meta:{requiresAuth:true,clientOnly:true} }],
+      children:[{path:'',name,component,meta:{requiresAuth:true,clientOnly:true}}],
     })
   })
 
-  const redirectAlias = (to, targetBase, fallback='inicio') => {
+  const redirectAlias = (to,targetBase,fallback='inicio') => {
     const raw = to.params.pathMatch
     const tail = Array.isArray(raw) ? raw.join('/') : String(raw || fallback)
-    return { path:`${targetBase}/${tail || fallback}`, query:to.query, hash:to.hash }
+    return {path:`${targetBase}/${tail || fallback}`,query:to.query,hash:to.hash}
   }
 
-  router.addRoute({ path:'/apps/aires/:pathMatch(.*)*', redirect:to => redirectAlias(to, '/apps/electrofrio') })
-  router.addRoute({ path:'/mi-apps/aires/:pathMatch(.*)*', redirect:to => redirectAlias(to, '/mi-apps/electrofrio') })
-  router.addRoute({ path:'/portal/aires/:pathMatch(.*)*', redirect:to => redirectAlias(to, '/portal/electrofrio') })
-  router.addRoute({ path:'/aires/acceso', redirect:'/electrofrio/acceso' })
+  router.addRoute({path:'/apps/aires/:pathMatch(.*)*',redirect:to=>redirectAlias(to,'/apps/electrofrio')})
+  router.addRoute({path:'/mi-apps/aires/:pathMatch(.*)*',redirect:to=>redirectAlias(to,'/mi-apps/electrofrio')})
+  router.addRoute({path:'/portal/aires/:pathMatch(.*)*',redirect:to=>redirectAlias(to,'/portal/electrofrio')})
+  router.addRoute({path:'/aires/acceso',redirect:'/electrofrio/acceso'})
 
   router.addRoute({
     path:'/solicitudes/:id/revision',
@@ -62,30 +62,41 @@ export default defineRouter(({ store }) => {
     meta:{requiresAuth:true,adminOnly:true},
   })
 
+  router.addRoute({
+    path:'/apps/fitfamily',
+    component:() => import('../layouts/MainLayout.vue'),
+    meta:{requiresAuth:true,adminOnly:true},
+    children:[{
+      path:'',
+      name:'fitfamily-admin',
+      component:() => import('../pages/FitFamilyAdminPage.vue'),
+      meta:{requiresAuth:true,adminOnly:true},
+    }],
+  })
+
   const homeFor = (user) => {
-    if (user?.rol === 'cliente_negocio') return { name:'electro-customer-home' }
-    if (user?.rol === 'cliente') return { name:'client-portal' }
-    if (user?.rol === 'soporte') return { name:'support-internal-home' }
-    return { name:'dashboard' }
+    if (user?.rol === 'cliente_negocio') return {name:'electro-customer-home'}
+    if (user?.rol === 'cliente') return {name:'client-portal'}
+    if (user?.rol === 'soporte') return {name:'support-internal-home'}
+    return {name:'dashboard'}
   }
 
-  router.beforeEach(async (to, from) => {
+  router.beforeEach(async (to,from) => {
     if (to.meta.publicLanding || to.name === 'viti-landing' || to.name === 'viti-plans') return true
-
     if (to.name === 'public-request') return true
 
     if (to.name === 'solicitud-detalle' && to.params.id) {
-      return { name:'solicitud-revision', params:{ id:to.params.id } }
+      return {name:'solicitud-revision',params:{id:to.params.id}}
     }
 
     const auth = useAuthStore(store)
     if (auth.setupRequired === null) await auth.checkSetup()
-    if (auth.setupRequired && to.name !== 'setup') return { name:'setup' }
-    if (!auth.setupRequired && to.name === 'setup') return auth.isAuthenticated ? homeFor(auth.user) : { name:'login' }
+    if (auth.setupRequired && to.name !== 'setup') return {name:'setup'}
+    if (!auth.setupRequired && to.name === 'setup') return auth.isAuthenticated ? homeFor(auth.user) : {name:'login'}
 
     if (to.meta.requiresAuth) {
       await auth.initialize()
-      if (!auth.isAuthenticated) return { name:to.meta.electroCustomerOnly ? 'electro-customer-login' : 'login', query:{ redirect:to.fullPath } }
+      if (!auth.isAuthenticated) return {name:to.meta.electroCustomerOnly ? 'electro-customer-login' : 'login',query:{redirect:to.fullPath}}
 
       if (to.meta.supportOnly && auth.user?.rol !== 'soporte') return homeFor(auth.user)
       if (to.meta.adminOnly && !['superadmin','administrador'].includes(auth.user?.rol)) return homeFor(auth.user)
@@ -100,15 +111,15 @@ export default defineRouter(({ store }) => {
         }
       }
 
-      if (auth.user?.rol === 'soporte' && !to.meta.supportOnly) return { name:'support-internal-home' }
-      if (!to.meta.electroCustomerOnly && auth.user?.rol === 'cliente_negocio') return { name:'electro-customer-home' }
+      if (auth.user?.rol === 'soporte' && !to.meta.supportOnly) return {name:'support-internal-home'}
+      if (!to.meta.electroCustomerOnly && auth.user?.rol === 'cliente_negocio') return {name:'electro-customer-home'}
     }
 
     const leavingDeliveredApp = Boolean(from.meta.appShell) && !to.meta.appShell && auth.isAuthenticated
     if (leavingDeliveredApp) {
       const explicit = sessionStorage.getItem('viti-app-explicit-exit') === '1'
       sessionStorage.removeItem('viti-app-explicit-exit')
-      if (!explicit) return { path:from.fullPath, replace:true }
+      if (!explicit) return {path:from.fullPath,replace:true}
     }
 
     if (['login','client-register','electro-customer-login'].includes(to.name)) {
