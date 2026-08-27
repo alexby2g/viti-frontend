@@ -1,1 +1,0 @@
-<template><q-page padding><div class="q-pa-md"><h1>Control de aplicaciones</h1></div></q-page></template>
