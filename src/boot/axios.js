@@ -1,5 +1,6 @@
 import { boot } from 'quasar/wrappers'
 import axios from 'axios'
+import { installVitiDraftSync } from '../utils/vitiDraftSync'
 
 const isDevelopment = import.meta.env.DEV
 const baseURL = import.meta.env.VITE_API_URL || (isDevelopment ? 'http://localhost:8000/api/v1' : '/api/v1')
@@ -140,5 +141,7 @@ api.interceptors.response.use(
     }
   },
 )
+
+installVitiDraftSync(api)
 
 export default boot(({ app }) => { app.config.globalProperties.$api = api })
