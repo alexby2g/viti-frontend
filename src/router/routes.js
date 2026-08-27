@@ -124,6 +124,7 @@ export default [
       { path: 'proyectos', name: 'proyectos', component: () => import('../pages/ProyectosPage.vue'), meta:{adminOnly:true} },
       { path: 'proyectos/:id', name: 'proyecto-detalle', component: () => import('../pages/ProyectoDetallePage.vue'), meta:{adminOnly:true} },
       { path: 'aplicaciones', name: 'aplicaciones', component: () => import('../pages/AplicacionesPage.vue'), meta:{adminOnly:true} },
+      { path: 'aplicaciones/:id/moldeador', name: 'aplicacion-moldeador', component: () => import('../pages/MoldeadorAplicacionPage.vue'), meta:{adminOnly:true} },
       { path: 'apphub', name: 'apphub', component: () => import('../pages/AppHubPage.vue'), meta:{adminOnly:true,superAdminOnly:true} },
       { path: 'apps/externa/:id', name: 'external-app', component: () => import('../pages/ExternalAppPage.vue') },
       { path: 'saas', name: 'saas', component: () => import('../pages/SaasPage.vue'), meta:{adminOnly:true,superAdminOnly:true} },
