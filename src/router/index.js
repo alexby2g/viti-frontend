@@ -62,6 +62,14 @@ export default defineRouter(({ store }) => {
     meta:{requiresAuth:true,adminOnly:true},
   })
 
+  // Historical recovery: evaluate the need before selecting a paid plan.
+  router.addRoute({
+    path:'/solicitud/sin-plan',
+    name:'public-no-plan-request',
+    component:() => import('../pages/VitiNoPlanRequestPage.vue'),
+    meta:{publicLanding:true},
+  })
+
   const homeFor = (user) => {
     if (user?.rol === 'cliente_negocio') return { name:'electro-customer-home' }
     if (user?.rol === 'cliente') return { name:'client-portal' }
@@ -70,7 +78,7 @@ export default defineRouter(({ store }) => {
   }
 
   router.beforeEach(async (to, from) => {
-    if (to.meta.publicLanding || to.name === 'viti-landing' || to.name === 'viti-plans') return true
+    if (to.meta.publicLanding || to.name === 'viti-landing' || to.name === 'viti-plans' || to.name === 'public-no-plan-request') return true
 
     if (to.name === 'public-request') return true
 

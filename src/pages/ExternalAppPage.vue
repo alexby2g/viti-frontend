@@ -13,7 +13,7 @@ const frameLoaded = ref(false)
 const application = ref(null)
 const error = ref('')
 
-const isAdmin = computed(() => auth.user?.rol === 'superadmin')
+const isAdmin = computed(() => ['superadmin', 'administrador'].includes(auth.user?.rol))
 const backPath = computed(() => isAdmin.value ? '/aplicaciones' : '/mi-aplicaciones')
 const safeUrl = computed(() => {
   const value = application.value?.url_externa || application.value?.url
