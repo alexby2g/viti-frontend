@@ -1,0 +1,1 @@
+This is an isolated public UX fix for VITI solution concept actions.
