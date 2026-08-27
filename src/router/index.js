@@ -10,7 +10,6 @@ export default defineRouter(({ store }) => {
     { path:'/viti/planes', name:'viti-plans', component:() => import('../pages/VitiPlansPage.vue'), meta:{publicLanding:true} },
     { path:'/viti/acceso', name:'viti-access-landing', component:() => import('../pages/VitiAccessPage.vue'), meta:{publicLanding:true} },
     { path:'/planes', redirect:'/viti/planes', meta:{publicLanding:true} },
-    { path:'/acceso', redirect:'/viti/acceso', meta:{publicLanding:true} },
     { path:'/presentacion', redirect:'/viti', meta:{publicLanding:true} },
   ]
   const router = createRouter({ history:createWebHistory(), routes:[...publicRoutes, ...routes] })
