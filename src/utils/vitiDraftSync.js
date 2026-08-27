@@ -5,6 +5,11 @@ function getDefaultStorage() {
   return localStorage
 }
 
+function normalizeRevision(value) {
+  const revision = Number(value || 0)
+  return Number.isFinite(revision) && revision >= 0 ? revision : 0
+}
+
 export function draftStorageKey(token) {
   const value = String(token || '').trim()
   if (!value) throw new Error('El token de la solicitud es obligatorio.')
@@ -31,7 +36,7 @@ export function createDraftSync(token, storage = getDefaultStorage()) {
     if (!storage) return false
     const draft = {
       ...payload,
-      server_revision: Number(payload?.server_revision || 0),
+      server_revision: normalizeRevision(payload?.server_revision),
       saved_at: payload?.saved_at || new Date().toISOString(),
       dirty: payload?.dirty !== false,
     }
@@ -51,18 +56,30 @@ export function createDraftSync(token, storage = getDefaultStorage()) {
   function hasConflict(serverRevision) {
     const draft = read()
     if (!draft?.dirty) return false
-    return Number(draft.server_revision || 0) !== Number(serverRevision || 0)
+    return normalizeRevision(draft.server_revision) !== normalizeRevision(serverRevision)
+  }
+
+  function status(serverRevision = null, online = true) {
+    const draft = read()
+    if (!online) return draft?.dirty ? 'offline-pending' : 'offline'
+    if (!draft) return 'empty'
+    if (draft.dirty && serverRevision != null && hasConflict(serverRevision)) return 'conflict'
+    return draft.dirty ? 'pending' : 'synced'
   }
 
   function markSynced(serverRevision, payload = {}) {
-    return write({ ...payload, server_revision: Number(serverRevision || 0), dirty: false })
+    return write({ ...payload, server_revision: normalizeRevision(serverRevision), dirty: false })
   }
 
   function markDirty(serverRevision, payload = {}) {
-    return write({ ...payload, server_revision: Number(serverRevision || 0), dirty: true })
+    return write({ ...payload, server_revision: normalizeRevision(serverRevision), dirty: true })
   }
 
-  return { key, read, write, clear, hasConflict, markSynced, markDirty }
+  function recoverServer(serverRevision, payload = {}) {
+    return markSynced(serverRevision, payload)
+  }
+
+  return { key, read, write, clear, hasConflict, status, markSynced, markDirty, recoverServer }
 }
 
 export default createDraftSync
