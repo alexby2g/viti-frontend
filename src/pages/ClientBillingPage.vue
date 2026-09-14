@@ -80,10 +80,21 @@ onMounted(load)
   <q-inner-loading :showing="loading"/>
 
   <template v-if="!loading">
+    <q-card flat class="viti-card payment-guide q-mb-lg">
+      <q-card-section>
+        <div class="section-label">Cómo funcionan tus pagos</div>
+        <div class="text-h6 text-weight-bold">Implementación y suscripción son conceptos distintos.</div>
+        <div class="payment-guide-grid q-mt-md">
+          <div><q-icon name="construction" color="primary" size="24px"/><div><b>Implementación</b><span>Es el trabajo inicial de análisis, configuración, personalización y puesta en marcha. Puede pagarse de contado o por etapas según el acuerdo.</span></div></div>
+          <div><q-icon name="autorenew" color="primary" size="24px"/><div><b>Suscripción VITI</b><span>Es el servicio recurrente que mantiene la plataforma, alojamiento, base de datos, respaldos, actualizaciones generales y soporte según tu plan.</span></div></div>
+        </div>
+        <q-banner rounded class="bg-blue-1 text-primary q-mt-md"><template #avatar><q-icon name="info"/></template>La suscripción no significa volver a pagar el desarrollo cada mes. Solo se cobra el servicio recurrente acordado después de la activación o periodo de prueba.</q-banner>
+      </q-card-section>
+    </q-card>
     <q-banner rounded class="bg-blue-1 text-primary q-mb-lg">
       <template #avatar><q-icon name="verified_user"/></template>
       <div class="text-weight-bold">El pago no se aplica automáticamente al subir una imagen.</div>
-      <div class="text-caption">Tu comprobante queda como <strong>Pendiente de revisión</strong>. Cuando AGR Studio lo confirme, VITI actualizará el monto pagado y el saldo.</div>
+      <div class="text-caption">Tu comprobante queda como <strong>Pendiente de revisión</strong>. Cuando VITI lo confirme, se actualizarán el monto pagado y el saldo.</div>
     </q-banner>
 
     <div class="row q-col-gutter-lg">
@@ -177,7 +188,7 @@ onMounted(load)
           <q-separator/>
           <q-list><q-item><q-item-section avatar><q-icon name="account_balance" color="primary"/></q-item-section><q-item-section><q-item-label caption>Banco</q-item-label><q-item-label class="text-weight-bold">{{data.configuracion?.banco||'Banco Ganadero'}}</q-item-label></q-item-section></q-item><q-item><q-item-section avatar><q-icon name="person" color="primary"/></q-item-section><q-item-section><q-item-label caption>Titular</q-item-label><q-item-label class="text-weight-bold">{{data.configuracion?.titular||'Guzman Ribera Alexander'}}</q-item-label></q-item-section></q-item></q-list>
           <q-card-section v-if="data.configuracion?.observaciones" class="text-body2 text-grey-7">{{data.configuracion.observaciones}}</q-card-section>
-          <q-card-section class="text-caption text-grey-6">Los comprobantes quedan privados dentro de VITI y son visibles para tu negocio y para AGR Studio.</q-card-section>
+          <q-card-section class="text-caption text-grey-6">Los comprobantes quedan privados dentro de VITI y son visibles para tu negocio y para el equipo VITI.</q-card-section>
         </q-card>
       </div>
     </div>
@@ -187,7 +198,7 @@ onMounted(load)
     <q-card style="width:620px;max-width:94vw">
       <q-card-section><div class="section-label">Registrar pago</div><div class="text-h5 text-weight-bold">{{conceptLabel}}</div><div class="text-caption text-grey-6">Importe pendiente: {{money(expectedAmount)}}</div></q-card-section>
       <q-separator/>
-      <q-card-section><q-banner rounded class="bg-orange-1 text-orange-10 q-mb-md"><template #avatar><q-icon name="hourglass_top"/></template>Al enviar el comprobante quedará pendiente de revisión. No se descontará del saldo hasta que AGR Studio lo confirme.</q-banner><div class="row q-col-gutter-md"><div class="col-12 col-sm-6"><q-input v-model.number="form.monto" outlined type="number" min="0.01" :max="expectedAmount" :readonly="paymentKind==='subscription'" label="Monto pagado (Bs)"/></div><div class="col-12 col-sm-6"><q-select v-model="form.metodo" outlined emit-value map-options :options="[{label:'QR',value:'qr'},{label:'Transferencia',value:'transferencia'},{label:'Efectivo',value:'efectivo'},{label:'Otro',value:'otro'}]" label="Método de pago"/></div><div class="col-12 col-sm-6"><q-input v-model="form.fecha_pago" outlined type="date" stack-label label="Fecha del pago"/></div><div class="col-12 col-sm-6"><q-input v-model="form.referencia" outlined label="Referencia / Nro. operación"/></div><div class="col-12"><q-file v-model="proof" outlined clearable accept="image/png,image/jpeg,image/webp,application/pdf" :label="requiresProof?'Comprobante *':'Comprobante (opcional para efectivo)'"><template #prepend><q-icon name="attach_file"/></template></q-file><div class="text-caption text-grey-6 q-mt-xs">JPG, PNG, WEBP o PDF. Máximo 5 MB.</div></div><div class="col-12"><q-input v-model="form.observaciones" outlined type="textarea" autogrow label="Observaciones opcionales"/></div></div></q-card-section>
+      <q-card-section><q-banner rounded class="bg-orange-1 text-orange-10 q-mb-md"><template #avatar><q-icon name="hourglass_top"/></template>Al enviar el comprobante quedará pendiente de revisión. No se descontará del saldo hasta que VITI lo confirme.</q-banner><div class="row q-col-gutter-md"><div class="col-12 col-sm-6"><q-input v-model.number="form.monto" outlined type="number" min="0.01" :max="expectedAmount" :readonly="paymentKind==='subscription'" label="Monto pagado (Bs)"/></div><div class="col-12 col-sm-6"><q-select v-model="form.metodo" outlined emit-value map-options :options="[{label:'QR',value:'qr'},{label:'Transferencia',value:'transferencia'},{label:'Efectivo',value:'efectivo'},{label:'Otro',value:'otro'}]" label="Método de pago"/></div><div class="col-12 col-sm-6"><q-input v-model="form.fecha_pago" outlined type="date" stack-label label="Fecha del pago"/></div><div class="col-12 col-sm-6"><q-input v-model="form.referencia" outlined label="Referencia / Nro. operación"/></div><div class="col-12"><q-file v-model="proof" outlined clearable accept="image/png,image/jpeg,image/webp,application/pdf" :label="requiresProof?'Comprobante *':'Comprobante (opcional para efectivo)'"><template #prepend><q-icon name="attach_file"/></template></q-file><div class="text-caption text-grey-6 q-mt-xs">JPG, PNG, WEBP o PDF. Máximo 5 MB.</div></div><div class="col-12"><q-input v-model="form.observaciones" outlined type="textarea" autogrow label="Observaciones opcionales"/></div></div></q-card-section>
       <q-card-actions align="right"><q-btn flat no-caps label="Cancelar" v-close-popup/><q-btn color="primary" unelevated no-caps icon="upload_file" label="Enviar comprobante" :loading="sending" @click="sendProof"/></q-card-actions>
     </q-card>
   </q-dialog>
@@ -195,5 +206,5 @@ onMounted(load)
 </template>
 
 <style scoped>
-.next-payment{background:var(--viti-surface-soft)}.qr-stage{display:flex;align-items:center;justify-content:center;padding:14px;border-radius:14px;background:#fff}.qr-img{display:block;width:100%;max-width:340px;height:auto;object-fit:contain;background:#fff}.sticky-card{position:sticky;top:84px}.empty-state{min-height:300px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;color:var(--viti-muted)}@media(max-width:1023px){.sticky-card{position:static}}
+.payment-guide{border:1px solid var(--viti-border)}.payment-guide-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}.payment-guide-grid>div{display:flex;align-items:flex-start;gap:11px;padding:14px;border-radius:13px;background:var(--viti-surface-soft)}.payment-guide-grid b,.payment-guide-grid span{display:block}.payment-guide-grid span{margin-top:4px;color:var(--viti-muted);font-size:12px;line-height:1.55}.next-payment{background:var(--viti-surface-soft)}.qr-stage{display:flex;align-items:center;justify-content:center;padding:14px;border-radius:14px;background:#fff}.qr-img{display:block;width:100%;max-width:340px;height:auto;object-fit:contain;background:#fff}.sticky-card{position:sticky;top:84px}.empty-state{min-height:300px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;color:var(--viti-muted)}@media(max-width:1023px){.sticky-card{position:static}.payment-guide-grid{grid-template-columns:1fr}}
 </style>

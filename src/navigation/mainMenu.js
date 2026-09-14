@@ -2,63 +2,56 @@ export function buildMainMenu({
   isClient,
   isSuperAdmin,
   hasClientProfile,
+  hasBusiness,
   isManager,
   unreadCount = 0,
   productName = 'VITI',
 }) {
-  const guideLabel = `Guía ${productName}`
-
   if (isClient) {
     const items = []
     if (hasClientProfile) items.push({ label: 'Mi espacio', icon: 'home', to: '/mi-cuenta' })
-    items.push({ label: 'Mi aplicación', icon: 'apps', to: '/mi-aplicaciones' })
-    if (isManager || hasClientProfile) items.push({ label: 'Mi proyecto', icon: 'account_tree', to: '/mi-proyecto' })
-    if (hasClientProfile) items.push({ label: 'Atención al cliente', icon: 'support_agent', to: '/mi-buzon', badge: unreadCount })
+    if (hasBusiness) items.push({ label: 'Mis sistemas', icon: 'grid_view', to: '/mi-aplicaciones' })
+    if (hasBusiness && (isManager || hasClientProfile)) items.push({ label: 'Mi proyecto', icon: 'account_tree', to: '/mi-proyecto' })
+    if (hasClientProfile) items.push({ label: 'Atención', icon: 'forum', to: '/mi-buzon', badge: unreadCount })
     if (hasClientProfile) items.push({ label: 'Nueva solicitud', icon: 'add_circle', action: 'request' })
     return items
   }
 
-  const operational = [
-    { label: 'Inicio', icon: 'dashboard', to: '/' },
+  const items = [
+    { label: 'Centro VITI', icon: 'space_dashboard', to: '/' },
+    { label: 'Solicitudes', icon: 'fact_check', to: '/solicitudes' },
+    { label: 'Proyectos', icon: 'account_tree', to: '/proyectos' },
     { label: 'Empresas', icon: 'business', to: '/empresas' },
-    { label: 'Desarrollo', icon: 'terminal', children: [
-      { label: 'Solicitudes', icon: 'fact_check', to: '/solicitudes' },
-      { label: 'Proyectos', icon: 'account_tree', to: '/proyectos' },
-      { label: 'Aplicaciones', icon: 'apps', to: '/aplicaciones' },
-    ] },
+    { label: 'Sistemas', icon: 'grid_view', to: '/aplicaciones' },
     { label: 'Atención', icon: 'forum', children: [
-      { label: 'Mensajes de empresas', icon: 'mark_chat_unread', to: '/buzon', badge: unreadCount },
-      { label: 'Casos de soporte', icon: 'build_circle', to: '/mantenimientos' },
+      { label: 'Mensajes', icon: 'mark_chat_unread', to: '/buzon', badge: unreadCount },
+      { label: 'Soporte', icon: 'support_agent', to: '/mantenimientos' },
     ] },
-    { label: 'Archivos', icon: 'folder', children: [{ label: 'Archivos de empresas', icon: 'folder_shared', to: '/archivos' }] },
-    { label: 'Control', icon: 'analytics', children: [{ label: 'Reportes', icon: 'picture_as_pdf', to: '/reportes' }] },
-    { label: guideLabel, icon: 'help_center', to: '/guia-viti' },
   ]
 
   if (isSuperAdmin) {
-    const development = operational.find(item => item.label === 'Desarrollo')
-    if (development) development.children.push({ label: 'AppHub', icon: 'hub', to: '/apphub' })
-
-    operational.splice(1, 0, {
+    items.splice(5, 0, {
       label: 'Planes y cobros',
-      icon: 'hub',
+      icon: 'sell',
       children: [
-        { label: 'Planes y módulos', icon: 'cloud_circle', to: '/saas' },
-        { label: `Pagos ${productName}`, icon: 'payments', to: '/pagos' },
+        { label: 'Planes y precios', icon: 'sell', to: '/saas' },
+        { label: `Pagos ${productName}`, icon: 'receipt_long', to: '/pagos' },
       ],
     })
-    const files = operational.find(item => item.label === 'Archivos')
-    if (files) files.children.push({ label: 'Salud del sistema', icon: 'health_and_safety', to: '/almacenamiento' })
-    operational.push({
+    items.push({
       label: 'Administración',
       icon: 'admin_panel_settings',
       children: [
         { label: 'Usuarios', icon: 'manage_accounts', to: '/usuarios' },
+        { label: 'Formularios VITI', icon: 'dynamic_form', to: '/formularios-viti' },
+        { label: 'Archivos', icon: 'folder_shared', to: '/archivos' },
+        { label: 'Reportes', icon: 'analytics', to: '/reportes' },
         { label: 'Auditoría', icon: 'history', to: '/auditoria' },
+        { label: 'Salud del sistema', icon: 'health_and_safety', to: '/almacenamiento' },
         { label: 'Marca y apariencia', icon: 'palette', action: 'branding' },
       ],
     })
   }
 
-  return operational
+  return items
 }

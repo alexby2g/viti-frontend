@@ -33,7 +33,7 @@ export function resolveAgr006LocalAction(input: string): Agr006LocalAction {
     return { type: 'navigate', to: '/empresas?new=1', label: 'Abriendo el formulario para registrar una empresa.' }
   }
   if (hasAny(text, ['crear solicitud', 'crear una solicitud', 'nueva solicitud', 'registrar solicitud'])) {
-    return { type: 'navigate', to: '/solicitudes?new=1', label: 'Abriendo el formulario para crear una solicitud.' }
+    return { type: 'navigate', to: '/solicitud', label: 'Abriendo el formulario para crear una solicitud.' }
   }
 
   const openVerb = hasAny(text, [

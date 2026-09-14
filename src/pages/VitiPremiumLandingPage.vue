@@ -8,10 +8,10 @@ const solutions = [
 ]
 
 const flow = [
-  ['01','Cuéntanos qué necesitas','Describe tu negocio y el problema que quieres resolver.'],
-  ['02','VITI entiende tu operación','El cuestionario organiza necesidades, procesos y módulos.'],
-  ['03','Creamos la solución','Tu empresa recibe una aplicación configurable dentro de VITI.'],
-  ['04','Operas y creces','Usuarios, datos, módulos y capacidades evolucionan contigo.'],
+  ['01','Crea tu cuenta','Entra a VITI sin elegir un plan ni pagar antes de conocer la propuesta.'],
+  ['02','Cuéntanos tu necesidad','Describe tu negocio y el problema que quieres digitalizar con palabras simples.'],
+  ['03','Recibe una propuesta','AGR Studio analiza, cotiza y convierte la solicitud aprobada en proyecto.'],
+  ['04','Sigue y opera','Controla avances, aplicaciones, pagos y soporte desde tu espacio VITI.'],
 ]
 </script>
 
@@ -28,7 +28,8 @@ const flow = [
         </nav>
         <div class="nav-actions">
           <q-btn flat no-caps color="dark" label="Ingresar" to="/login" />
-          <q-btn unelevated no-caps color="primary" label="Empezar" to="/solicitud/sin-plan" />
+          <q-btn flat no-caps color="primary" label="Probar demo" to="/demo" />
+          <q-btn unelevated no-caps color="primary" label="Crear cuenta" to="/registro" />
         </div>
       </div>
     </header>
@@ -38,14 +39,15 @@ const flow = [
         <div class="shell hero-grid">
           <div class="hero-copy">
             <div class="eyebrow"><q-icon name="auto_awesome" /> AGR Studio · VITI</div>
-            <h1>Tu negocio no necesita otro software.<br><span>Necesita un sistema pensado para él.</span></h1>
-            <p class="hero-lead">VITI convierte una necesidad de negocio en una solución digital operativa: empresa, aplicaciones, usuarios, módulos, datos y seguimiento dentro de una sola plataforma.</p>
+            <h1>Digitalizamos tu negocio.<br><span>VITI convierte una necesidad en una solución.</span></h1>
+            <p class="hero-lead">VITI es el punto de entrada para solicitar, construir y administrar soluciones digitales para microempresas y empresas: desde pedidos y citas hasta inventario, clientes y sistemas personalizados.</p>
             <div class="hero-actions">
-              <q-btn size="lg" color="primary" unelevated no-caps label="Cuéntame qué necesitas" to="/solicitud/sin-plan" />
+              <q-btn size="lg" color="primary" unelevated no-caps label="Crear cuenta sin plan" to="/registro" />
+              <q-btn size="lg" outline color="primary" no-caps label="Probar VITI" to="/demo" />
               <q-btn size="lg" flat color="dark" no-caps label="Ver cómo funciona" href="#como-funciona" />
             </div>
             <div class="hero-points">
-              <span><q-icon name="verified" color="positive" /> Configurable</span>
+              <span><q-icon name="verified" color="positive" /> Cuenta sin plan obligatorio</span>
               <span><q-icon name="shield" color="positive" /> Acceso controlado</span>
               <span><q-icon name="hub" color="positive" /> Multiempresa</span>
             </div>
@@ -72,14 +74,14 @@ const flow = [
 
       <section id="solucion" class="section dark-section">
         <div class="shell split">
-          <div><div class="kicker">No es un sistema prefabricado</div><h2>Es una plataforma para construir la solución que tu negocio necesita.</h2></div>
-          <div class="copy"><p>VITI conecta la identidad del usuario, la empresa y la aplicación. El resultado es un espacio de trabajo que puede tener módulos, permisos y capacidades distintos para cada negocio.</p><p>Por eso Peluquería, ElectroFrío y FitFamily pueden vivir dentro de la misma plataforma sin convertirse en el mismo sistema.</p></div>
+          <div><div class="kicker">No es un sistema prefabricado</div><h2>Un centro comercial y operativo para digitalizar servicios.</h2></div>
+          <div class="copy"><p>Primero registras tu cuenta y explicas lo que necesitas. VITI organiza la solicitud, la propuesta, el proyecto, los pagos, la entrega y el soporte en un mismo espacio.</p><p>Las soluciones reutilizables como Peluquería, ElectroFrío o FitFamily aceleran entregas; los proyectos especiales pueden desarrollarse a medida sin perder el seguimiento central de VITI.</p></div>
         </div>
       </section>
 
       <section id="como-funciona" class="section">
         <div class="shell">
-          <div class="section-heading"><div class="kicker">Cómo funciona</div><h2>De la idea a una operación digital.</h2><p>No necesitas conocer arquitectura, bases de datos ni módulos. VITI traduce tu necesidad a un flujo de trabajo claro.</p></div>
+          <div class="section-heading"><div class="kicker">Cómo funciona</div><h2>De la idea a una operación digital.</h2><p>No necesitas saber de arquitectura, bases de datos ni planes técnicos. Empiezas con una cuenta sencilla y VITI te guía hasta una solución clara.</p></div>
           <div class="flow-grid">
             <article v-for="item in flow" :key="item[0]" class="flow-card"><span>{{ item[0] }}</span><h3>{{ item[1] }}</h3><p>{{ item[2] }}</p></article>
           </div>
@@ -101,7 +103,7 @@ const flow = [
             <div class="kicker">Ejemplo</div>
             <h2>“Necesito un sistema para vender alimentos.”</h2>
             <p>VITI no te obliga a adivinar qué plan corresponde. Puedes explicar primero tu operación y decidir la propuesta después.</p>
-            <q-btn color="primary" unelevated no-caps label="Probar con FitFamily" to="/solicitud/sin-plan" />
+            <q-btn color="primary" unelevated no-caps label="Ver VITI en modo demo" to="/demo" />
           </div>
           <div class="scenario-card">
             <div class="scenario-line"><span>Necesidad</span><b>Productos + compras</b></div>
@@ -114,13 +116,13 @@ const flow = [
 
       <section class="section cta-section">
         <div class="shell cta-card">
-          <div><div class="kicker">VITI · AGR Studio</div><h2>Cuéntanos qué quieres construir.</h2><p>Empieza sin elegir un plan. Primero entendemos tu sistema; después definimos la mejor forma de ponerlo en marcha.</p></div>
-          <div class="cta-actions"><q-btn size="lg" color="primary" unelevated no-caps label="Empezar sin plan" to="/solicitud/sin-plan" /><q-btn size="lg" outline color="primary" no-caps label="Ver planes" to="/viti/planes" /></div>
+          <div><div class="kicker">VITI · AGR Studio</div><h2>Empieza con una cuenta, no con una compra.</h2><p>Regístrate sin plan, explora tu espacio y cuéntanos qué quieres digitalizar. La propuesta y la suscripción se explican antes de contratar.</p></div>
+          <div class="cta-actions"><q-btn size="lg" color="primary" unelevated no-caps label="Crear cuenta sin plan" to="/registro" /><q-btn size="lg" outline color="primary" no-caps label="Probar demo" to="/demo" /><q-btn size="lg" flat color="primary" no-caps label="Ver planes" to="/viti/planes" /></div>
         </div>
       </section>
     </main>
 
-    <footer class="footer"><div class="shell footer-inner"><div><AppBrand/><p>Soluciones digitales profesionales para negocios que quieren crecer.</p></div><div class="footer-links"><router-link to="/viti">VITI</router-link><router-link to="/viti/planes">Planes</router-link><router-link to="/solicitud/sin-plan">Empezar</router-link><router-link to="/login">Ingresar</router-link></div></div></footer>
+    <footer class="footer"><div class="shell footer-inner"><div><AppBrand/><p>Soluciones digitales profesionales para negocios que quieren crecer.</p></div><div class="footer-links"><router-link to="/viti">VITI</router-link><router-link to="/viti/planes">Planes</router-link><router-link to="/registro">Crear cuenta</router-link><router-link to="/demo">Demo</router-link><router-link to="/login">Ingresar</router-link></div></div></footer>
   </div>
 </template>
 

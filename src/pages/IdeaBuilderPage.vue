@@ -1,193 +1,146 @@
 <script setup>
 import { computed, onMounted, reactive, ref } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { useQuasar } from 'quasar'
-import { useRoute } from 'vue-router'
 import { api } from '../boot/axios'
 import AppBrand from '../components/AppBrand.vue'
 
-const $q = useQuasar()
 const route = useRoute()
+const router = useRouter()
+const $q = useQuasar()
 const loading = ref(true)
-const saving = ref(false)
-const submitting = ref(false)
-const sent = ref(false)
+const sending = ref(false)
 const step = ref(1)
-const request = ref(null)
-const plans = ref([])
-const form = reactive({
-  clienteNombre:'', clienteWhatsApp:'', clienteCiudad:'',
-  empresaNombre:'', empresaActividad:'',
-  tituloSistema:'', resumen:'', publico:'', problema:'', vision:'',
-  planId:null, pago:'por_definir', frecuencia:'',
-  declaracion:false, declaracionNombre:'', acuerdo:false, acuerdoNombre:''
-})
+const item = ref(null)
+const billingMode = ref('mensual')
+const accepted = ref(false)
+const form = reactive({ empresa_nombre:'', empresa_actividad:'', titulo:'', resumen:'', plan_id:null })
 
-const currentPlan = computed(() => plans.value.find(p => Number(p.id) === Number(form.planId)) || null)
-const progress = computed(() => step.value === 1 ? 25 : step.value === 2 ? 50 : step.value === 3 ? 75 : 100)
-const suggestions = computed(() => {
-  const text = `${form.tituloSistema} ${form.resumen} ${form.problema}`.toLowerCase()
-  const modules = []
-  const add = (label, why) => { if (!modules.some(m => m.label === label)) modules.push({ label, why }) }
-  if (/producto|venta|comida|alimento|catálogo|catalogo|tienda/.test(text)) {
-    add('Productos y catálogo','Organiza lo que ofreces y qué está disponible.')
-    add('Pedidos y ventas','Registra solicitudes de compra y su estado.')
-    add('Clientes','Centraliza la información de tus compradores.')
-  }
-  if (/cita|agenda|reserva|salón|salon|peluquer/.test(text)) {
-    add('Agenda y citas','Permite reservar y consultar horarios.')
-    add('Clientes','Mantiene el historial de atención.')
-    add('Servicios','Ordena los servicios que ofreces.')
-  }
-  if (/servicio técnico|servicio tecnico|mantenimiento|aire|equipo|técnico|tecnico/.test(text)) {
-    add('Clientes y equipos','Relaciona personas con equipos o servicios.')
-    add('Órdenes de trabajo','Controla el trabajo desde la recepción hasta el cierre.')
-    add('Historial','Conserva antecedentes y seguimiento.')
-  }
-  if (/pago|cobro|saldo|factur/.test(text)) add('Pagos y seguimiento','Controla cobros, saldos o estados de pago.')
-  if (!modules.length) {
-    add('Clientes','Centraliza a las personas que usarán o contratarán tu servicio.')
-    add('Operación principal','Organiza el proceso central de tu negocio.')
-    add('Seguimiento','Permite consultar estados, historial y avances.')
-  }
-  return modules.slice(0,6)
-})
+const plans = computed(() => item.value?.planes_disponibles || [])
+const selectedPlan = computed(() => plans.value.find(p => Number(p.id) === Number(form.plan_id)) || null)
+const companyName = computed(() => item.value?.empresa?.nombre_comercial || 'tu negocio')
+const clientName = computed(() => item.value?.cliente?.nombre || 'Cliente VITI')
 
-function money(v){ return v == null || v === '' ? 'A cotizar' : `${Number(v).toFixed(0)} Bs` }
-function planPrice(plan){ if (!plan) return ''; const base = money(plan.precio_proyecto); return plan.precio_mensual !== null || plan.precio_anual !== null ? `${base} + suscripción` : base }
-
-function validateStep1(){
-  const required = [
-    [form.tituloSistema,'Ponle un nombre a tu sistema.'],
-    [form.resumen,'Cuéntanos en una frase qué hará.'],
-    [form.publico,'Indica para quién es el sistema.'],
-  ]
-  const missing = required.find(([v]) => !String(v || '').trim())
-  if (missing) { $q.notify({type:'warning',message:missing[1]}); return false }
-  return true
-}
-function validateStep2(){
-  if (!String(form.problema || '').trim() || !String(form.vision || '').trim()) { $q.notify({type:'warning',message:'Cuéntanos qué problema quieres resolver y cómo imaginas el resultado.'}); return false }
-  return true
-}
-function validateStep3(){ if (!form.planId) { $q.notify({type:'warning',message:'Selecciona un plan para continuar.'}); return false } return true }
+function money(value){ return value === null || value === undefined || value === '' ? 'A cotizar' : `${Number(value).toFixed(0)} Bs` }
+function choosePlan(plan){ form.plan_id = plan.id }
 function next(){
-  if(step.value===1 && !validateStep1()) return
-  if(step.value===2 && !validateStep2()) return
-  if(step.value===3 && !validateStep3()) return
-  if(step.value<4) step.value++
-  saveDraft()
+  if(step.value===1 && (form.empresa_nombre.trim().length<2 || form.titulo.trim().length<3 || form.resumen.trim().length<8)){
+    $q.notify({type:'warning',message:'Completa el nombre de tu negocio, qué necesitas y qué quieres resolver.'}); return
+  }
+  if(step.value===2 && !selectedPlan.value){ $q.notify({type:'warning',message:'Selecciona un plan o cotización personalizada.'}); return }
+  step.value = Math.min(3, step.value + 1)
 }
-function back(){ if(step.value>1) step.value-- }
+function back(){ if(step.value>1) step.value--; else router.push('/mi-cuenta') }
 
 function payload(){
+  const today = new Date().toISOString().slice(0,10)
+  const p = selectedPlan.value
+  const needsFrequency = p && (p.precio_mensual !== null || p.precio_anual !== null)
   return {
-    registro:{
-      cliente_nombre:form.clienteNombre || request.value?.cliente?.nombre || '',
-      cliente_whatsapp:form.clienteWhatsApp || request.value?.cliente?.whatsapp || '',
-      cliente_ciudad:form.clienteCiudad || request.value?.cliente?.ciudad || '',
-      empresa_nombre:form.empresaNombre || request.value?.empresa?.nombre_comercial || '',
-      empresa_actividad:form.empresaActividad || request.value?.empresa?.actividad || '',
-      titulo_sistema:form.tituloSistema,
-      resumen:[form.resumen, form.problema ? `Problema: ${form.problema}` : '', form.vision ? `Visión: ${form.vision}` : '', form.publico ? `Público: ${form.publico}` : ''].filter(Boolean).join('\n\n')
-    },
-    plan_viti_id:form.planId,
-    forma_pago_preferida:form.pago,
-    frecuencia_suscripcion_preferida:form.frecuencia || null,
-    declaracion_aceptada:form.declaracion,
-    declaracion_nombre:form.declaracionNombre,
-    declaracion_fecha:new Date().toISOString().slice(0,10),
-    acuerdo_comercial_aceptado:form.acuerdo,
-    acuerdo_comercial_nombre:form.acuerdoNombre,
-    acuerdo_comercial_fecha:new Date().toISOString().slice(0,10),
+    plan_viti_id: form.plan_id,
+    forma_pago_preferida: 'por_definir',
+    frecuencia_suscripcion_preferida: needsFrequency ? billingMode.value : null,
+    declaracion_aceptada: accepted.value,
+    declaracion_nombre: clientName.value,
+    declaracion_fecha: today,
+    acuerdo_comercial_aceptado: accepted.value,
+    acuerdo_comercial_nombre: clientName.value,
+    acuerdo_comercial_fecha: today,
+    registro: { empresa_nombre: form.empresa_nombre.trim(), empresa_actividad: form.empresa_actividad.trim() || null, titulo_sistema: form.titulo.trim(), resumen: form.resumen.trim() },
+    respuestas: [],
   }
-}
-
-async function saveDraft(){
-  if(!request.value?.publico_habilitado || saving.value) return
-  saving.value=true
-  try{ await api.put(`/publico/solicitudes/${route.params.token}`,payload(),{timeout:20000}) } catch(e) { /* evita interrumpir la escritura */ } finally { saving.value=false }
 }
 
 async function submit(){
-  if(!validateStep1() || !validateStep2() || !validateStep3()) return
-  if(!form.declaracion || !form.declaracionNombre){$q.notify({type:'warning',message:'Confirma que los datos de la solicitud son correctos.'});return}
-  if(!form.acuerdo || !form.acuerdoNombre){$q.notify({type:'warning',message:'Acepta el acuerdo comercial inicial para enviar la solicitud.'});return}
-  submitting.value=true
+  if(!accepted.value){ $q.notify({type:'warning',message:'Confirma que la información es correcta para enviar.'}); return }
+  sending.value = true
   try{
-    await api.put(`/publico/solicitudes/${route.params.token}`,payload(),{timeout:20000})
-    const {data}=await api.post(`/publico/solicitudes/${route.params.token}/enviar`,{}, {timeout:30000})
-    sent.value=true
-    $q.notify({type:'positive',message:data?.message || 'Solicitud enviada correctamente.'})
-  }catch(e){$q.notify({type:'negative',message:e?.response?.data?.message || 'No pudimos enviar la solicitud.'})}finally{submitting.value=false}
+    await api.put(`/publico/solicitudes/${route.params.token}`, payload(), {timeout:20000})
+    await api.post(`/publico/solicitudes/${route.params.token}/enviar`, {}, {timeout:30000})
+    $q.notify({type:'positive',message:'Solicitud enviada. VITI la revisará contigo.'})
+    router.replace('/mi-cuenta')
+  }catch(error){
+    const errors=error?.response?.data?.errors
+    const first=errors?Object.values(errors).flat()[0]:null
+    $q.notify({type:'negative',message:first||error?.response?.data?.message||'No pudimos enviar la solicitud.'})
+  }finally{ sending.value=false }
 }
 
-async function load(){
-  loading.value=true
+onMounted(async()=>{
   try{
     const {data}=await api.get(`/publico/solicitudes/${route.params.token}`)
-    request.value=data.data
-    plans.value=request.value?.planes_disponibles || []
-    const first = request.value?.respuestas?.find(r=>r.pregunta?.numero===1)?.respuesta_texto || ''
-    form.clienteNombre=request.value?.cliente?.nombre || ''
-    form.clienteWhatsApp=request.value?.cliente?.whatsapp || ''
-    form.clienteCiudad=request.value?.cliente?.ciudad || ''
-    form.empresaNombre=request.value?.empresa?.nombre_comercial || ''
-    form.empresaActividad=request.value?.empresa?.actividad || ''
-    form.tituloSistema=request.value?.titulo || first
-    form.planId=request.value?.plan_viti_id || null
-    form.pago=request.value?.forma_pago_preferida || 'por_definir'
-    form.frecuencia=request.value?.frecuencia_suscripcion_preferida || ''
-    if(request.value?.estado==='en_revision' || request.value?.estado==='aprobada' || request.value?.estado==='convertida') sent.value=true
-  }catch(e){$q.notify({type:'negative',message:e?.response?.data?.message || 'No pudimos cargar esta solicitud.'})}finally{loading.value=false}
-}
-
-onMounted(load)
+    item.value=data?.data||null
+    form.empresa_nombre=item.value?.empresa?.nombre_comercial === 'Mi negocio' ? '' : (item.value?.empresa?.nombre_comercial||'')
+    form.empresa_actividad=item.value?.empresa?.actividad||''
+    form.titulo=item.value?.titulo||''
+    form.resumen=item.value?.resumen||''
+    form.plan_id=item.value?.plan_viti_id||null
+    billingMode.value=item.value?.frecuencia_suscripcion_preferida||'mensual'
+  }catch(error){
+    $q.notify({type:'negative',message:error?.response?.data?.message||'Esta solicitud ya no está disponible.'})
+    router.replace('/mi-cuenta')
+  }finally{ loading.value=false }
+})
 </script>
 
 <template>
-  <q-page class="idea-page">
-    <q-inner-loading :showing="loading" />
-    <div v-if="!loading" class="idea-shell">
-      <header class="idea-header"><AppBrand /><q-badge outline color="primary">Constructor VITI</q-badge></header>
-      <div v-if="sent" class="success-card"><q-icon name="verified" color="positive" size="64px"/><div class="eyebrow">SOLICITUD RECIBIDA</div><h1>Ya tenemos tu idea.</h1><p>AGR Studio revisará la información y te contactará para definir alcance y próximos pasos.</p><div class="code">{{ request?.codigo }}</div></div>
-      <template v-else>
-        <section class="intro"><div class="eyebrow">VITI · CONSTRUCTOR DE IDEA</div><h1>Cuéntanos la idea. No necesitas saber cómo programarla.</h1><p>Primero entendemos tu negocio. Después VITI propone una estructura para que AGR Studio la convierta en un sistema real.</p></section>
-        <div class="progress"><div><span>Paso {{step}} de 4</span><strong>{{progress}}%</strong></div><q-linear-progress rounded :value="progress/100" color="primary" track-color="blue-1" size="8px" /></div>
-        <q-card flat class="idea-card">
-          <q-card-section v-if="step===1" class="q-pa-xl">
-            <div class="step">01 · TU SISTEMA</div><h2>Empieza por la idea, no por los módulos.</h2>
-            <div class="field-grid"><q-input v-model="form.tituloSistema" outlined label="¿Cómo se llamará tu sistema?" placeholder="Ej. FitFamily"/><q-input v-model="form.empresaNombre" outlined label="¿Para qué negocio o proyecto?" placeholder="Ej. FitFamily Store"/></div>
-            <q-input v-model="form.resumen" outlined type="textarea" autogrow class="q-mt-md" label="¿Qué hará principalmente?" placeholder="Ej. Permitirá registrar productos, mostrar un catálogo y recibir pedidos."/>
-            <q-input v-model="form.publico" outlined class="q-mt-md" label="¿Quién lo utilizará?" placeholder="Ej. Clientes de la tienda y personal de ventas"/>
-          </q-card-section>
-          <q-card-section v-else-if="step===2" class="q-pa-xl">
-            <div class="step">02 · TU VISIÓN</div><h2>Cuéntanos qué quieres solucionar.</h2>
-            <q-input v-model="form.problema" outlined type="textarea" autogrow label="¿Qué problema quieres resolver?" placeholder="Ej. Hoy registramos pedidos por WhatsApp y se nos pierden datos."/>
-            <q-input v-model="form.vision" outlined type="textarea" autogrow class="q-mt-md" label="¿Cómo imaginas el resultado?" placeholder="Ej. Quiero que el cliente vea productos, elija lo que necesita y pueda enviar su compra."/>
-            <q-banner rounded class="q-mt-lg hint"><template #avatar><q-icon name="lightbulb" color="primary"/></template>No necesitas conocer términos técnicos. Escríbelo como se lo explicarías a otra persona.</q-banner>
-          </q-card-section>
-          <q-card-section v-else-if="step===3" class="q-pa-xl">
-            <div class="step">03 · PROPUESTA VITI</div><h2>Esto es lo que entendimos.</h2><p class="lead">A partir de lo que nos contaste, VITI propone una primera estructura. AGR Studio podrá ajustarla contigo.</p>
-            <div class="summary"><div><span>Sistema</span><strong>{{form.tituloSistema}}</strong></div><div><span>Necesidad</span><strong>{{form.resumen}}</strong></div><div><span>Público</span><strong>{{form.publico}}</strong></div></div>
-            <div class="module-grid q-mt-lg"><q-card v-for="item in suggestions" :key="item.label" flat bordered><q-card-section><div class="module-title"><q-icon name="check_circle" color="positive"/>{{item.label}}</div><div class="module-copy">{{item.why}}</div></q-card-section></q-card></div>
-            <div class="step q-mt-xl">PLAN</div><div class="row q-col-gutter-md q-mt-sm"><div v-for="plan in plans" :key="plan.id" class="col-12 col-md-6"><q-card flat bordered clickable :class="['plan', {selected:Number(form.planId)===Number(plan.id)}]" @click="form.planId=plan.id"><q-card-section><div class="row items-center"><div class="text-h6 text-weight-bold">{{plan.nombre}}</div><q-space/><q-icon v-if="Number(form.planId)===Number(plan.id)" name="check_circle" color="primary"/></div><div class="text-caption text-grey-7 q-mt-xs">{{plan.descripcion}}</div><div class="text-subtitle1 text-weight-bold q-mt-md">{{planPrice(plan)}}</div></q-card-section></q-card></div></div>
-          </q-card-section>
-          <q-card-section v-else class="q-pa-xl">
-            <div class="step">04 · CONFIRMA</div><h2>Una última revisión y lo enviamos.</h2>
-            <div class="summary"><div><span>Sistema</span><strong>{{form.tituloSistema}}</strong></div><div><span>Plan</span><strong>{{currentPlan?.nombre || 'Sin seleccionar'}}</strong></div><div><span>Pago</span><strong>{{form.pago}}</strong></div></div>
-            <div v-if="currentPlan?.precio_mensual !== null || currentPlan?.precio_anual !== null" class="q-mt-lg"><q-option-group v-model="form.frecuencia" inline :options="[{label:'Mensual',value:'mensual'},{label:'Anual',value:'anual'}]" /></div>
-            <q-select v-model="form.pago" outlined class="q-mt-lg" label="¿Cómo prefieres manejar el pago?" :options="[{label:'Acordarlo con AGR Studio',value:'por_definir'},{label:'Pago completo de implementación',value:'contado'},{label:'50% al iniciar / 50% al entregar',value:'50_50'},{label:'40% / 30% / 30%',value:'tres_partes'}]" emit-value map-options />
-            <q-checkbox v-model="form.declaracion" class="q-mt-md" label="Confirmo que la información enviada es correcta."/><q-input v-model="form.declaracionNombre" outlined label="Escribe tu nombre para confirmar"/>
-            <q-checkbox v-model="form.acuerdo" class="q-mt-md" label="Acepto el acuerdo comercial inicial para que AGR Studio revise la solicitud."/><q-input v-model="form.acuerdoNombre" outlined label="Nombre para el acuerdo"/>
-          </q-card-section>
-          <q-separator/>
-          <q-card-actions class="q-pa-lg" align="between"><q-btn v-if="step>1" flat color="primary" no-caps label="Atrás" @click="back"/><q-space/><q-btn v-if="step<4" color="primary" unelevated no-caps label="Continuar" @click="next"/><q-btn v-else color="primary" unelevated no-caps icon="send" label="Enviar solicitud" :loading="submitting" @click="submit"/></q-card-actions>
-        </q-card>
-      </template>
-    </div>
+  <q-page class="request-page">
+    <q-inner-loading :showing="loading" dark />
+    <header class="request-header">
+      <router-link to="/mi-cuenta" class="brand-link"><AppBrand/></router-link>
+      <div class="step-label">Paso {{step}} de 3</div>
+    </header>
+
+    <main v-if="!loading" class="request-shell">
+      <div class="request-intro">
+        <div class="eyebrow">NUEVA SOLICITUD · {{ companyName }}</div>
+        <h1 v-if="step===1">¿Qué necesitas ahora?</h1>
+        <h1 v-else-if="step===2">Elige el alcance.</h1>
+        <h1 v-else>Revisa y envía.</h1>
+        <p v-if="step===1">No necesitas explicar tecnología. Dinos qué quieres hacer más fácil en tu negocio.</p>
+        <p v-else-if="step===2">El plan sirve como referencia comercial. VITI confirmará el alcance antes de iniciar.</p>
+        <p v-else>Después de enviar, la solicitud aparecerá en tu espacio y VITI la revisará.</p>
+      </div>
+
+      <q-card flat class="request-card">
+        <q-card-section class="q-pa-lg">
+          <div v-if="step===1" class="q-gutter-md">
+            <div class="business-grid"><q-input v-model="form.empresa_nombre" outlined label="Negocio, institución o proyecto *" maxlength="180"/><q-input v-model="form.empresa_actividad" outlined label="¿A qué se dedica? (opcional)" maxlength="200"/></div>
+            <q-input v-model="form.titulo" outlined label="¿Qué sistema o mejora necesitas? *" maxlength="200" />
+            <q-input v-model="form.resumen" outlined type="textarea" autogrow label="¿Qué quieres resolver? *" maxlength="5000" hint="Ej.: organizar pedidos, controlar pagos, recibir reservas o mejorar un sistema que ya uso." />
+          </div>
+
+          <div v-else-if="step===2">
+            <div class="subscription-note"><q-icon name="info"/><div><b>La implementación y la suscripción son cosas distintas.</b><span>La implementación paga el desarrollo inicial. La suscripción mantiene alojamiento, mantenimiento y soporte después de la entrega.</span></div></div><div class="billing-row"><span>Frecuencia de la suscripción</span><q-btn-toggle v-model="billingMode" no-caps unelevated rounded toggle-color="primary" :options="[{label:'Mensual',value:'mensual'},{label:'Anual',value:'anual'}]" /></div>
+            <div class="plan-grid q-mt-md">
+              <button v-for="plan in plans" :key="plan.id" type="button" class="plan-choice" :class="{selected:Number(form.plan_id)===Number(plan.id)}" @click="choosePlan(plan)">
+                <div class="choice-top"><b>{{plan.nombre}}</b><q-icon v-if="Number(form.plan_id)===Number(plan.id)" name="check_circle"/></div>
+                <p>{{plan.descripcion}}</p>
+                <div class="choice-price"><small>Implementación</small><strong>{{money(plan.precio_proyecto)}}</strong></div>
+                <div class="choice-service"><span>Servicio {{billingMode}}</span><b>{{money(billingMode==='anual'?plan.precio_anual:plan.precio_mensual)}}</b></div>
+              </button>
+            </div>
+          </div>
+
+          <div v-else class="review-box">
+            <div><small>NEGOCIO</small><b>{{form.empresa_nombre}}</b><span>{{form.empresa_actividad || 'Actividad por definir'}}</span></div>
+            <div><small>SOLICITUD</small><b>{{form.titulo}}</b><span>{{form.resumen}}</span></div>
+            <div><small>PLAN</small><b>{{selectedPlan?.nombre}}</b><span>{{money(selectedPlan?.precio_proyecto)}} de implementación · {{billingMode}}</span></div>
+            <q-checkbox v-model="accepted" color="orange" label="Confirmo que esta información es correcta y autorizo a VITI a revisarla para preparar el siguiente paso." />
+          </div>
+        </q-card-section>
+      </q-card>
+
+      <div class="request-actions">
+        <q-btn flat no-caps icon="arrow_back" label="Atrás" @click="back" />
+        <q-space/>
+        <q-btn v-if="step<3" color="primary" unelevated no-caps label="Continuar" icon-right="arrow_forward" @click="next" />
+        <q-btn v-else color="primary" unelevated no-caps label="Enviar solicitud" icon-right="send" :loading="sending" @click="submit" />
+      </div>
+    </main>
   </q-page>
 </template>
 
 <style scoped>
-.idea-page{min-height:100vh;background:#f5f9fb;color:#102a43}.idea-shell{width:min(980px,100%);margin:auto;padding:24px 18px 50px}.idea-header{display:flex;align-items:center;justify-content:space-between}.intro{max-width:760px;padding:52px 0 18px}.eyebrow,.step{font-size:10px;font-weight:900;letter-spacing:.16em;text-transform:uppercase;color:#0b7593}.intro h1,.success-card h1{font-size:46px;line-height:1.02;letter-spacing:-.055em;margin:12px 0}.intro p,.lead{font-size:16px;line-height:1.7;color:#60798a}.progress{margin:18px 0}.progress>div{display:flex;justify-content:space-between;font-size:12px;color:#60798a;margin-bottom:7px}.progress strong{color:#102a43}.idea-card{border:1px solid #dce7ec;border-radius:22px;overflow:hidden;background:#fff}.idea-card h2{font-size:30px;line-height:1.1;letter-spacing:-.04em;margin:10px 0 20px}.field-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}.hint{background:#eef7f8;color:#587180}.summary{display:grid;grid-template-columns:1fr 1fr;gap:12px}.summary>div{padding:14px;border-radius:14px;background:#f6fafb}.summary span{display:block;font-size:10px;text-transform:uppercase;letter-spacing:.12em;color:#77909d;font-weight:800}.summary strong{display:block;margin-top:6px;line-height:1.45}.module-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px}.module-title{display:flex;gap:8px;align-items:center;font-weight:800}.module-copy{color:#647d8a;font-size:12px;line-height:1.5;margin-top:7px}.plan.selected{border:2px solid #146ef5}.plan{transition:.16s ease}.success-card{margin:100px auto;max-width:680px;text-align:center;padding:44px;border:1px solid #dce7ec;border-radius:22px;background:#fff}.success-card p{color:#60798a;line-height:1.7}.code{display:inline-block;margin-top:20px;padding:9px 14px;border-radius:10px;background:#eef7f8;color:#075f78;font-weight:900}@media(max-width:700px){.intro h1,.success-card h1{font-size:36px}.field-grid,.summary,.module-grid{grid-template-columns:1fr}.idea-shell{padding:16px 12px 36px}.idea-card h2{font-size:26px}.success-card{margin:50px auto 0;padding:28px 20px}}
+.request-page{min-height:100vh;background:radial-gradient(circle at 90% 5%,rgba(20,87,184,.16),transparent 28rem),linear-gradient(180deg,#06111f,#09192b);color:#edf4fb;padding:0 18px}.request-header{width:min(1120px,100%);min-height:82px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid rgba(102,132,163,.18)}.brand-link{text-decoration:none;color:inherit}.step-label{font-size:11px;color:#9fb1c1;border:1px solid rgba(102,132,163,.24);padding:7px 10px;border-radius:999px}.request-shell{width:min(980px,100%);margin:0 auto;padding:58px 0 78px}.request-intro{max-width:720px}.eyebrow{font-size:11px;font-weight:900;letter-spacing:.14em;color:#f28b30}.request-intro h1{font-size:clamp(38px,5vw,58px);line-height:1;letter-spacing:-.05em;margin:12px 0;color:#f7fbff}.request-intro p{font-size:17px;line-height:1.65;color:#aebdcc}.request-card{margin-top:28px;background:linear-gradient(180deg,#0c2036,#091a2d)!important;color:#edf4fb;border:1px solid rgba(83,116,147,.30);border-radius:22px}.request-card :deep(.q-field--outlined .q-field__control){background:#07192a!important;border-radius:14px}.request-card :deep(.q-field--outlined .q-field__control:before){border-color:#294761!important}.request-card :deep(.q-field--focused .q-field__control:before){border-color:#f28b30!important}.request-card :deep(.q-field__native),.request-card :deep(.q-field__input){color:#edf4fb!important}.request-card :deep(.q-field__label){color:#91a7b9!important}.business-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}.subscription-note{display:flex;gap:10px;padding:13px 14px;margin-bottom:16px;border-radius:13px;background:rgba(20,87,184,.08);border:1px solid rgba(83,116,147,.24);color:#aec0ce}.subscription-note>.q-icon{color:#f28b30;font-size:21px}.subscription-note b,.subscription-note span{display:block}.subscription-note span{font-size:11px;line-height:1.5;color:#93a9ba;margin-top:3px}.billing-row{display:flex;justify-content:space-between;align-items:center;gap:14px;color:#b5c4d1}.plan-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px}.plan-choice{font:inherit;text-align:left;color:#eaf2f9;background:#091c30;border:1px solid #294761;border-radius:17px;padding:18px;cursor:pointer;transition:.18s ease}.plan-choice:hover{transform:translateY(-1px);border-color:#557794}.plan-choice.selected{border-color:#f28b30;background:#102944;box-shadow:0 0 0 1px rgba(242,139,48,.18)}.choice-top{display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:17px}.choice-top .q-icon{color:#f28b30}.plan-choice p{min-height:56px;color:#9fb2c3;font-size:12px;line-height:1.55}.choice-price small,.choice-price strong{display:block}.choice-price small{color:#f28b30;font-size:9px;font-weight:900;letter-spacing:.1em;text-transform:uppercase}.choice-price strong{font-size:23px;margin-top:3px}.choice-service{display:flex;justify-content:space-between;gap:10px;margin-top:12px;padding-top:12px;border-top:1px solid rgba(102,132,163,.17);font-size:11px;color:#9fb2c3}.choice-service b{color:#edf4fb}.review-box{display:grid;gap:12px}.review-box>div{padding:16px;border:1px solid rgba(102,132,163,.2);border-radius:14px;background:rgba(6,21,37,.36)}.review-box small,.review-box b,.review-box span{display:block}.review-box small{color:#f28b30;font-size:9px;font-weight:900;letter-spacing:.1em}.review-box b{margin-top:4px}.review-box span{color:#9fb2c3;font-size:12px;line-height:1.5;margin-top:3px}.request-actions{display:flex;align-items:center;margin-top:18px}.request-actions .q-btn{min-height:46px;border-radius:12px}@media(max-width:700px){.business-grid{grid-template-columns:1fr}.request-shell{padding-top:36px}.plan-grid{grid-template-columns:1fr}.billing-row{align-items:flex-start;flex-direction:column}.plan-choice p{min-height:0}}@media(max-width:480px){.request-page{padding:0 12px}.request-actions .q-btn{min-width:0}.request-actions .q-btn:last-child{flex:1}}
 </style>

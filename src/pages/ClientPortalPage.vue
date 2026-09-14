@@ -35,7 +35,7 @@ const isConverted = computed(() => request.value?.estado === 'convertida')
 const flowCopy = computed(() => {
   const state=request.value?.estado
   if(state==='borrador')return {title:'Tu nueva solicitud está en borrador',text:'Completa el formulario y envíalo cuando tengas lista la información esencial.'}
-  if(state==='en_revision')return {title:'Estamos revisando tu solicitud',text:'AGR Studio está organizando tus necesidades. Si necesitamos aclarar algo, te escribiremos por el buzón.'}
+  if(state==='en_revision')return {title:'Estamos revisando tu solicitud',text:'VITI está revisando tu necesidad. Si necesitamos aclarar algo, te escribiremos por Atención.'}
   if(state==='aprobada')return {title:'La solicitud fue aprobada',text:'El siguiente paso es definir alcance, condiciones y convertirla en un proyecto de trabajo.'}
   if(state==='convertida')return {title:'Esta solicitud ya es un proyecto',text:'El formulario quedó cerrado como antecedente. Ahora el seguimiento corresponde a Mi proyecto.'}
   if(state==='rechazada')return {title:'La solicitud requiere ajustes',text:'Revisa la observación con el equipo antes de iniciar una nueva propuesta.'}
@@ -133,7 +133,7 @@ onMounted(load)
               <div class="text-h5 text-weight-bold">{{ profile.nombre }}</div>
               <div class="id-line"><span>Usuario para iniciar sesión</span><strong>@{{ profile.usuario?.usuario || 'Sin registrar' }}</strong></div>
               <div class="id-line"><span>CI</span><strong>{{ profile.documento || 'Sin registrar' }} {{ profile.ci_expedido || '' }}</strong></div>
-              <div class="id-line"><span>Teléfono</span><strong>{{ profile.telefono }}</strong></div>
+              <div class="id-line"><span>Celular</span><strong>{{ profile.telefono }}</strong></div>
               <div class="id-line"><span>Ciudad</span><strong>{{ profile.ciudad || 'Sin registrar' }}</strong></div>
             </div>
           </q-card-section>
@@ -205,7 +205,7 @@ onMounted(load)
             <div class="q-mt-md client-flow">
               <div><b>1.</b> Creas una solicitud nueva con su propio código.</div>
               <div><b>2.</b> Completas un cuestionario breve con lo esencial.</div>
-              <div><b>3.</b> AGR Studio revisa viabilidad, alcance y propuesta.</div>
+              <div><b>3.</b> VITI revisa viabilidad, alcance y propuesta.</div>
               <div><b>4.</b> Si se aprueba, la solicitud se convierte en un proyecto independiente.</div>
               <div><b>5.</b> Las solicitudes anteriores permanecen en tu historial.</div>
             </div>

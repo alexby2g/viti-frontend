@@ -1,4 +1,7 @@
-:root{--viti-bg:#f3f6fb;--viti-card:#fff;--viti-text:#0c2340;--viti-muted:#667085;--viti-border:#dfe7f1}.body--dark{--viti-bg:#06162b;--viti-card:#0c294c;--viti-text:#f3f7fc;--viti-muted:#a9b7c9;--viti-border:#244667}html,body,#q-app{min-height:100%;max-width:100%;overflow-x:hidden}body{font-family:Inter,Roboto,Arial,sans-serif;background:var(--viti-bg);color:var(--viti-text)}.viti-header{background:var(--viti-card);color:var(--viti-text)}.viti-drawer{background:#092b55;color:#fff}.toolbar-search{display:flex;align-items:center;gap:8px;background:rgba(127,145,165,.12);border-radius:10px;padding:0 12px;width:min(520px,55vw)}.viti-page{padding:28px;max-width:1500px;margin:auto;min-width:0}.page-title{font-size:30px;font-weight:800;line-height:1.18;margin:0}.page-subtitle{color:var(--viti-muted);margin-top:6px}.viti-card{background:var(--viti-card);border:1px solid var(--viti-border);border-radius:16px;min-width:0}.viti-table{background:var(--viti-card);border-radius:16px;border:1px solid var(--viti-border);overflow:hidden;max-width:100%}.viti-table .q-table__container,.viti-table .q-table__middle{max-width:100%}.empty-state{padding:54px 20px;text-align:center;color:var(--viti-muted)}.stat-value{font-size:34px;font-weight:800}.stat-label{color:var(--viti-muted)}.section-label{font-size:12px;font-weight:700;color:#1976d2;text-transform:uppercase;letter-spacing:.08em}.q-dialog__inner>div{border-radius:16px}.body--dark .q-field--outlined .q-field__control:before{border-color:#35597c}.body--dark .q-table,.body--dark .q-card{background:var(--viti-card);color:var(--viti-text)}.row>*{min-width:0}
+:root{--viti-bg:#eef3f8;--viti-card:#ffffff;--viti-text:#101820;--viti-muted:#5f6b76;--viti-border:#d7e0ea;--viti-accent:#f28b30;--viti-accent-soft:#ffb067;--viti-brand:#1457b8;--viti-brand-dark:#0c2240}.body--dark{--viti-bg:#06162b;--viti-card:#0c294c;--viti-text:#f3f7fc;--viti-muted:#a9b7c9;--viti-border:#244667}html,body,#q-app{min-height:100%;max-width:100%;overflow-x:hidden}body{font-family:Inter,Roboto,Arial,sans-serif;background:var(--viti-bg);color:var(--viti-text)}.viti-header{background:var(--viti-card);color:var(--viti-text)}.viti-drawer{background:#092b55;color:#fff}.toolbar-search{display:flex;align-items:center;gap:8px;background:rgba(127,145,165,.12);border-radius:10px;padding:0 12px;width:min(520px,55vw)}.viti-page{padding:28px;max-width:1280px;margin:auto;min-width:0}.page-title{font-size:30px;font-weight:800;line-height:1.18;margin:0}.page-subtitle{color:var(--viti-muted);margin-top:6px}.viti-card{background:var(--viti-card);border:1px solid var(--viti-border);border-radius:16px;min-width:0}.viti-table{background:var(--viti-card);border-radius:16px;border:1px solid var(--viti-border);overflow:hidden;max-width:100%}.viti-table .q-table__container,.viti-table .q-table__middle{max-width:100%}.empty-state{padding:54px 20px;text-align:center;color:var(--viti-muted)}.stat-value{font-size:34px;font-weight:800}.stat-label{color:var(--viti-muted)}.section-label{font-size:12px;font-weight:700;color:#1976d2;text-transform:uppercase;letter-spacing:.08em}.q-dialog__inner>div{border-radius:16px}.body--dark .q-field--outlined .q-field__control:before{border-color:#35597c}.body--dark.viti-main-active .q-table,.body--dark.viti-main-active .q-card{background:var(--viti-card);color:var(--viti-text)}.row>*{min-width:0}
+
+/* Afinado visual general: acento naranja, texto oscuro legible y paneles informativos más profundos. */
+.viti-main-active .q-banner,.agr-viti-auth .q-banner{border-radius:16px}.viti-main-active .q-banner .text-caption,.agr-viti-auth .q-banner .text-caption{opacity:1}.viti-main-active .text-orange,.agr-viti-auth .text-orange{color:var(--viti-accent)!important}
 
 /* Atención VITI: conversación familiar tipo mensajería */
 .client-chat-page,.admin-chat-page{width:100%}.client-chat-page .messenger-card,.admin-chat-page .messenger-card{border-radius:22px!important;box-shadow:0 12px 36px rgba(9,43,85,.08);border-color:rgba(116,145,177,.22)!important}.client-chat-page .chat-header,.admin-chat-page .chat-header{background:var(--viti-card);position:relative;z-index:3;border-bottom:1px solid var(--viti-border);padding:13px 16px!important}.client-chat-page .messages,.admin-chat-page .messages{background-color:color-mix(in srgb,var(--viti-bg) 78%,var(--viti-card));background-image:radial-gradient(circle at 20% 10%,rgba(21,101,192,.035),transparent 22%),radial-gradient(circle at 90% 80%,rgba(67,160,71,.03),transparent 24%);scroll-behavior:smooth}.client-chat-page .message-row,.admin-chat-page .message-row{margin:1px 0}.client-chat-page .bubble,.admin-chat-page .bubble{border-radius:20px!important;padding:9px 13px!important;box-shadow:0 1px 2px rgba(12,35,64,.08)!important;line-height:1.35}.client-chat-page .bubble-mine,.admin-chat-page .bubble-admin{background:linear-gradient(135deg,#1565c0,#1976d2)!important;color:#fff!important;border-bottom-right-radius:6px!important}.client-chat-page .bubble-team,.admin-chat-page .bubble-client{background:var(--viti-card)!important;color:var(--viti-text)!important;border:1px solid var(--viti-border);border-bottom-left-radius:6px!important}.client-chat-page .message-meta,.admin-chat-page .message-meta{font-size:10px!important;letter-spacing:.01em}.client-chat-page .chat-image,.admin-chat-page .chat-image{border-radius:16px!important;box-shadow:0 3px 12px rgba(0,0,0,.12)}.client-chat-page .composer,.admin-chat-page .composer{background:var(--viti-card);padding:10px 12px!important;position:sticky;bottom:0;z-index:4}.client-chat-page .composer .q-field__control,.admin-chat-page .composer .q-field__control{border-radius:24px!important;background:color-mix(in srgb,var(--viti-bg) 76%,var(--viti-card))}.client-chat-page .attachment-preview,.admin-chat-page .attachment-preview{background:var(--viti-card);border-top:1px solid var(--viti-border);padding-bottom:8px}.admin-chat-page .contacts-card{border-radius:20px!important;padding:8px;box-shadow:0 8px 24px rgba(9,43,85,.06)}.admin-chat-page .contacts-card .q-item{border-radius:15px;margin:3px 0;min-height:72px}.admin-chat-page .contacts-card .q-item.q-item--active{background:rgba(21,101,192,.11)!important}.body--dark .client-chat-page .messages,.body--dark .admin-chat-page .messages{background-color:#071b33}.body--dark .client-chat-page .bubble-team,.body--dark .admin-chat-page .bubble-client{background:#102f53!important;border-color:#244667}
@@ -29,3 +32,190 @@ body{text-size-adjust:100%;-webkit-text-size-adjust:100%}img{max-width:100%}.q-a
 .viti-main-active .viti-header{background:#0b0b0d!important;color:#f7f7f8!important;border-color:#242428!important;box-shadow:0 1px 0 rgba(255,255,255,.04)}
 .viti-main-active .viti-header .q-btn,.viti-main-active .viti-header .q-icon,.viti-main-active .viti-header .q-toolbar__title{color:#f7f7f8!important}
 .viti-main-active .viti-header .q-btn:hover{background:rgba(255,255,255,.08)!important}
+
+
+/* ============================================================
+   CONTRASTE VITI 2026-09-10
+   Evita texto claro sobre superficies blancas y mantiene legible
+   focus/filled/selected tanto en el panel oscuro como en auth.
+   ============================================================ */
+
+/* Panel administrativo en modo oscuro: las utilidades claras de Quasar
+   no deben crear bloques blancos con texto heredado blanco. */
+.body--dark.viti-main-active .bg-grey-1,
+.body--dark.viti-main-active .bg-grey-2,
+.body--dark.viti-main-active .bg-grey-3{
+  background:#0a2442!important;
+  color:#f3f7fc!important;
+}
+.body--dark.viti-main-active .q-field--outlined .q-field__control,
+.body--dark.viti-main-active .q-field--filled .q-field__control{
+  background:#0b2748!important;
+  color:#f3f7fc!important;
+  border-radius:10px;
+}
+.body--dark.viti-main-active .q-field--focused .q-field__control{
+  background:#102f53!important;
+  box-shadow:0 0 0 2px rgba(117,184,255,.16)!important;
+}
+.body--dark.viti-main-active .q-field__native,
+.body--dark.viti-main-active .q-field__input,
+.body--dark.viti-main-active .q-field__prefix,
+.body--dark.viti-main-active .q-field__suffix{
+  color:#f7fbff!important;
+  opacity:1!important;
+}
+.body--dark.viti-main-active .q-field__label{color:#b9cce0!important}
+.body--dark.viti-main-active .q-field__native::placeholder,
+.body--dark.viti-main-active .q-field__input::placeholder,
+.body--dark.viti-main-active input::placeholder,
+.body--dark.viti-main-active textarea::placeholder{
+  color:#89a6c2!important;
+  opacity:1!important;
+}
+.body--dark.viti-main-active .q-field--disabled,
+.body--dark.viti-main-active .q-field--readonly{opacity:.86}
+.body--dark.viti-main-active .q-item.q-item--active,
+.body--dark.viti-main-active .q-item.q-router-link--active{
+  color:#fff;
+}
+
+/* Pantallas públicas/autenticación: dark premium permanente. No dependen del modo del navegador. */
+.agr-viti-auth{--viti-bg:#06111f;--viti-card:#0c2239;--viti-text:#f3f7fc;--viti-muted:#9fb1c4;--viti-border:#294864;background:#06111f;color:#f3f7fc}
+.agr-viti-auth .q-page-container,.agr-viti-auth .q-page{background-color:transparent;color:var(--viti-text)}
+.agr-viti-auth .q-field--outlined .q-field__control,.agr-viti-auth .q-field--filled .q-field__control{background:#0a1a2c!important;color:#f3f7fc!important;border-radius:14px}
+.agr-viti-auth .q-field--outlined .q-field__control:before{border-color:#294864!important}.agr-viti-auth .q-field--outlined:hover .q-field__control:before{border-color:#4b6d8b!important}
+.agr-viti-auth .q-field--focused .q-field__control{background:#0d2239!important;box-shadow:0 0 0 3px rgba(242,139,48,.08)!important}.agr-viti-auth .q-field--focused .q-field__control:after{color:#f28b30!important}
+.agr-viti-auth .q-field__native,.agr-viti-auth .q-field__input,.agr-viti-auth .q-field__prefix,.agr-viti-auth .q-field__suffix{color:#f4f8fc!important;opacity:1!important}
+.agr-viti-auth .q-field__label{color:#91a6b9!important}.agr-viti-auth .q-field--focused .q-field__label{color:#ffb067!important}.agr-viti-auth .q-field__marginal{color:#7891a8!important}
+.agr-viti-auth .q-field__native::placeholder,.agr-viti-auth .q-field__input::placeholder,.agr-viti-auth input::placeholder,.agr-viti-auth textarea::placeholder{color:#657f98!important;opacity:1!important}
+.agr-viti-auth .q-separator{background:rgba(108,139,168,.20)!important}.agr-viti-auth .text-grey-6,.agr-viti-auth .text-grey-7{color:#9fb1c4!important}
+.agr-viti-auth .q-menu,.agr-viti-auth .q-dialog .q-card{background:#0b2037!important;color:#eef4fa!important;border:1px solid #294763}.agr-viti-auth .q-menu .q-item:hover{background:rgba(255,255,255,.045)}
+.agr-viti-auth .q-btn{transition:transform .16s ease,background .16s ease,border-color .16s ease,box-shadow .16s ease}.agr-viti-auth .q-btn:hover{transform:translateY(-1px)}.agr-viti-auth .q-btn.q-btn--outline,.agr-viti-auth .q-btn.q-btn--flat{background:rgba(255,255,255,.025)}.agr-viti-auth .q-btn.q-btn--outline:hover,.agr-viti-auth .q-btn.q-btn--flat:hover{background:rgba(242,139,48,.07)}
+
+/* ============================================================
+   VITI PRO SHELL — 2026-09-10
+   Panel administrativo oscuro permanente, superficies limpias,
+   controles translúcidos y acento naranja. El login/público se
+   gobierna por sus propios estilos.
+   ============================================================ */
+body.viti-main-active{
+  --viti-bg:#061425;
+  --viti-card:#0c223b;
+  --viti-text:#f3f7fc;
+  --viti-muted:#9fb1c4;
+  --viti-border:#1f3d5d;
+  background:
+    radial-gradient(circle at 86% 0%,rgba(20,87,184,.10),transparent 30rem),
+    #061425;
+  color:var(--viti-text);
+}
+body.viti-main-active .q-page-container,
+body.viti-main-active .q-page{
+  background:transparent!important;
+  color:var(--viti-text);
+}
+body.viti-main-active .viti-page{
+  width:min(1320px,calc(100% - 44px));
+  max-width:1320px;
+  padding:30px 0 44px;
+  margin:0 auto;
+}
+body.viti-main-active .page-title{font-size:clamp(28px,3vw,38px);letter-spacing:-.035em;color:#f5f9ff}
+body.viti-main-active .page-subtitle{max-width:760px;color:#a9bacb;line-height:1.55}
+body.viti-main-active .section-label{color:#f28b30!important;font-weight:800;letter-spacing:.13em}
+body.viti-main-active .viti-card,
+body.viti-main-active .viti-table,
+body.viti-main-active .q-card{
+  background:rgba(12,34,59,.86);
+  color:var(--viti-text);
+  border-color:var(--viti-border);
+}
+body.viti-main-active .viti-table{border-radius:20px;box-shadow:0 20px 50px rgba(0,0,0,.08)}
+body.viti-main-active .viti-table .q-table__middle{background:transparent}
+body.viti-main-active .viti-table thead tr,
+body.viti-main-active .viti-table thead th{
+  background:#0a1728!important;
+  color:#b9c8d7!important;
+  font-size:10px;
+  font-weight:800;
+  letter-spacing:.05em;
+  text-transform:uppercase;
+  border-color:rgba(111,142,173,.16)!important;
+}
+body.viti-main-active .viti-table tbody td{color:#e7eef6!important;border-color:rgba(111,142,173,.12)!important}
+body.viti-main-active .viti-table tbody tr{transition:background .16s ease}
+body.viti-main-active .viti-table tbody tr:hover{background:rgba(20,87,184,.08)!important}
+body.viti-main-active .q-separator{background:rgba(111,142,173,.18)!important}
+body.viti-main-active .text-grey-6,
+body.viti-main-active .text-grey-7,
+body.viti-main-active .q-item__label--caption{color:#9fb1c4!important}
+body.viti-main-active .text-primary{color:#ff9a3c!important}
+body.viti-main-active .bg-primary{background:#1457b8!important}
+body.viti-main-active .q-btn.bg-primary{background:linear-gradient(135deg,rgba(20,87,184,.88),rgba(26,105,207,.72))!important;color:#fff!important;border:1px solid rgba(114,166,230,.28)!important;border-radius:12px;box-shadow:0 10px 26px rgba(4,16,29,.18)!important;backdrop-filter:blur(8px)}
+body.viti-main-active .q-btn.bg-primary:hover{background:linear-gradient(135deg,rgba(27,104,210,.96),rgba(35,119,223,.88))!important;border-color:rgba(242,139,48,.36)!important;box-shadow:0 12px 30px rgba(4,16,29,.24)!important;transform:translateY(-2px)}
+body.viti-main-active .q-btn.q-btn--outline{border-color:rgba(161,184,207,.28);background:rgba(255,255,255,.018)!important;backdrop-filter:blur(8px)}
+body.viti-main-active .q-btn.q-btn--outline:hover,
+body.viti-main-active .q-btn.q-btn--flat:hover{background:rgba(242,139,48,.07)!important;border-color:rgba(242,139,48,.36)!important;transform:translateY(-1px)}
+body.viti-main-active .q-field--outlined .q-field__control,
+body.viti-main-active .q-field--filled .q-field__control{
+  background:rgba(8,27,48,.78)!important;
+  color:#f4f8fc!important;
+  border-radius:12px;
+}
+body.viti-main-active .q-field--outlined .q-field__control:before{border-color:#294968!important}
+body.viti-main-active .q-field--outlined:hover .q-field__control:before{border-color:#4a6d8e!important}
+body.viti-main-active .q-field--focused .q-field__control{
+  background:#0d2947!important;
+  box-shadow:0 0 0 2px rgba(242,139,48,.11)!important;
+}
+body.viti-main-active .q-field--focused .q-field__control:after{color:#f28b30!important}
+body.viti-main-active .q-field__native,
+body.viti-main-active .q-field__input,
+body.viti-main-active .q-field__prefix,
+body.viti-main-active .q-field__suffix{color:#f4f8fc!important;opacity:1!important}
+body.viti-main-active .q-field__label{color:#9fb1c4!important}
+body.viti-main-active .q-field__marginal{color:#7590aa!important}
+body.viti-main-active input::placeholder,
+body.viti-main-active textarea::placeholder{color:#718aa2!important;opacity:1!important}
+body.viti-main-active .q-menu,
+body.viti-main-active .q-dialog .q-card{background:#0b2037!important;color:#eef4fa!important;border:1px solid #294763}
+body.viti-main-active .q-menu .q-item:hover{background:rgba(255,255,255,.045)}
+body.viti-main-active .q-chip{border-radius:9px}
+body.viti-main-active .q-banner{box-shadow:none}
+body.viti-main-active .empty-state{color:#8fa4b8}
+body.viti-main-active .q-tabs{background:transparent;color:#9fb1c4}
+body.viti-main-active .q-tab{border-radius:11px;transition:.16s ease}
+body.viti-main-active .q-tab:hover{background:rgba(255,255,255,.025)}
+body.viti-main-active .q-tab--active{color:#ff9a3c!important;background:rgba(242,139,48,.055)}
+body.viti-main-active .viti-card{transition:border-color .18s ease,background .18s ease,transform .18s ease}
+body.viti-main-active .viti-card:hover{border-color:rgba(101,137,171,.42)}
+
+
+@media(max-width:1023px){body.viti-main-active .viti-page{width:min(100% - 28px,1320px);padding:20px 0 34px}}
+@media(max-width:600px){body.viti-main-active .viti-page{width:min(100% - 20px,1320px);padding:14px 0 28px}}
+
+/* ============================================================
+   VITI UX POLISH — campos/autofill y botones consistentes
+   Evita que Chrome/Brave cambie los campos a blanco al autocompletar.
+   ============================================================ */
+.agr-viti-auth input:-webkit-autofill,
+.agr-viti-auth input:-webkit-autofill:hover,
+.agr-viti-auth input:-webkit-autofill:focus,
+body.viti-main-active input:-webkit-autofill,
+body.viti-main-active input:-webkit-autofill:hover,
+body.viti-main-active input:-webkit-autofill:focus{
+  -webkit-text-fill-color:#f4f8fc!important;
+  caret-color:#f4f8fc!important;
+  -webkit-box-shadow:0 0 0 1000px #0a1a2c inset!important;
+  box-shadow:0 0 0 1000px #0a1a2c inset!important;
+  transition:background-color 9999s ease-out 0s!important;
+}
+.agr-viti-auth .q-btn:not(.q-btn--round),
+body.viti-main-active .q-btn:not(.q-btn--round){
+  border-radius:13px;
+}
+.agr-viti-auth .q-btn.q-btn--outline:before,
+body.viti-main-active .q-btn.q-btn--outline:before{
+  border-width:1.35px!important;
+}

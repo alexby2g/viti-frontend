@@ -3,7 +3,7 @@ import { computed, onMounted, reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useQuasar } from 'quasar'
 import { api } from '../boot/axios'
-import { formatDate } from '../utils/date'
+import { formatDateTime } from '../utils/date'
 import PageHeader from '../components/PageHeader.vue'
 
 const route = useRoute()
@@ -12,113 +12,187 @@ const $q = useQuasar()
 const item = ref(null)
 const loading = ref(true)
 const actionLoading = ref(false)
+const inviteLoading = ref(false)
 const loadError = ref('')
 const rejectDialog = ref(false)
-const rejectForm = reactive({ motivo: '' })
+const rejectForm = reactive({ motivo:'' })
+
 const plan = computed(() => item.value?.plan_viti || null)
-const approvalChecks = computed(() => [
-  { label: 'Responsable', ok: Boolean(item.value?.cliente_id) },
-  { label: 'Empresa', ok: Boolean(item.value?.empresa_id) },
-  { label: 'Plan VITI', ok: Boolean(item.value?.plan_viti_id && plan.value) },
-  { label: 'Declaración aceptada', ok: Boolean(item.value?.declaracion_aceptada) },
-  { label: 'Acuerdo comercial aceptado', ok: Boolean(item.value?.acuerdo_comercial_aceptado) },
-])
-const approvalReady = computed(() => approvalChecks.value.every((check) => check.ok))
-const canApprove = computed(() => item.value?.estado === 'en_revision' && !item.value?.proyecto && approvalReady.value)
-const canReject = computed(() => ['borrador', 'en_revision'].includes(item.value?.estado) && !item.value?.proyecto)
-const canCreateProject = computed(() => item.value?.estado === 'aprobada' && !item.value?.proyecto)
+const access = computed(() => item.value?.acceso_cliente || {})
+const hasAccount = computed(() => Boolean(access.value?.tiene_cuenta) || access.value?.estado === 'cuenta_creada')
 const answers = computed(() => item.value?.respuestas || [])
+const approvalReady = computed(() => Boolean(item.value?.cliente_id && item.value?.cliente?.correo && item.value?.empresa_id && item.value?.plan_viti_id && plan.value && item.value?.declaracion_aceptada && item.value?.acuerdo_comercial_aceptado))
+const canApprove = computed(() => item.value?.estado === 'en_revision' && !item.value?.proyecto && approvalReady.value)
+const canReject = computed(() => ['borrador','en_revision'].includes(item.value?.estado) && !item.value?.proyecto)
+const canCreateProject = computed(() => item.value?.estado === 'aprobada' && !item.value?.proyecto && hasAccount.value)
+const waitingForAccount = computed(() => item.value?.estado === 'aprobada' && !item.value?.proyecto && !hasAccount.value)
+const flowSteps = computed(() => [
+  {label:'Solicitud',done:Boolean(item.value?.id),active:item.value?.estado==='en_revision'},
+  {label:'Aprobación',done:['aprobada','convertida'].includes(item.value?.estado),active:item.value?.estado==='en_revision'},
+  {label:'Acceso',done:hasAccount.value,active:waitingForAccount.value},
+  {label:'Proyecto',done:Boolean(item.value?.proyecto),active:canCreateProject.value},
+])
+
 function normalize(response){ return response?.data?.data ?? response?.data ?? null }
 function pretty(value){ return String(value || '').replaceAll('_',' ').replace(/\b\w/g,char=>char.toUpperCase()) }
 function money(value){ return value === null || value === undefined || value === '' ? 'A cotizar' : `${Number(value).toFixed(0)} Bs` }
+function statusTone(value){ return ({en_revision:'warning',aprobada:'positive',convertida:'positive',rechazada:'negative'}[value] || 'primary') }
+
 async function load(){
   loadError.value=''; loading.value=true
-  const id=Number(route.params.id)
-  if(!Number.isInteger(id)||id<=0){ loadError.value='La solicitud indicada no es válida.'; loading.value=false; return }
   try{
-    item.value=normalize(await api.get(`/solicitudes/${id}`))
+    item.value=normalize(await api.get(`/solicitudes/${Number(route.params.id)}`))
     if(!item.value?.id) throw new Error('El servidor no devolvió una solicitud válida.')
   }catch(error){ loadError.value=error?.response?.data?.message||error?.message||'No se pudo cargar la solicitud.' }
   finally{ loading.value=false }
 }
-async function approveRequest(){
-  if(!canApprove.value||!item.value?.id) return
-  $q.dialog({title:'Aprobar solicitud',message:'¿Confirmas que esta solicitud pasa a aprobada?',cancel:true,persistent:true}).onOk(async()=>{
+
+function approveRequest(){
+  if(!canApprove.value) return
+  $q.dialog({title:'Aprobar solicitud',message:'VITI aprobará la solicitud y preparará automáticamente el acceso del cliente. ¿Continuar?',cancel:true,persistent:true}).onOk(async()=>{
     actionLoading.value=true
     try{
-      await api.post(`/solicitudes/${item.value.id}/aprobar`)
-      $q.notify({type:'positive',message:'Solicitud aprobada correctamente.'})
+      const response=await api.post(`/solicitudes/${item.value.id}/aprobar`)
+      $q.notify({type:response?.data?.data?.acceso?.email_enviado||response?.data?.data?.acceso?.tiene_cuenta?'positive':'warning',message:response?.data?.message||'Solicitud aprobada.',timeout:5000})
       await load()
-    }catch(error){ $q.notify({type:'negative',message:error?.response?.data?.message||'No se pudo aprobar la solicitud.'}) }
-    finally{ actionLoading.value=false }
+    }catch(error){$q.notify({type:'negative',message:error?.response?.data?.message||'No se pudo aprobar la solicitud.'})}
+    finally{actionLoading.value=false}
   })
 }
-function openReject(){ rejectForm.motivo=''; rejectDialog.value=true }
+
+function openReject(){rejectForm.motivo='';rejectDialog.value=true}
 async function rejectRequest(){
-  if(!item.value?.id||String(rejectForm.motivo).trim().length<5){ $q.notify({type:'warning',message:'Escribe un motivo breve para registrar el rechazo.'}); return }
+  if(String(rejectForm.motivo).trim().length<5){$q.notify({type:'warning',message:'Escribe un motivo breve.'});return}
   actionLoading.value=true
-  try{ await api.post(`/solicitudes/${item.value.id}/rechazar`,{motivo:String(rejectForm.motivo).trim()}); rejectDialog.value=false; $q.notify({type:'positive',message:'Solicitud rechazada y registrada.'}); await load() }
-  catch(error){ $q.notify({type:'negative',message:error?.response?.data?.message||'No se pudo rechazar la solicitud.'}) }
-  finally{ actionLoading.value=false }
+  try{await api.post(`/solicitudes/${item.value.id}/rechazar`,{motivo:rejectForm.motivo.trim()});rejectDialog.value=false;$q.notify({type:'positive',message:'Solicitud rechazada.'});await load()}
+  catch(error){$q.notify({type:'negative',message:error?.response?.data?.message||'No se pudo rechazar la solicitud.'})}
+  finally{actionLoading.value=false}
 }
+
+async function createInvitation(){
+  inviteLoading.value=true
+  try{const response=await api.post(`/solicitudes/${item.value.id}/invitacion`,{dias_vigencia:7});$q.notify({type:response?.data?.data?.email_enviado?'positive':'warning',message:response?.data?.message||'Invitación creada.'});await load()}
+  catch(error){$q.notify({type:'negative',message:error?.response?.data?.message||'No se pudo crear la invitación.'})}
+  finally{inviteLoading.value=false}
+}
+async function resendInvitation(){
+  inviteLoading.value=true
+  try{const response=await api.post(`/solicitudes/${item.value.id}/invitacion/reenviar`);$q.notify({type:response?.data?.data?.email_enviado?'positive':'warning',message:response?.data?.message||'Invitación procesada.'});await load()}
+  catch(error){$q.notify({type:'negative',message:error?.response?.data?.message||'No se pudo reenviar.'})}
+  finally{inviteLoading.value=false}
+}
+async function copyInvitation(){
+  if(!access.value?.url) return
+  try{await navigator.clipboard.writeText(access.value.url);$q.notify({type:'positive',message:'Enlace copiado.'})}
+  catch{$q.dialog({title:'Enlace de acceso',message:access.value.url,ok:'Cerrar'})}
+}
+
 async function createProject(){
-  if(!canCreateProject.value||!item.value?.id) return
+  if(!canCreateProject.value) return
   actionLoading.value=true
   try{
     const created=normalize(await api.post('/proyectos',{solicitud_id:item.value.id,empresa_id:item.value.empresa_id,cliente_id:item.value.cliente_id,nombre:item.value.titulo||'Proyecto VITI',descripcion:item.value.resumen||'',fase:'levantamiento',estado:'activo',progreso:0,fecha_inicio:new Date().toISOString().slice(0,10)}))
-    if(!created?.id) throw new Error('El servidor no devolvió el proyecto creado.')
+    if(!created?.id) throw new Error('No se recibió el proyecto creado.')
+    $q.notify({type:'positive',message:'Proyecto iniciado.'})
     await router.push(`/proyectos/${created.id}`)
-  }catch(error){ $q.notify({type:'negative',message:error?.response?.data?.message||error?.message||'No se pudo crear el proyecto.'}) }
-  finally{ actionLoading.value=false }
+  }catch(error){$q.notify({type:'negative',message:error?.response?.data?.message||error?.message||'No se pudo iniciar el proyecto.'})}
+  finally{actionLoading.value=false}
 }
+
 onMounted(load)
 </script>
+
 <template>
-  <div class="viti-page request-review-page">
-    <q-inner-loading :showing="loading"/>
-    <q-banner v-if="loadError" rounded class="bg-red-1 text-negative q-mb-lg"><template #avatar><q-icon name="error_outline"/></template>{{loadError}}<template #action><q-btn flat color="negative" label="Volver" to="/solicitudes"/></template></q-banner>
+  <div class="viti-page review-page">
+    <q-inner-loading :showing="loading" />
+    <q-banner v-if="loadError" rounded class="error-banner"><template #avatar><q-icon name="error_outline"/></template>{{ loadError }}<template #action><q-btn flat label="Volver" to="/solicitudes"/></template></q-banner>
+
     <template v-if="item">
-      <PageHeader eyebrow="Revisión AGR Studio" :title="`${item.codigo||'SOL'} · ${item.titulo||'Solicitud VITI'}`" :subtitle="`${item.empresa?.nombre_comercial||'Sin empresa'} · ${item.cliente?.nombre||'Sin responsable'}`">
-        <div class="row q-gutter-sm items-center">
-          <q-btn v-if="item.estado === 'en_revision' && !item.proyecto" color="positive" unelevated no-caps icon="verified" label="Aprobar solicitud" :loading="actionLoading" :disable="!approvalReady" @click="approveRequest"/>
-          <q-btn v-if="canReject" outline color="negative" no-caps icon="block" label="Rechazar" :loading="actionLoading" @click="openReject"/>
-          <q-btn v-if="canCreateProject" color="primary" unelevated no-caps icon="rocket_launch" label="Crear proyecto" :loading="actionLoading" @click="createProject"/>
-          <q-btn v-if="item.proyecto?.id" outline color="primary" no-caps icon="open_in_new" label="Abrir proyecto" :to="`/proyectos/${item.proyecto.id}`"/>
-        </div>
+      <PageHeader eyebrow="Solicitud" :title="item.titulo || 'Solicitud VITI'" :subtitle="`${item.codigo} · recibida ${formatDateTime(item.created_at)}`">
+        <q-badge outline :color="statusTone(item.estado)" class="status-badge">{{ pretty(item.estado) }}</q-badge>
       </PageHeader>
 
-      <q-card flat class="viti-card q-mb-lg approval-card">
-        <q-card-section>
-          <div class="row items-center justify-between q-mb-sm">
-            <div>
-              <div class="section-label">Checklist de aprobación</div>
-              <div class="text-h6 text-weight-bold">Requisitos para pasar a aprobada</div>
-            </div>
-            <q-badge :color="approvalReady ? 'positive' : 'warning'">{{ approvalReady ? 'Lista para aprobar' : 'Faltan requisitos' }}</q-badge>
-          </div>
-          <div class="row q-col-gutter-sm">
-            <div v-for="check in approvalChecks" :key="check.label" class="col-12 col-sm-6 col-lg-4">
-              <div class="approval-check" :class="check.ok ? 'is-ok' : 'is-pending'">
-                <q-icon :name="check.ok ? 'check_circle' : 'radio_button_unchecked'" size="20px"/>
-                <span>{{ check.label }}</span>
-              </div>
-            </div>
-          </div>
-          <div v-if="!approvalReady" class="text-caption text-warning q-mt-sm">Completa los requisitos pendientes antes de aprobar. El servidor también los valida por seguridad.</div>
+      <div class="flow-strip q-mb-lg">
+        <div v-for="(flow,index) in flowSteps" :key="flow.label" class="flow-item" :class="{done:flow.done,active:flow.active}">
+          <span>{{ flow.done ? '✓' : index+1 }}</span><b>{{ flow.label }}</b>
+        </div>
+      </div>
+
+      <section class="review-grid q-mb-lg">
+        <article class="summary-card need-card">
+          <small>LO QUE NECESITA</small>
+          <h2>{{ item.titulo }}</h2>
+          <p>{{ item.resumen || 'Sin descripción adicional.' }}</p>
+          <div class="company-line"><q-icon name="business"/> {{ item.empresa?.nombre_comercial || 'Sin negocio' }}<span v-if="item.empresa?.actividad">· {{ item.empresa.actividad }}</span></div>
+        </article>
+
+        <article class="summary-card">
+          <small>CONTACTO</small>
+          <h3>{{ item.cliente?.nombre || 'Sin nombre' }}</h3>
+          <p class="compact">{{ item.cliente?.telefono || 'Sin teléfono' }}</p>
+          <p class="compact">{{ item.cliente?.correo || 'Sin correo' }}</p>
+          <p class="compact">{{ item.cliente?.ciudad || 'Sin ciudad' }}</p>
+        </article>
+
+        <article class="summary-card">
+          <small>PLAN ELEGIDO</small>
+          <h3>{{ plan?.nombre || 'Sin plan' }}</h3>
+          <div class="price-row"><span>Implementación</span><b>{{ money(plan?.precio_proyecto) }}</b></div>
+          <div class="price-row"><span>Servicio mensual</span><b>{{ money(plan?.precio_mensual) }}</b></div>
+          <div class="price-row"><span>Servicio anual</span><b>{{ money(plan?.precio_anual) }}</b></div>
+        </article>
+      </section>
+
+      <q-card flat class="next-card q-mb-lg">
+        <q-card-section class="next-content">
+          <template v-if="item.estado==='en_revision'">
+            <div class="next-copy"><small>SIGUIENTE PASO</small><h2>¿El proyecto es viable para continuar?</h2><p>Si apruebas, VITI prepara el acceso del cliente. Si necesitas aclarar algo, puedes contactarlo antes de decidir.</p><div v-if="!approvalReady" class="warning-line"><q-icon name="warning_amber"/> Faltan datos obligatorios de la solicitud. Revisa los detalles internos.</div></div>
+            <div class="next-actions"><q-btn outline color="negative" no-caps label="Rechazar" icon="close" :disable="!canReject" @click="openReject"/><q-btn color="primary" unelevated no-caps label="Aprobar y habilitar acceso" icon-right="arrow_forward" :loading="actionLoading" :disable="!canApprove" @click="approveRequest"/></div>
+          </template>
+
+          <template v-else-if="waitingForAccount">
+            <div class="next-copy"><small>ACCESO DEL CLIENTE</small><h2>Solicitud aprobada. Falta que el cliente cree su cuenta.</h2><p v-if="access.url">El enlace ya está preparado para {{ item.cliente?.correo }}. Puedes copiarlo o reenviarlo.</p><p v-else>Genera el enlace de acceso para continuar.</p><div v-if="access.expira_at" class="access-expiry">Vigente hasta {{ formatDateTime(access.expira_at) }}</div></div>
+            <div class="next-actions"><q-btn v-if="access.url" outline color="orange" no-caps icon="content_copy" label="Copiar enlace" @click="copyInvitation"/><q-btn v-if="access.url" flat no-caps icon="forward_to_inbox" label="Reenviar" :loading="inviteLoading" @click="resendInvitation"/><q-btn v-else color="primary" unelevated no-caps icon="person_add" label="Crear acceso" :loading="inviteLoading" @click="createInvitation"/></div>
+          </template>
+
+          <template v-else-if="canCreateProject">
+            <div class="next-copy"><small>CLIENTE LISTO</small><h2>El acceso ya está creado. Puedes iniciar el proyecto.</h2><p>El proyecto quedará vinculado a esta misma solicitud, empresa y cliente.</p></div>
+            <div class="next-actions"><q-btn color="primary" unelevated no-caps icon="rocket_launch" label="Crear proyecto ahora" :loading="actionLoading" @click="createProject"/></div>
+          </template>
+
+          <template v-else-if="item.proyecto?.id">
+            <div class="next-copy"><small>PROYECTO ACTIVO</small><h2>Esta solicitud ya se convirtió en proyecto.</h2><p>Continúa el seguimiento desde el proyecto; no necesitas volver a editar la solicitud.</p></div>
+            <div class="next-actions"><q-btn outline color="orange" no-caps icon="open_in_new" label="Abrir proyecto" :to="`/proyectos/${item.proyecto.id}`"/></div>
+          </template>
+
+          <template v-else>
+            <div class="next-copy"><small>ESTADO</small><h2>{{ pretty(item.estado) }}</h2><p>La solicitud queda registrada en el historial.</p></div>
+          </template>
         </q-card-section>
       </q-card>
 
-      <div class="row q-col-gutter-lg q-mb-lg">
-        <div class="col-12 col-xl-7"><q-card flat class="viti-card full-height"><q-card-section><div class="section-label">Decisión actual</div><div class="row items-center q-gutter-md q-mt-sm"><q-icon name="fact_check" :color="item.estado==='en_revision'?'warning':'primary'" size="38px"/><div><div class="text-h6 text-weight-bold">{{pretty(item.estado)}}</div><div class="text-body2 text-grey-7">Revisa la información antes de aprobar, rechazar o iniciar el proyecto.</div></div></div></q-card-section><q-separator/><q-card-section class="row q-col-gutter-md"><div class="col-6 col-md-3"><div class="detail-label">Estado</div><q-badge color="orange">{{pretty(item.estado)}}</q-badge></div><div class="col-6 col-md-3"><div class="detail-label">Prioridad</div><strong>{{pretty(item.prioridad||'normal')}}</strong></div><div class="col-6 col-md-3"><div class="detail-label">Recibida</div><span>{{formatDate(item.created_at)}}</span></div><div class="col-6 col-md-3"><div class="detail-label">Respuestas</div><strong>{{answers.length}}</strong></div><div class="col-12"><div class="detail-label">Necesidad</div><div class="request-text">{{item.resumen||'Sin resumen adicional.'}}</div></div></q-card-section></q-card></div>
-        <div class="col-12 col-xl-5"><q-card flat class="viti-card full-height"><q-card-section><div class="section-label">Plan y presupuesto</div><div class="text-h6 text-weight-bold">{{plan?.nombre||'Plan no disponible'}}</div><div class="commercial-prices q-mt-md" v-if="plan"><div><span>Implementación</span><strong>{{money(plan.precio_proyecto)}}</strong></div><div><span>Mensual</span><strong>{{money(plan.precio_mensual)}}</strong></div><div><span>Anual</span><strong>{{money(plan.precio_anual)}}</strong></div></div><q-separator class="q-my-md"/><div class="detail-label">Forma de pago</div><div class="text-weight-bold">{{pretty(item.forma_pago_preferida||'por_definir')}}</div><div class="detail-label q-mt-md">Suscripción</div><div class="text-weight-bold">{{pretty(item.frecuencia_suscripcion_preferida||'por_definir')}}</div></q-card-section></q-card></div>
-      </div>
-      <q-card flat class="viti-card q-mb-lg"><q-card-section><div class="section-label">Responsable y negocio</div><div class="row q-col-gutter-lg q-mt-sm"><div class="col-12 col-md-6"><div class="text-caption text-grey-6">Responsable</div><div class="text-weight-bold">{{item.cliente?.nombre||'Sin nombre'}}</div><div class="text-caption">{{item.cliente?.correo||'Sin correo'}}</div><div class="text-caption">{{item.cliente?.telefono||'Sin teléfono'}}</div><div class="text-caption">{{item.cliente?.ciudad||'Sin ciudad'}}</div></div><div class="col-12 col-md-6"><div class="text-caption text-grey-6">Empresa / proyecto</div><div class="text-weight-bold">{{item.empresa?.nombre_comercial||'Sin empresa'}}</div><div class="text-caption">{{item.empresa?.actividad||'Actividad no especificada'}}</div><div class="text-caption">{{item.empresa?.ciudad||'Sin ciudad'}}</div></div></div></q-card-section></q-card>
-      <q-card flat class="viti-card q-mb-lg"><q-card-section><div class="row items-center justify-between"><div><div class="section-label">Respuestas del cliente</div><div class="text-h6 text-weight-bold">Cuestionario de evaluación</div></div><q-badge outline color="primary">{{answers.length}} respondidas</q-badge></div></q-card-section><q-separator/><q-list separator><q-item v-for="response in answers" :key="response.id"><q-item-section><q-item-label overline>Pregunta {{response.pregunta?.numero||response.pregunta_id}}</q-item-label><q-item-label class="text-weight-medium">{{response.pregunta?.enunciado||response.pregunta?.pregunta||'Pregunta'}}</q-item-label><q-item-label caption class="q-mt-sm response-value">{{Array.isArray(response.respuesta_json)?response.respuesta_json.join(', '):(response.respuesta_texto||'Sin respuesta')}}</q-item-label></q-item-section></q-item><q-item v-if="!answers.length"><q-item-section class="text-grey-6">No hay respuestas registradas.</q-item-section></q-item></q-list></q-card>
-      <q-card flat class="viti-card q-mb-lg"><q-card-section><div class="section-label">Acceso y trazabilidad</div><div class="row q-col-gutter-lg q-mt-md"><div class="col-12 col-md-6"><div class="text-weight-bold">{{item.acceso_cliente?.tiene_cuenta?'Cuenta creada':'Acceso pendiente'}}</div><div class="text-caption text-grey-7">{{item.acceso_cliente?.correo||item.cliente?.correo||'Sin correo'}}</div></div><div class="col-12 col-md-6"><div class="text-weight-bold">Proyecto</div><div class="text-caption text-grey-7">{{item.proyecto?.nombre||'Todavía no creado'}}</div></div></div></q-card-section></q-card>
+      <q-expansion-item class="details-panel" icon="tune" label="Detalles internos" caption="Información administrativa y datos de levantamiento" expand-separator>
+        <q-card flat class="details-card">
+          <q-card-section class="details-grid">
+            <div><small>Prioridad</small><b>{{ pretty(item.prioridad || 'normal') }}</b></div>
+            <div><small>Forma de pago</small><b>{{ pretty(item.forma_pago_preferida || 'por_definir') }}</b></div>
+            <div><small>Suscripción preferida</small><b>{{ pretty(item.frecuencia_suscripcion_preferida || 'por_definir') }}</b></div>
+            <div><small>Respuestas internas</small><b>{{ answers.length }}</b></div>
+          </q-card-section>
+          <q-separator/>
+          <q-list v-if="answers.length" separator>
+            <q-item v-for="response in answers" :key="response.id"><q-item-section><q-item-label caption>Pregunta {{ response.pregunta?.numero || response.pregunta_id }}</q-item-label><q-item-label>{{ response.pregunta?.enunciado || 'Dato de levantamiento' }}</q-item-label><q-item-label caption class="answer-value">{{ Array.isArray(response.respuesta_json) ? response.respuesta_json.join(', ') : (response.respuesta_texto || 'Sin respuesta') }}</q-item-label></q-item-section></q-item>
+          </q-list>
+        </q-card>
+      </q-expansion-item>
     </template>
-    <q-dialog v-model="rejectDialog"><q-card style="width:560px;max-width:94vw"><q-card-section><div class="section-label text-negative">Decisión administrativa</div><div class="text-h5 text-weight-bold">Rechazar solicitud</div></q-card-section><q-separator/><q-card-section><q-input v-model="rejectForm.motivo" outlined type="textarea" autogrow maxlength="1000" counter label="Motivo del rechazo *"/></q-card-section><q-card-actions align="right"><q-btn flat label="Cancelar" v-close-popup/><q-btn color="negative" unelevated no-caps label="Confirmar rechazo" :loading="actionLoading" @click="rejectRequest"/></q-card-actions></q-card></q-dialog>
+
+    <q-dialog v-model="rejectDialog"><q-card class="reject-card"><q-card-section><div class="text-overline text-negative">RECHAZAR SOLICITUD</div><div class="text-h6 text-weight-bold">Registra un motivo breve</div><div class="text-caption text-grey-6">Quedará en el historial para referencia interna.</div></q-card-section><q-card-section><q-input v-model="rejectForm.motivo" outlined type="textarea" autogrow label="Motivo *"/></q-card-section><q-card-actions align="right"><q-btn flat no-caps label="Cancelar" v-close-popup/><q-btn outline color="negative" no-caps label="Confirmar" :loading="actionLoading" @click="rejectRequest"/></q-card-actions></q-card></q-dialog>
   </div>
 </template>
+
 <style scoped>
-.request-review-page{padding-bottom:40px}.detail-label{font-size:11px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--viti-muted);margin-bottom:5px}.approval-card{border:1px solid var(--viti-border)}.approval-check{display:flex;align-items:center;gap:8px;padding:10px 12px;border-radius:10px;font-size:13px;font-weight:700}.approval-check.is-ok{background:rgba(18,183,106,.09);color:#147a4b}.approval-check.is-pending{background:rgba(245,158,11,.1);color:#9a6700}.commercial-prices{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}.commercial-prices>div{padding:10px;border:1px solid var(--viti-border);border-radius:12px}.commercial-prices span{display:block;font-size:10px;text-transform:uppercase;color:var(--viti-muted);font-weight:700}.commercial-prices strong{display:block;margin-top:3px;font-size:16px}.request-text,.response-value{white-space:pre-wrap;line-height:1.6}@media(max-width:600px){.commercial-prices{grid-template-columns:1fr}}
+.review-page{max-width:1240px;padding-top:32px;padding-bottom:52px}.status-badge{font-size:12px;padding:7px 11px;border-radius:999px}.flow-strip{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}.flow-item{display:flex;align-items:center;gap:9px;color:#70869b;padding:10px 12px;border-radius:12px;background:rgba(255,255,255,.018);border:1px solid rgba(71,105,137,.22)}.flow-item span{width:26px;height:26px;border-radius:50%;display:grid;place-items:center;background:#07192a;border:1px solid #294761;font-size:11px}.flow-item b{font-size:12px}.flow-item.done{color:#9bd8b9}.flow-item.done span{border-color:rgba(54,201,128,.45);color:#62d799}.flow-item.active{border-color:rgba(242,139,48,.38);color:#ffd0a4}.flow-item.active span{border-color:#f28b30;color:#f7a85e}.review-grid{display:grid;grid-template-columns:1.5fr .75fr .85fr;gap:14px}.summary-card{padding:22px;border-radius:18px;background:linear-gradient(180deg,#0c2138,#0a1c31);border:1px solid rgba(65,100,134,.3)}.summary-card small,.next-copy>small{font-size:10px;font-weight:900;letter-spacing:.13em;color:#f28b30}.summary-card h2{font-size:28px;line-height:1.15;margin:8px 0;color:#f3f7fb}.summary-card h3{font-size:19px;margin:8px 0 13px}.summary-card p{color:#a3b4c4;line-height:1.55;margin:0}.summary-card p.compact{font-size:13px;margin:4px 0}.company-line{margin-top:17px;padding-top:15px;border-top:1px solid rgba(78,110,141,.2);color:#c7d4df;font-size:13px}.company-line .q-icon{color:#f28b30;margin-right:5px}.company-line span{color:#8198ac;margin-left:5px}.price-row{display:flex;justify-content:space-between;gap:12px;padding:8px 0;border-bottom:1px solid rgba(78,110,141,.14);font-size:12px;color:#94a8ba}.price-row:last-child{border-bottom:0}.price-row b{color:#e8eff6}.next-card{background:linear-gradient(135deg,#0d2239,#102c4a)!important;border:1px solid rgba(242,139,48,.22);border-radius:20px;color:#edf4fb}.next-content{display:flex;align-items:center;justify-content:space-between;gap:28px;padding:25px}.next-copy{max-width:720px}.next-copy h2{font-size:24px;margin:6px 0}.next-copy p{color:#9fb1c1;margin:0;line-height:1.55}.next-actions{display:flex;align-items:center;justify-content:flex-end;gap:8px;flex-wrap:wrap}.next-actions :deep(.q-btn){min-height:44px;border-radius:12px}.warning-line{margin-top:11px;color:#f6bd7e;font-size:12px}.access-expiry{margin-top:10px;color:#7f96aa;font-size:11px}.details-panel{border:1px solid rgba(67,99,130,.24);border-radius:16px;background:rgba(7,25,42,.55);overflow:hidden;color:#c9d6e1}.details-card{background:#081a2c!important;color:#dce6ee}.details-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}.details-grid>div{padding:11px;border:1px solid rgba(67,99,130,.22);border-radius:11px}.details-grid small,.details-grid b{display:block}.details-grid small{color:#738ba1;font-size:9px;text-transform:uppercase}.details-grid b{margin-top:4px;font-size:12px}.answer-value{white-space:pre-wrap;color:#92a8ba!important}.error-banner{background:rgba(193,0,21,.08);border:1px solid rgba(193,0,21,.2);color:#ff9ca8}.reject-card{width:520px;max-width:94vw;background:#0c1e32!important;color:#edf4fb;border:1px solid #294761;border-radius:18px!important}
+@media(max-width:980px){.review-grid{grid-template-columns:1fr 1fr}.need-card{grid-column:1/-1}.next-content{align-items:flex-start;flex-direction:column}.next-actions{justify-content:flex-start}.details-grid{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:600px){.review-page{padding-top:18px}.flow-strip{grid-template-columns:1fr 1fr}.review-grid{grid-template-columns:1fr}.need-card{grid-column:auto}.details-grid{grid-template-columns:1fr}.next-actions{width:100%;display:grid;grid-template-columns:1fr}.next-actions .q-btn{width:100%}}
 </style>

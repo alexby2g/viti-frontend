@@ -1,129 +1,132 @@
 <script setup>
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
+import { useRouter } from 'vue-router'
 import { api } from '../boot/axios'
 import PageHeader from '../components/PageHeader.vue'
-import AgrAutopilotPanel from '../components/AgrAutopilotPanel.vue'
+import { formatDateTime } from '../utils/date'
 
-const data = ref({ resumen: {}, solicitudes_recientes: [], proyectos_recientes: [], requieren_atencion: [] })
+const router = useRouter()
 const loading = ref(true)
-const agrMessage = ref('')
-const agrLoading = ref(false)
-const agrResponse = ref(null)
-const agrCreateLoading = ref(false)
-const agrClientForm = ref({ nombre: '', telefono: '', whatsapp: '', correo: '', ciudad: '', direccion: '', observaciones: '' })
+const data = ref({ resumen: {}, solicitudes_recientes: [], proyectos_recientes: [], requieren_atencion: [] })
 
-const cards = [
-  { key: 'negocios_activos', label: 'Negocios activos', icon: 'business', color: 'blue', to: '/clientes' },
-  { key: 'aplicaciones_activas', label: 'Apps activas', icon: 'apps', color: 'teal', to: '/saas' },
-  { key: 'suscripciones_activas', label: 'Suscripciones activas', icon: 'autorenew', color: 'green', to: '/pagos' },
-  { key: 'pagos_vencidos', label: 'Pagos con atención', icon: 'schedule', color: 'orange', to: '/pagos' }
-]
+const metrics = computed(() => [
+  { key: 'solicitudes_activas', label: 'Solicitudes activas', icon: 'fact_check', to: '/solicitudes' },
+  { key: 'proyectos_activos', label: 'Proyectos activos', icon: 'account_tree', to: '/proyectos' },
+  { key: 'aplicaciones_activas', label: 'Sistemas activos', icon: 'grid_view', to: '/aplicaciones' },
+  { key: 'pagos_vencidos', label: 'Cobros con atención', icon: 'payments', to: '/pagos' },
+])
 
-function pretty(v) { return String(v || '').replaceAll('_', ' ').replace(/\b\w/g, c => c.toUpperCase()) }
+const flow = computed(() => [
+  { number: '01', title: 'Solicitud', text: 'Recibe la necesidad del cliente y define el alcance.', icon: 'description', to: '/solicitudes', active: (data.value.resumen.solicitudes_activas || 0) > 0 },
+  { number: '02', title: 'Aprobación', text: 'Decide si la solicitud continúa y habilita el acceso del cliente.', icon: 'verified', to: '/solicitudes', active: (data.value.resumen.solicitudes_activas || 0) > 0 },
+  { number: '03', title: 'Proyecto', text: 'Registra avances, fechas y una beta cuando esté lista para revisar.', icon: 'account_tree', to: '/proyectos', active: (data.value.resumen.proyectos_activos || 0) > 0 },
+  { number: '04', title: 'Entrega', text: 'Publica el sistema, sus accesos y la APK cuando realmente esté listo.', icon: 'rocket_launch', to: '/aplicaciones', active: (data.value.resumen.aplicaciones_activas || 0) > 0 },
+])
 
-function applyClientDraft(draft = {}) {
-  agrClientForm.value = {
-    nombre: draft.nombre || '', telefono: draft.telefono || '', whatsapp: draft.whatsapp || '', correo: draft.correo || '',
-    ciudad: draft.ciudad || '', direccion: draft.direccion || '', observaciones: draft.observaciones || ''
-  }
-}
+const workspaceEmpty = computed(() =>
+  !data.value.resumen.solicitudes_activas &&
+  !data.value.resumen.proyectos_activos &&
+  !data.value.resumen.aplicaciones_activas &&
+  !data.value.resumen.negocios_activos
+)
 
-async function askAgr(message = agrMessage.value) {
-  const text = String(message || '').trim()
-  if (!text || agrLoading.value) return
-  agrLoading.value = true
-  agrResponse.value = null
-  try {
-    const response = (await api.get('/dashboard', { params: { agr: text } })).data
-    agrResponse.value = response
-    if (['create_client', 'create_client_workflow', 'create_client_ready'].includes(response?.intent)) {
-      if (response?.data?.draft) applyClientDraft(response.data.draft)
-      if (response?.intent === 'create_client') applyClientDraft()
-    }
-  } catch (error) {
-    agrResponse.value = { intent: 'error', message: error?.response?.data?.message || 'No pude comunicarme con AGR Assistant.' }
-  } finally { agrLoading.value = false }
-}
+function go(to) { router.push(to) }
 
-async function confirmCreateClient() {
-  if (!agrClientForm.value.nombre.trim() || agrCreateLoading.value) return
-  agrCreateLoading.value = true
-  try {
-    const response = (await api.post('/agr/acciones/crear-cliente', agrClientForm.value)).data
-    agrResponse.value = { intent: 'create_client_success', message: response.message, data: { client: response.data?.client } }
-    agrMessage.value = ''
-    data.value = (await api.get('/dashboard')).data
-  } catch (error) {
-    agrResponse.value = { intent: 'error', message: error?.response?.data?.message || 'No pude registrar el cliente.' }
-  } finally { agrCreateLoading.value = false }
-}
-
-function useExample(text) { agrMessage.value = text; askAgr(text) }
-function executeAgrAction() {
-  const action = agrResponse.value?.data?.action
-  if (!action || action.type !== 'navigate' || !action.to) return
-  window.history.pushState({}, '', action.to)
-  window.dispatchEvent(new PopStateEvent('popstate'))
-}
-
-onMounted(async () => { try { data.value = (await api.get('/dashboard')).data } finally { loading.value = false } })
+onMounted(async () => {
+  try { data.value = (await api.get('/dashboard')).data }
+  finally { loading.value = false }
+})
 </script>
 
 <template>
-  <q-page class="viti-page">
+  <q-page class="viti-page dashboard-page">
     <q-inner-loading :showing="loading" />
-    <PageHeader eyebrow="SaaS" title="Panel VITI" subtitle="La plataforma en una mirada: negocios, aplicaciones, suscripciones y lo que requiere atención.">
-      <q-btn color="primary" unelevated icon="person_add" label="Registrar cliente" no-caps to="/clientes?new=1" />
+
+    <PageHeader
+      eyebrow="Centro VITI"
+      title="Tu operación, en orden."
+      subtitle="Recibe solicitudes, aprueba proyectos, registra avances y entrega sistemas desde un solo lugar."
+    >
+      <q-btn class="viti-btn viti-btn--ghost" outline no-caps icon="language" label="Vista pública" to="/viti" />
+      <q-btn class="viti-btn viti-btn--primary" unelevated no-caps icon="open_in_new" label="Probar formulario" to="/solicitud" />
     </PageHeader>
 
-    <div class="row q-col-gutter-md">
-      <div v-for="card in cards" :key="card.key" class="col-12 col-sm-6 col-xl-3">
-        <q-card flat class="viti-card action-card cursor-pointer" @click="$router.push(card.to)">
-          <q-card-section><div class="row items-center no-wrap"><q-avatar :color="`${card.color}-1`" :text-color="`${card.color}-8`" :icon="card.icon" size="50px" /><q-space /><q-icon name="arrow_forward" color="grey-5" /></div><div class="stat-value q-mt-md">{{ data.resumen[card.key] || 0 }}</div><div class="stat-label">{{ card.label }}</div></q-card-section>
-        </q-card>
+    <section class="metrics-grid">
+      <button v-for="item in metrics" :key="item.key" class="metric-card" type="button" @click="go(item.to)">
+        <span class="metric-icon"><q-icon :name="item.icon" /></span>
+        <span class="metric-copy"><b>{{ data.resumen[item.key] || 0 }}</b><small>{{ item.label }}</small></span>
+        <q-icon name="north_east" class="metric-arrow" />
+      </button>
+    </section>
+
+    <section v-if="workspaceEmpty && !loading" class="empty-workspace q-mt-lg">
+      <div class="empty-orbit"><q-icon name="hub" /></div>
+      <div class="empty-copy">
+        <div class="section-label">Espacio limpio</div>
+        <h2>VITI está listo para tu primer proyecto.</h2>
+        <p>No hay clientes, solicitudes, proyectos ni sistemas de demostración. Empieza una prueba real y VITI irá habilitando cada etapa cuando corresponda.</p>
       </div>
-    </div>
+      <div class="empty-actions">
+        <q-btn class="viti-btn viti-btn--primary" unelevated no-caps icon="open_in_new" label="Probar como cliente" to="/solicitud" />
+        <q-btn class="viti-btn viti-btn--ghost" outline no-caps icon="fact_check" label="Ver solicitudes" to="/solicitudes" />
+      </div>
+    </section>
 
-    <div class="q-mt-lg"><AgrAutopilotPanel :dashboard-data="data" /></div>
+    <section class="flow-section q-mt-lg">
+      <div class="section-top">
+        <div>
+          <div class="section-label">Flujo principal</div>
+          <h2>De la idea a la entrega</h2>
+        </div>
+        <span class="flow-hint">Cada etapa abre la siguiente</span>
+      </div>
+      <div class="flow-grid">
+        <button v-for="step in flow" :key="step.number" class="flow-card" :class="{ 'is-active': step.active }" type="button" @click="go(step.to)">
+          <span class="flow-number">{{ step.number }}</span>
+          <span class="flow-icon"><q-icon :name="step.icon" /></span>
+          <strong>{{ step.title }}</strong>
+          <p>{{ step.text }}</p>
+          <span class="flow-link">Abrir <q-icon name="arrow_forward" /></span>
+        </button>
+      </div>
+    </section>
 
-    <q-card flat class="viti-card q-mt-lg agr-card">
-      <q-card-section><div class="row items-center q-col-gutter-md"><div class="col-auto"><q-avatar color="primary" text-color="white" icon="auto_awesome" size="52px" /></div><div class="col"><div class="text-h6 text-weight-bold">AGR Assistant</div><div class="text-caption text-grey-6">Asistente local de VITI. Funciona con reglas y datos reales del sistema, sin API externa.</div></div><div class="col-12 col-md-auto"><q-badge color="positive" outline label="LOCAL · SIN API" /></div></div></q-card-section>
-      <q-separator />
-      <q-card-section>
-        <q-input v-model="agrMessage" outlined rounded dense placeholder="Escribe una orden para AGR..." @keyup.enter="askAgr()"><template #prepend><q-icon name="chat" /></template><template #append><q-btn round flat dense icon="send" color="primary" :loading="agrLoading" @click="askAgr()" /></template></q-input>
-        <div class="row q-gutter-sm q-mt-md"><q-btn outline no-caps size="sm" label="Resumen" @click="useExample('resumen')" /><q-btn outline no-caps size="sm" label="Abrir clientes" @click="useExample('abrir clientes')" /><q-btn outline no-caps size="sm" label="Crear cliente" @click="useExample('crear cliente')" /><q-btn outline no-caps size="sm" label="Crear solicitud" @click="useExample('crear solicitud')" /><q-btn outline no-caps size="sm" label="Pagos vencidos" @click="useExample('pagos vencidos')" /><q-btn outline no-caps size="sm" label="Soportes abiertos" @click="useExample('soportes abiertos')" /></div>
-      </q-card-section>
+    <section class="dashboard-columns q-mt-lg">
+      <article class="viti-panel">
+        <div class="panel-head">
+          <div><div class="section-label">Entrada</div><h3>Solicitudes recientes</h3></div>
+          <q-btn flat round icon="arrow_forward" class="panel-link" to="/solicitudes"><q-tooltip>Ver solicitudes</q-tooltip></q-btn>
+        </div>
+        <div v-if="data.solicitudes_recientes?.length" class="activity-list">
+          <button v-for="item in data.solicitudes_recientes" :key="item.id" type="button" class="activity-row" @click="go(`/solicitudes/${item.id}`)">
+            <span class="activity-icon"><q-icon name="description" /></span>
+            <span class="activity-copy"><b>{{ item.titulo || item.codigo }}</b><small>{{ item.empresa?.nombre_comercial || item.cliente?.nombre || 'Sin empresa asignada' }}</small></span>
+            <span class="activity-date">{{ formatDateTime(item.created_at) }}</span>
+          </button>
+        </div>
+        <div v-else class="panel-empty"><q-icon name="inbox" /><b>Sin solicitudes todavía</b><span>Las nuevas solicitudes aparecerán aquí.</span></div>
+      </article>
 
-      <q-card-section v-if="agrResponse" class="q-pt-none"><div class="agr-response"><div class="text-caption text-grey-6 q-mb-xs">AGR · {{ pretty(agrResponse.intent) }}</div><div class="text-body1">{{ agrResponse.message }}</div>
-        <div v-if="agrResponse.intent === 'create_client_workflow'" class="q-mt-md"><q-badge color="primary" outline :label="`Paso ${agrResponse.data?.step || 1}`" /><div class="text-caption text-grey-6 q-mt-sm">AGR mantiene el borrador mientras avanzas. Puedes escribir “cancelar” para detener la operación.</div></div>
-        <q-form v-if="['create_client','create_client_ready'].includes(agrResponse.intent)" class="q-mt-md" @submit.prevent="confirmCreateClient">
-          <div class="text-subtitle2 text-weight-bold q-mb-md">Revisa los datos del cliente</div>
-          <div class="row q-col-gutter-sm">
-            <div class="col-12 col-md-6"><q-input v-model="agrClientForm.nombre" outlined dense label="Nombre completo *" /></div>
-            <div class="col-12 col-md-3"><q-input v-model="agrClientForm.telefono" outlined dense label="Teléfono" /></div>
-            <div class="col-12 col-md-3"><q-input v-model="agrClientForm.whatsapp" outlined dense label="WhatsApp" /></div>
-            <div class="col-12 col-md-6"><q-input v-model="agrClientForm.correo" outlined dense type="email" label="Correo" /></div>
-            <div class="col-12 col-md-3"><q-input v-model="agrClientForm.ciudad" outlined dense label="Ciudad" /></div>
-            <div class="col-12 col-md-3"><q-input v-model="agrClientForm.direccion" outlined dense label="Dirección" /></div>
-            <div class="col-12"><q-input v-model="agrClientForm.observaciones" outlined dense type="textarea" autogrow label="Observaciones" /></div>
-          </div>
-          <div class="row items-center q-gutter-sm q-mt-md"><q-badge color="orange" outline label="CONFIRMACIÓN REQUERIDA" /><q-space /><q-btn flat no-caps label="Cancelar" @click="agrResponse = null" /><q-btn color="primary" unelevated no-caps icon="person_add" label="Confirmar registro" type="submit" :loading="agrCreateLoading" :disable="!agrClientForm.nombre.trim()" /></div>
-        </q-form>
-
-        <div v-if="agrResponse.intent === 'create_client_success' && agrResponse.data?.client" class="q-mt-md"><q-card flat bordered><q-card-section><div class="text-subtitle2 text-weight-bold">Cliente creado correctamente</div><div class="q-mt-sm">{{ agrResponse.data.client.nombre }}</div><div class="text-caption text-grey-6">ID #{{ agrResponse.data.client.id }} · {{ agrResponse.data.client.telefono || 'Sin teléfono' }}</div></q-card-section></q-card></div>
-        <div v-if="agrResponse.data?.clients !== undefined" class="row q-col-gutter-sm q-mt-md"><div v-for="item in [{key:'clients',label:'Clientes'},{key:'companies',label:'Empresas'},{key:'requests',label:'Solicitudes'},{key:'projects',label:'Proyectos'},{key:'payments',label:'Pagos'},{key:'support',label:'Soportes'}]" :key="item.key" class="col-6 col-sm-4 col-md-2"><q-card flat bordered class="summary-chip"><q-card-section class="text-center q-pa-sm"><div class="text-h6 text-weight-bold">{{ agrResponse.data[item.key] ?? 0 }}</div><div class="text-caption text-grey-6">{{ item.label }}</div></q-card-section></q-card></div></div>
-        <q-list v-if="agrResponse.intent === 'search_client' && agrResponse.data?.results?.length" separator class="q-mt-md rounded-borders"><q-item v-for="client in agrResponse.data.results" :key="client.id"><q-item-section><q-item-label class="text-weight-bold">{{ client.nombre }}</q-item-label><q-item-label caption>{{ client.telefono || 'Sin teléfono' }} · {{ client.correo || 'Sin correo' }}</q-item-label></q-item-section><q-item-section side><q-badge :label="client.estado || 'sin estado'" /></q-item-section></q-item></q-list>
-        <q-list v-if="agrResponse.intent === 'search_company' && agrResponse.data?.results?.length" separator class="q-mt-md rounded-borders"><q-item v-for="company in agrResponse.data.results" :key="company.id"><q-item-section avatar><q-avatar color="primary" text-color="white" icon="business" /></q-item-section><q-item-section><q-item-label class="text-weight-bold">{{ company.nombre_comercial }}</q-item-label><q-item-label caption>{{ company.codigo || 'Sin código' }} · {{ company.ciudad || 'Sin ciudad' }} · {{ company.telefono || 'Sin teléfono' }}</q-item-label></q-item-section><q-item-section side><q-badge :label="company.estado || 'sin estado'" /></q-item-section></q-item></q-list>
-        <div v-if="agrResponse.data?.action?.type === 'navigate'" class="q-mt-md"><q-btn color="primary" unelevated no-caps icon="open_in_new" :label="agrResponse.data.action.label || 'Abrir'" @click="executeAgrAction" /></div>
-        <div v-if="agrResponse.data?.commands?.length" class="q-mt-md"><div class="text-caption text-grey-6 q-mb-sm">Comandos disponibles</div><div class="row q-gutter-xs"><q-chip v-for="command in agrResponse.data.commands" :key="command" dense>{{ command }}</q-chip></div></div>
-      </div></q-card-section>
-    </q-card>
-
-    <div class="row q-col-gutter-lg q-mt-sm"><div class="col-12 col-lg-6"><q-card flat class="viti-card full-height"><q-card-section class="row items-center"><div><div class="text-h6 text-weight-bold">Necesitan atención</div><div class="text-caption text-grey-6">Entregas, vencimientos y suspensiones detectadas por VITI.</div></div><q-space /><q-btn flat dense no-caps color="primary" label="Centro SaaS" to="/saas" /></q-card-section><q-separator /><q-list v-if="data.requieren_atencion?.length" separator><q-item v-for="row in data.requieren_atencion" :key="row.app.id" clickable to="/saas"><q-item-section avatar><q-avatar color="orange-1" text-color="orange-9" :icon="row.ciclo.estado === 'lista_entrega' ? 'key' : row.ciclo.estado === 'suspendida' ? 'block' : 'schedule'" /></q-item-section><q-item-section><q-item-label class="text-weight-bold">{{ row.app.nombre }}</q-item-label><q-item-label caption>{{ row.app.empresa?.nombre_comercial }} · {{ row.ciclo.mensaje }}</q-item-label></q-item-section><q-item-section side><q-badge :color="row.ciclo.estado === 'suspendida' ? 'negative' : 'orange'">{{ pretty(row.ciclo.estado) }}</q-badge></q-item-section></q-item></q-list><div v-else class="empty-state"><q-icon name="task_alt" size="46px" /><div class="q-mt-sm">No hay incidencias SaaS pendientes.</div></div></q-card></div><div class="col-12 col-lg-6"><q-card flat class="viti-card"><q-card-section><div class="text-h6 text-weight-bold">Operación de hoy</div><div class="text-caption text-grey-6">Lo que todavía requiere trabajo humano, ese componente que insiste en seguir siendo necesario.</div></q-card-section><q-separator /><q-list><q-item clickable to="/solicitudes"><q-item-section avatar><q-avatar color="orange-1" text-color="orange-8" icon="assignment" /></q-item-section><q-item-section>Solicitudes activas</q-item-section><q-item-section side><strong>{{ data.resumen.solicitudes_activas || 0 }}</strong></q-item-section></q-item><q-item clickable to="/proyectos"><q-item-section avatar><q-avatar color="purple-1" text-color="purple-8" icon="account_tree" /></q-item-section><q-item-section>Proyectos activos</q-item-section><q-item-section side><strong>{{ data.resumen.proyectos_activos || 0 }}</strong></q-item-section></q-item><q-item clickable to="/mantenimientos"><q-item-section avatar><q-avatar color="red-1" text-color="red-8" icon="support_agent" /></q-item-section><q-item-section>Soportes abiertos</q-item-section><q-item-section side><strong>{{ data.resumen.mantenimientos_abiertos || 0 }}</strong></q-item-section></q-item><q-item clickable to="/aplicaciones"><q-item-section avatar><q-avatar color="teal-1" text-color="teal-8" icon="key" /></q-item-section><q-item-section>Pendientes de entrega</q-item-section><q-item-section side><strong>{{ data.resumen.aplicaciones_pendientes_entrega || 0 }}</strong></q-item-section></q-item></q-list></q-card></div></div>
+      <article class="viti-panel">
+        <div class="panel-head">
+          <div><div class="section-label">Producción</div><h3>Proyectos recientes</h3></div>
+          <q-btn flat round icon="arrow_forward" class="panel-link" to="/proyectos"><q-tooltip>Ver proyectos</q-tooltip></q-btn>
+        </div>
+        <div v-if="data.proyectos_recientes?.length" class="activity-list">
+          <button v-for="item in data.proyectos_recientes" :key="item.id" type="button" class="activity-row" @click="go(`/proyectos/${item.id}`)">
+            <span class="activity-icon"><q-icon name="account_tree" /></span>
+            <span class="activity-copy"><b>{{ item.nombre || item.codigo }}</b><small>{{ item.empresa?.nombre_comercial || item.cliente?.nombre || 'Sin empresa asignada' }}</small></span>
+            <span class="progress-pill">{{ item.progreso || 0 }}%</span>
+          </button>
+        </div>
+        <div v-else class="panel-empty"><q-icon name="conversion_path" /><b>Sin proyectos activos</b><span>Convierte una solicitud aprobada para iniciar.</span></div>
+      </article>
+    </section>
   </q-page>
 </template>
 
 <style scoped>
-.action-card{height:100%;transition:transform .15s ease,box-shadow .15s ease}.action-card:hover{transform:translateY(-2px);box-shadow:0 10px 24px rgba(12,35,64,.08)}
-.agr-card{overflow:hidden}.agr-response{border-radius:16px;background:rgba(25,118,210,.05);padding:16px}.summary-chip{height:100%}
+.dashboard-page{padding-top:34px}.metrics-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px}.metric-card,.flow-card,.activity-row{font:inherit;color:inherit;text-align:left}.metric-card{border:1px solid var(--viti-border);background:rgba(15,40,70,.55);border-radius:18px;padding:18px;display:flex;align-items:center;gap:14px;cursor:pointer;transition:.2s ease;min-height:96px}.metric-card:hover{transform:translateY(-2px);border-color:rgba(242,139,48,.55);background:rgba(20,52,88,.76)}.metric-icon{width:44px;height:44px;border-radius:13px;background:rgba(242,139,48,.11);color:#ff9a3c;display:grid;place-items:center;font-size:23px}.metric-copy{display:grid;gap:2px}.metric-copy b{font-size:27px;line-height:1}.metric-copy small{color:var(--viti-muted);font-size:12px}.metric-arrow{margin-left:auto;color:#6f89a4}.empty-workspace{border:1px solid rgba(242,139,48,.24);background:linear-gradient(135deg,rgba(11,31,52,.88),rgba(18,47,78,.7));border-radius:22px;padding:28px;display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:22px}.empty-orbit{width:70px;height:70px;border:1px solid rgba(242,139,48,.38);border-radius:50%;display:grid;place-items:center;color:#ff9a3c;font-size:30px;box-shadow:inset 0 0 24px rgba(242,139,48,.08)}.empty-copy h2{margin:4px 0 6px;font-size:26px}.empty-copy p{margin:0;color:var(--viti-muted);max-width:680px;line-height:1.55}.empty-actions{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}.flow-section,.viti-panel{border:1px solid var(--viti-border);background:rgba(8,25,45,.62);border-radius:22px}.flow-section{padding:24px}.section-top,.panel-head{display:flex;align-items:center;justify-content:space-between;gap:20px}.section-top h2,.panel-head h3{margin:4px 0 0}.section-top h2{font-size:24px}.flow-hint{font-size:12px;color:var(--viti-muted)}.flow-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-top:20px}.flow-card{position:relative;border:1px solid rgba(99,129,160,.2);background:rgba(16,43,72,.52);border-radius:17px;padding:18px;cursor:pointer;transition:.2s ease;overflow:hidden}.flow-card:before{content:"";position:absolute;left:0;top:0;bottom:0;width:2px;background:transparent}.flow-card:hover,.flow-card.is-active{border-color:rgba(242,139,48,.42);background:rgba(20,53,88,.82)}.flow-card.is-active:before{background:#f28b30}.flow-number{font-size:10px;letter-spacing:.12em;color:#7d96af;font-weight:800}.flow-icon{display:grid;place-items:center;width:38px;height:38px;border-radius:12px;margin:14px 0;background:rgba(20,87,184,.18);color:#77adff;font-size:21px}.flow-card strong{font-size:17px}.flow-card p{color:var(--viti-muted);font-size:12px;line-height:1.55;min-height:58px}.flow-link{font-size:11px;color:#ff9a3c;display:inline-flex;align-items:center;gap:4px;font-weight:700}.dashboard-columns{display:grid;grid-template-columns:1fr 1fr;gap:14px}.viti-panel{overflow:hidden}.panel-head{padding:20px 22px;border-bottom:1px solid rgba(99,129,160,.18)}.panel-head h3{font-size:18px}.panel-link{color:#ff9a3c}.activity-list{display:grid}.activity-row{border:0;border-bottom:1px solid rgba(99,129,160,.13);background:transparent;padding:15px 20px;display:flex;align-items:center;gap:12px;cursor:pointer;transition:.18s ease}.activity-row:last-child{border-bottom:0}.activity-row:hover{background:rgba(20,87,184,.08)}.activity-icon{width:36px;height:36px;border-radius:10px;display:grid;place-items:center;background:rgba(255,255,255,.04);color:#8ba8c4}.activity-copy{display:grid;gap:2px;min-width:0}.activity-copy b{font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.activity-copy small,.activity-date{color:var(--viti-muted);font-size:11px}.activity-date{margin-left:auto;white-space:nowrap}.progress-pill{margin-left:auto;padding:5px 9px;border-radius:999px;background:rgba(242,139,48,.12);color:#ffad62;font-size:11px;font-weight:800}.panel-empty{min-height:180px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;color:var(--viti-muted);gap:5px;padding:22px}.panel-empty .q-icon{font-size:34px;color:#66819d}.panel-empty b{color:var(--viti-text);font-size:14px}.panel-empty span{font-size:12px}.viti-btn{border-radius:12px;min-height:42px}.viti-btn--ghost{background:rgba(255,255,255,.025)!important;border-color:rgba(158,180,201,.28)!important}.viti-btn--primary{background:linear-gradient(135deg,#1457b8,#1a69cf)!important;box-shadow:0 10px 28px rgba(20,87,184,.18)!important}
+@media(max-width:1100px){.metrics-grid,.flow-grid{grid-template-columns:repeat(2,1fr)}.dashboard-columns{grid-template-columns:1fr}.empty-workspace{grid-template-columns:auto 1fr}.empty-actions{grid-column:1/-1;justify-content:flex-start}}
+@media(max-width:600px){.dashboard-page{padding-top:18px}.metrics-grid,.flow-grid{grid-template-columns:1fr}.empty-workspace{grid-template-columns:1fr}.empty-orbit{width:58px;height:58px}.flow-section{padding:17px}.activity-date{display:none}}
 </style>

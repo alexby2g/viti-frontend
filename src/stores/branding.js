@@ -38,7 +38,7 @@ export const useBrandingStore = defineStore('branding', {
       root.style.setProperty('--q-dark', this.dark_color)
       root.style.setProperty('--viti-drawer-live', this.drawer_color)
       root.style.setProperty('--viti-primary-live', this.primary_color)
-      document.title = `${this.product_name} · ${this.studio_name}`
+      document.title = `${this.product_name} · Plataforma de sistemas`
     },
     async load(force = false) {
       if (this.loaded && !force) return

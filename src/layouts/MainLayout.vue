@@ -42,13 +42,12 @@ const profilePhoto = computed(() => isClient.value ? auth.user?.cliente?.foto_ur
 const canChangeProfilePhoto = computed(() => isClient.value || isSuperAdmin.value)
 const unreadLabel = computed(() => notifications.unreadCount > 99 ? '99+' : String(notifications.unreadCount || ''))
 const businessOptions = computed(() => tenant.businesses.map(b => ({ label: b.nombre_comercial, value: b.id })))
-const guideFloatClass = computed(() => branding.guide_position === 'right-bottom' ? 'guide-right-bottom' : 'guide-right-center')
-const showGuideFloat = computed(() => branding.guide_enabled && route.path !== '/guia-viti')
 
 const menu = computed(() => buildMainMenu({
   isClient: isClient.value,
   isSuperAdmin: isSuperAdmin.value,
   hasClientProfile: hasClientProfile.value,
+  hasBusiness: tenant.businesses.length > 0,
   isManager: isManager.value,
   unreadCount: notifications.unreadCount,
   productName: branding.product_name,
@@ -64,7 +63,6 @@ const filteredQuickItems = computed(() => {
     : quickItems.value).slice(0, 12)
 })
 
-function toggleDark() { Dark.toggle(); localStorage.setItem('viti-theme', Dark.isActive ? 'dark' : 'light') }
 function refreshApp() { window.location.reload() }
 function closeMobileDrawer() { if ($q.screen.lt.md) drawer.value = false }
 function openProfile() { profileDialog.value = true }
@@ -115,10 +113,10 @@ async function handleItem(item) {
     return
   }
   if (item.action === 'request') {
-    try {
-      const { data } = await api.post('/mi/solicitud')
-      window.location.href = data.data.enlace_publico
-    } catch { return }
+    // El formulario oficial crea el negocio cuando hace falta y reutiliza la cuenta
+    // existente. No exigimos un negocio previo para solicitar un sistema.
+    window.location.href = '/solicitud'
+    return
   }
   if (item.to) router.push(item.to)
 }
@@ -128,9 +126,10 @@ function refreshWhenVisible() { if (document.visibilityState === 'visible') noti
 function openQuickSearch() { quickTerm.value = ''; quickSearch.value = true }
 function goQuick(item) { quickSearch.value = false; router.push(item.to) }
 function handleGlobalShortcut(event) { if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') { event.preventDefault(); openQuickSearch() } }
-function openGuide() { router.push('/guia-viti') }
 
 onMounted(async () => {
+  Dark.set(true)
+  localStorage.setItem('viti-theme', 'dark')
   document.body.classList.add('viti-main-active')
   drawer.value = $q.screen.gt.sm
   branding.load().catch(() => {})
@@ -156,7 +155,6 @@ onBeforeUnmount(() => {
         <q-space />
         <q-btn flat round dense icon="refresh" @click="refreshApp"><q-tooltip>Actualizar {{ branding.product_name }}</q-tooltip></q-btn>
         <q-btn flat round icon="search" @click="openQuickSearch"><q-tooltip>Buscar en {{ branding.product_name }} · Ctrl K</q-tooltip></q-btn>
-        <q-btn flat round :icon="$q.dark.isActive ? 'light_mode' : 'dark_mode'" @click="toggleDark"><q-tooltip>Cambiar tema</q-tooltip></q-btn>
         <q-btn flat round :icon="notifications.unreadCount ? 'notifications_active' : 'notifications_none'">
           <q-badge v-if="notifications.unreadCount" floating rounded color="negative" :label="unreadLabel" />
           <q-tooltip>Notificaciones internas</q-tooltip>
@@ -189,11 +187,11 @@ onBeforeUnmount(() => {
       </q-toolbar>
     </q-header>
 
-    <q-drawer v-model="drawer" show-if-above :breakpoint="900" :overlay="$q.screen.lt.md" :width="288" class="viti-drawer" :style="{ background: branding.drawer_color }">
+    <q-drawer v-model="drawer" show-if-above :breakpoint="900" :overlay="$q.screen.lt.md" :width="272" class="viti-drawer" :style="{ background: branding.drawer_color }">
       <div class="column fit no-wrap">
         <div class="q-pa-lg"><AppBrand /></div>
         <div v-if="!isClient" class="q-px-md q-pb-md">
-          <q-btn unelevated color="primary" icon="add" label="Nueva solicitud" no-caps class="full-width" to="/solicitudes?new=1" @click="closeMobileDrawer" />
+          <q-btn unelevated color="primary" icon="add" label="Nueva solicitud" no-caps class="full-width drawer-primary-action" to="/solicitud" @click="closeMobileDrawer" />
         </div>
         <div v-else class="q-px-md q-pb-md">
           <div class="client-badge">
@@ -248,20 +246,6 @@ onBeforeUnmount(() => {
     <q-page-container><router-view /></q-page-container>
     <CallCenter />
 
-    <q-btn
-      v-if="showGuideFloat"
-      class="viti-guide-float"
-      :class="guideFloatClass"
-      outline
-      rounded
-      color="primary"
-      icon="help_outline"
-      label="Guía"
-      no-caps
-      @click="openGuide"
-    >
-      <q-tooltip>Guía {{ branding.product_name }}</q-tooltip>
-    </q-btn>
 
     <BrandingSettingsDialog v-if="isSuperAdmin" v-model="brandingDialog" />
 
@@ -373,11 +357,14 @@ onBeforeUnmount(() => {
 
 <style scoped>
 .client-badge{padding:14px 16px;border-radius:14px;background:rgba(255,255,255,.08)}
-.viti-toolbar{min-height:64px}
+
+.viti-toolbar{min-height:68px;padding-inline:16px;background:rgba(7,14,24,.82);backdrop-filter:blur(14px)}
+.viti-toolbar :deep(.q-btn){border-radius:11px;transition:background .18s ease,transform .18s ease}.viti-toolbar :deep(.q-btn:hover){background:rgba(255,255,255,.06);transform:translateY(-1px)}
+.drawer-primary-action{min-height:44px;border-radius:12px;background:linear-gradient(135deg,rgba(20,87,184,.92),rgba(26,105,207,.92))!important;border:1px solid rgba(116,170,244,.2);box-shadow:0 12px 28px rgba(4,17,33,.18)}
+.viti-drawer :deep(.q-list){padding-top:4px}.viti-drawer :deep(.q-item){position:relative}.viti-drawer :deep(.q-item.q-router-link--active:before){content:"";position:absolute;left:0;top:9px;bottom:9px;width:3px;border-radius:999px;background:#f28b30}.viti-drawer :deep(.q-item.q-router-link--active){background:linear-gradient(90deg,rgba(242,139,48,.09),rgba(255,255,255,.025))!important}.viti-drawer :deep(.q-item.q-router-link--active .q-icon){color:#ff9a3c!important}.viti-drawer :deep(.q-expansion-item__container>.q-item:hover),.viti-drawer :deep(.q-item:hover){background:rgba(255,255,255,.045)!important}
+.viti-toolbar{min-height:68px}
 .quick-search-card{width:620px;max-width:94vw;margin-top:9vh;border-radius:18px}
 .profile-footer{border-radius:14px;transition:background .18s ease}.profile-footer:hover{background:rgba(255,255,255,.07)}
 .profile-card{width:520px;max-width:94vw;border-radius:20px;overflow:hidden}.profile-photo-wrap{position:relative;display:inline-flex}.profile-photo-large{box-shadow:0 12px 34px rgba(5,20,40,.22);border:4px solid rgba(255,255,255,.22)}.profile-photo-zoom-btn{position:absolute;right:-14px;bottom:7px;box-shadow:0 8px 20px rgba(5,20,40,.28)}.profile-photo-preview-card{width:min(560px,92vw);border-radius:20px;overflow:hidden}.profile-photo-preview-body{padding:18px;display:flex;justify-content:center;align-items:center;min-height:300px}.profile-photo-preview-image{display:block;max-width:100%;max-height:68vh;object-fit:contain;border-radius:16px;box-shadow:0 16px 44px rgba(5,20,40,.26)}
-.viti-guide-float{position:fixed;z-index:2200;background:var(--viti-card);box-shadow:0 10px 28px rgba(5,20,40,.18);min-height:48px;padding:0 18px}.guide-right-center{right:18px;top:52%;transform:translateY(-50%)}.guide-right-bottom{right:20px;bottom:22px}
-@media(max-width:900px){.viti-guide-float{right:12px!important;top:auto!important;bottom:max(14px,env(safe-area-inset-bottom))!important;transform:none!important;min-width:48px;padding:0 13px}.viti-guide-float :deep(.q-btn__content .block){display:none}}
 @media(max-width:600px){.viti-toolbar{min-height:58px;padding-left:10px;padding-right:10px}.quick-search-card{margin-top:4vh}.profile-card{width:94vw}.profile-photo-large{font-size:1.1rem}.profile-photo-preview-card{width:92vw}}
 </style>
