@@ -38,25 +38,21 @@ body.body--dark.viti-main-active .q-page-container,
   background-attachment:fixed;
 }
 
-body.viti-main-active .viti-header{
-  background:rgba(255,255,255,.9);
-  color:var(--viti-text);
-  border-color:var(--viti-border);
-  backdrop-filter:blur(16px);
-  -webkit-backdrop-filter:blur(16px);
-}
+body.viti-main-active .viti-header,
 body.body--dark.viti-main-active .viti-header{
-  background:rgba(11,11,13,.91);
+  background:rgba(6,15,27,.92);
   color:var(--viti-text);
-  border-color:#242429;
+  border-color:rgba(79,111,143,.24);
+  backdrop-filter:blur(18px);
+  -webkit-backdrop-filter:blur(18px);
 }
 
 body.viti-main-active .viti-drawer{
-  background:#0b0b0d;
-  color:#f5f5f6;
-  border-right:1px solid #242429;
+  background:linear-gradient(180deg,#08182b 0%,#0a2340 100%);
+  color:#f5f7fa;
+  border-right:1px solid rgba(76,111,147,.28);
 }
-body.viti-main-active .viti-drawer .q-separator{background:#26262c}
+body.viti-main-active .viti-drawer .q-separator{background:rgba(111,143,173,.18)}
 body.viti-main-active .viti-drawer .q-item,
 body.viti-main-active .viti-drawer .q-expansion-item__container>.q-item{
   margin:2px 10px;
@@ -69,11 +65,12 @@ body.viti-main-active .viti-drawer .q-expansion-item__container>.q-item .q-icon{
 body.viti-main-active .viti-drawer .q-item.q-router-link--active,
 body.viti-main-active .viti-drawer .q-item:hover,
 body.viti-main-active .viti-drawer .q-expansion-item__container>.q-item:hover{
-  background:#1a1a20;
+  background:linear-gradient(90deg,rgba(242,139,48,.10),rgba(20,87,184,.08));
   color:#fff;
+  box-shadow:inset 3px 0 0 #f28b30;
 }
 body.viti-main-active .viti-drawer .q-item.q-router-link--active .q-icon,
-body.viti-main-active .viti-drawer .q-item:hover .q-icon{color:#8d80e7}
+body.viti-main-active .viti-drawer .q-item:hover .q-icon{color:#ff9a3c}
 body.viti-main-active .client-badge{
   background:#15151a!important;
   border:1px solid #27272d;
@@ -102,17 +99,17 @@ body.viti-main-active .section-label,
 .agr-viti-auth .section-label,
 body.viti-main-active .text-primary,
 .agr-viti-auth .text-primary{
-  color:#6b5fd2!important;
+  color:#f28b30!important;
 }
 body.body--dark.viti-main-active .section-label,
 .body--dark .agr-viti-auth .section-label,
 body.body--dark.viti-main-active .text-primary,
 .body--dark .agr-viti-auth .text-primary{
-  color:#9589eb!important;
+  color:#ffb067!important;
 }
 body.viti-main-active .bg-primary,
 .agr-viti-auth .bg-primary{
-  background:#675bd0!important;
+  background:#1457b8!important;
 }
 body.viti-main-active .q-btn.bg-primary,
 .agr-viti-auth .q-btn.bg-primary{
@@ -120,11 +117,11 @@ body.viti-main-active .q-btn.bg-primary,
 }
 body.viti-main-active .q-btn.bg-primary:hover,
 .agr-viti-auth .q-btn.bg-primary:hover{
-  background:#5d52bf!important;
+  background:#114a9b!important;
 }
 body.viti-main-active .q-avatar.bg-accent,
 .agr-viti-auth .q-avatar.bg-accent{
-  background:linear-gradient(145deg,#3f74bb,#7566d6)!important;
+  background:linear-gradient(145deg,#1457b8,#f28b30)!important;
 }
 
 body.viti-main-active .q-field--outlined .q-field__control:before,
@@ -135,26 +132,26 @@ body.body--dark.viti-main-active .q-field__label,
 body.body--dark.viti-main-active .q-field__native,
 body.body--dark.viti-main-active .q-field__input,
 body.body--dark.viti-main-active .q-field__marginal,
-.body--dark .agr-viti-auth .q-field__label,
+.body--dark .agr-viti-auth .q-field__label{color:#91a6b9!important}
 .body--dark .agr-viti-auth .q-field__native,
-.body--dark .agr-viti-auth .q-field__input,
-.body--dark .agr-viti-auth .q-field__marginal{color:#e8e8eb}
+.body--dark .agr-viti-auth .q-field__input{color:#f4f8fc!important}
+.body--dark .agr-viti-auth .q-field__marginal{color:#7891a8!important}
 body.body--dark.viti-main-active .q-separator,
-.body--dark .agr-viti-auth .q-separator{background:#2a2a30}
+.body--dark .agr-viti-auth .q-separator{background:rgba(108,139,168,.20)}
 body.body--dark.viti-main-active .q-table thead th{background:#19191e;color:#d9d9de}
 body.body--dark.viti-main-active .q-table tbody td{color:#efeff1}
 
-/* Login y acceso público: negro/blanco con acentos AGR discretos. */
+/* Login y acceso público: dark premium AGR/VITI. */
 .agr-viti-auth .auth-page{
   background:
     radial-gradient(circle at 86% 12%,rgba(75,134,216,.10),transparent 24rem),
     radial-gradient(circle at 10% 92%,rgba(117,102,214,.08),transparent 26rem),
-    var(--viti-bg)!important;
+    #06111f!important;
 }
 .agr-viti-auth .login-card{
-  background:var(--viti-card)!important;
-  color:var(--viti-text);
-  border:1px solid var(--viti-border);
+  background:#0c2239!important;
+  color:#f3f7fc;
+  border:1px solid #294864;
 }
 
 /* 006 — lenguaje corporal contextual para el holograma. */

@@ -6,18 +6,21 @@ import { useTenantStore } from '../stores/tenant'
 
 export default defineRouter(({ store }) => {
   const publicRoutes = [
-    { path:'/viti', name:'viti-landing', component:() => import('../pages/VitiPremiumLandingPage.vue'), meta:{publicLanding:true} },
+    { path:'/viti', name:'viti-landing', component:() => import('../pages/VitiLandingPage.vue'), meta:{publicLanding:true} },
     { path:'/viti/planes', name:'viti-plans', component:() => import('../pages/VitiPlansPage.vue'), meta:{publicLanding:true} },
     { path:'/planes', redirect:'/viti/planes', meta:{publicLanding:true} },
     { path:'/presentacion', redirect:'/viti', meta:{publicLanding:true} },
+    { path:'/demo', component:() => import('../layouts/AuthLayout.vue'), meta:{publicLanding:true}, children:[{ path:'', name:'viti-demo', component:() => import('../pages/GuestDemoPage.vue'), meta:{publicLanding:true} }] },
   ]
-  const router = createRouter({ history: createWebHistory(), routes:[...publicRoutes, ...routes] })
-
-  if (router.hasRoute('public-request')) router.removeRoute('public-request')
-  router.addRoute({
-    path:'/solicitar/:token',
-    component:() => import('../layouts/AuthLayout.vue'),
-    children:[{ path:'', name:'public-request', component:() => import('../pages/IdeaBuilderPage.vue') }],
+  const router = createRouter({
+    history: createWebHistory(),
+    routes:[...publicRoutes, ...routes],
+    scrollBehavior(to, from, savedPosition) {
+      if (to.hash) return { el:to.hash, behavior:'smooth' }
+      const alwaysTop = to.meta.publicLanding || ['public-application','client-register','login','viti-demo'].includes(to.name)
+      if (alwaysTop) return { top:0, left:0 }
+      return savedPosition || { top:0, left:0 }
+    },
   })
 
   const clientHubRoutes = [
@@ -49,13 +52,6 @@ export default defineRouter(({ store }) => {
   router.addRoute({ path:'/aires/acceso', redirect:'/electrofrio/acceso' })
 
   router.addRoute({
-    path:'/solicitudes/:id/revision',
-    name:'solicitud-revision',
-    component:() => import('../pages/SolicitudRevisionPage.vue'),
-    meta:{requiresAuth:true,adminOnly:true},
-  })
-
-  router.addRoute({
     path:'/monitor',
     name:'monitor',
     component:() => import('../pages/MonitorPage.vue'),
@@ -73,10 +69,6 @@ export default defineRouter(({ store }) => {
     if (to.meta.publicLanding || to.name === 'viti-landing' || to.name === 'viti-plans') return true
 
     if (to.name === 'public-request') return true
-
-    if (to.name === 'solicitud-detalle' && to.params.id) {
-      return { name:'solicitud-revision', params:{ id:to.params.id } }
-    }
 
     const auth = useAuthStore(store)
     if (auth.setupRequired === null) await auth.checkSetup()
@@ -113,6 +105,8 @@ export default defineRouter(({ store }) => {
 
     if (['login','client-register','electro-customer-login'].includes(to.name)) {
       await auth.initialize()
+      const googleOnboarding = to.name === 'client-register' && to.query.google === 'created' && auth.user?.rol === 'cliente' && !auth.user?.cliente_id
+      if (googleOnboarding) return true
       if (auth.isAuthenticated) return homeFor(auth.user)
     }
     return true

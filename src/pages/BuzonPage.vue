@@ -76,7 +76,7 @@ const quickReplies = computed(() => {
     { label:'Revisión de alcance', icon:'manage_search', text:`Hola ${name}. Estamos revisando tu solicitud. Verificaremos que el plan cubra las funciones que necesitas y te confirmaremos el siguiente paso por este buzón.` },
     { label:'Falta información', icon:'help_outline', text:`Hola ${name}. Para continuar con la revisión necesitamos confirmar un dato adicional de tu operación. Te indicaremos exactamente qué información falta para no hacerte repetir todo el formulario.` },
     { label:'Plan / cotización', icon:'request_quote', text:`Hola ${name}. Revisamos el alcance comercial de tu solicitud. Antes de iniciar confirmaremos contigo el plan, el costo de implementación y la modalidad de suscripción.` },
-    { label:'Comprobante recibido', icon:'receipt_long', text:`Hola ${name}. Recibimos tu comprobante de pago. Está en revisión y el saldo se actualizará cuando quede confirmado por AGR Studio.` },
+    { label:'Comprobante recibido', icon:'receipt_long', text:`Hola ${name}. Recibimos tu comprobante de pago. Está en revisión y el saldo se actualizará cuando quede confirmado por VITI.` },
     { label:'Nuevo avance', icon:'timeline', text:`Hola ${name}. Tu proyecto tiene un nuevo avance disponible en VITI. Puedes revisarlo desde Mi proyecto y escribirnos aquí si necesitas una aclaración.` },
     { label:'Beta disponible', icon:'science', text:`Hola ${name}. Ya tenemos una versión de prueba disponible. Esta etapa sirve para validar el funcionamiento antes de la entrega definitiva.` },
     { label:'Entrega lista', icon:'verified_user', text:`Hola ${name}. Tu aplicación está lista para la siguiente etapa de entrega. Confirmaremos acceso, estado del proyecto y condiciones de soporte desde VITI.` },

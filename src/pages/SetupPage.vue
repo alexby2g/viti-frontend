@@ -79,7 +79,7 @@ async function submit() {
           <div class="col-12 col-sm-6"><q-input v-model="form.nombre" outlined label="Nombre *" lazy-rules :rules="[rules.required]" /></div>
           <div class="col-12 col-sm-6"><q-input v-model="form.apellido" outlined label="Apellido" /></div>
           <div class="col-12 col-sm-6"><q-input v-model="form.usuario" outlined label="Usuario *" maxlength="80" lazy-rules :rules="[rules.required, rules.username]" /></div>
-          <div class="col-12 col-sm-6"><q-input v-model="form.telefono" outlined label="Teléfono *" inputmode="numeric" maxlength="15" lazy-rules :rules="[rules.required, rules.phone]" @update:model-value="v => form.telefono = String(v ?? '').replace(/\D/g, '')" /></div>
+          <div class="col-12 col-sm-6"><q-input v-model="form.telefono" outlined label="Celular *" inputmode="numeric" maxlength="15" lazy-rules :rules="[rules.required, rules.phone]" @update:model-value="v => form.telefono = String(v ?? '').replace(/\D/g, '')" /></div>
           <div class="col-12 col-sm-6"><q-input v-model="form.password" outlined :type="showPassword ? 'text' : 'password'" label="Contraseña *" lazy-rules :rules="[rules.password]"><template #append><q-icon :name="showPassword ? 'visibility_off' : 'visibility'" class="cursor-pointer" @click="showPassword = !showPassword" /></template></q-input></div>
           <div class="col-12 col-sm-6"><q-input v-model="form.password_confirmation" outlined :type="showPassword ? 'text' : 'password'" label="Confirmar contraseña *" lazy-rules :rules="[rules.required, rules.confirmation]" /></div>
         </div>

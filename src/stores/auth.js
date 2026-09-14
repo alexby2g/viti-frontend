@@ -70,6 +70,20 @@ export const useAuthStore = defineStore('auth', {
         this.loginStage = ''
       }
     },
+    async createClientAccount(payload) {
+      this.loading = true
+      try {
+        await warmBackend()
+        await initCsrf()
+        const { data } = await api.post('/auth/cliente/crear-cuenta', payload, { timeout: 30000 })
+        this.user = data.usuario
+        this.initialized = true
+        registerNativePushDevice(api).catch(() => {})
+        return data
+      } catch (error) {
+        throw normalizeConnectionError(error)
+      } finally { this.loading = false }
+    },
     async registerClient(payload) {
       this.loading = true
       try {

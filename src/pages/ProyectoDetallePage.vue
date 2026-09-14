@@ -55,10 +55,10 @@ async function saveDevelopment(){
   try{
     const payload={...form,development:JSON.parse(JSON.stringify(development))}
     await api.put(`/proyectos/${item.value.id}`,payload)
-    $q.notify({type:'positive',message:'Centro de Desarrollo actualizado.'})
+    $q.notify({type:'positive',message:'Detalles técnicos actualizados.'})
     developmentDialog.value=false
     await load()
-  }catch(e){$q.notify({type:'negative',message:e.response?.data?.message||'No se pudo guardar la configuración de desarrollo.'})}
+  }catch(e){$q.notify({type:'negative',message:e.response?.data?.message||'No se pudieron guardar los detalles técnicos.'})}
 }
 
 function openDevelopment(){hydrateDevelopment(item.value||{});developmentDialog.value=true}
@@ -91,7 +91,7 @@ onMounted(load)
       <div class="row q-gutter-sm">
         <q-btn outline color="primary" icon="picture_as_pdf" label="PDF" no-caps @click="downloadFile(`/reportes/proyectos/${item.id}.pdf`,`${item.codigo}.pdf`)"/>
         <q-btn outline color="primary" icon="edit" label="Editar" no-caps @click="editDialog=true"/>
-        <q-btn outline color="deep-purple" icon="hub" label="Centro de Desarrollo" no-caps @click="openDevelopment"/>
+        <q-btn flat color="orange" icon="tune" label="Detalles técnicos" no-caps @click="openDevelopment"/>
         <q-btn color="primary" unelevated icon="add_task" label="Registrar avance" no-caps @click="openAdvance"/>
       </div>
     </PageHeader>
@@ -110,22 +110,6 @@ onMounted(load)
           <q-card-section>
             <div class="text-subtitle1 text-weight-bold">Descripción</div>
             <div class="q-mt-sm" style="white-space:pre-wrap">{{item.descripcion||'Sin descripción.'}}</div>
-          </q-card-section>
-        </q-card>
-
-        <q-card flat class="viti-card q-mt-lg">
-          <q-card-section><div class="text-h6 text-weight-bold">Control técnico</div><div class="text-caption text-grey-6">Infraestructura asociada a este proyecto.</div></q-card-section>
-          <q-separator/>
-          <q-card-section>
-            <div class="row q-col-gutter-md">
-              <div class="col-12 col-md-4"><q-card flat bordered class="q-pa-md"><div class="text-caption text-grey-6">Repositorios</div><div class="text-h5 text-weight-bold">{{item.repositorios?.length||0}}</div></q-card></div>
-              <div class="col-12 col-md-4"><q-card flat bordered class="q-pa-md"><div class="text-caption text-grey-6">Ambientes</div><div class="text-h5 text-weight-bold">{{item.ambientes?.length||0}}</div></q-card></div>
-              <div class="col-12 col-md-4"><q-card flat bordered class="q-pa-md"><div class="text-caption text-grey-6">Dominios</div><div class="text-h5 text-weight-bold">{{item.dominios?.length||0}}</div></q-card></div>
-            </div>
-            <div class="q-mt-md row q-gutter-sm">
-              <q-chip v-for="repo in item.repositorios" :key="repo.id" icon="code" color="grey-2">{{repo.tipo}} · {{repo.nombre}}</q-chip>
-              <q-chip v-if="!item.repositorios?.length" color="grey-2">Todavía no hay repositorios asociados.</q-chip>
-            </div>
           </q-card-section>
         </q-card>
 
@@ -177,16 +161,16 @@ onMounted(load)
 
   <q-dialog v-model="developmentDialog" maximized>
     <q-card>
-      <q-card-section class="row items-center"><div><div class="section-label">Centro de Desarrollo</div><div class="text-h5 text-weight-bold">{{item?.codigo}} · {{item?.nombre}}</div><div class="text-caption text-grey-6">Todo queda relacionado con este proyecto mediante <b>proyecto_id</b>.</div></div><q-space/><q-btn flat round icon="close" v-close-popup/></q-card-section>
+      <q-card-section class="row items-center"><div><div class="section-label">Detalles técnicos</div><div class="text-h5 text-weight-bold">{{item?.codigo}} · {{item?.nombre}}</div><div class="text-caption text-grey-6">Información opcional para el equipo de desarrollo. El cliente no necesita verla.</div></div><q-space/><q-btn flat round icon="close" v-close-popup/></q-card-section>
       <q-separator/>
       <q-card-section class="q-pa-lg">
         <div class="row q-col-gutter-lg">
           <div class="col-12 col-xl-6">
             <q-card flat bordered>
-              <q-card-section class="row items-center"><div><div class="text-h6 text-weight-bold">Repositorios</div><div class="text-caption">Frontend, backend, móvil e infraestructura.</div></div><q-space/><q-btn color="primary" icon="add" label="Repositorio" no-caps @click="addRepo"/></q-card-section>
+              <q-card-section class="row items-center"><div><div class="text-h6 text-weight-bold">Repositorios</div><div class="text-caption">Referencias de código cuando el proyecto las necesite.</div></div><q-space/><q-btn color="primary" icon="add" label="Repositorio" no-caps @click="addRepo"/></q-card-section>
               <q-separator/>
               <q-card-section>
-                <div v-for="(repo,index) in development.repositorios" :key="index" class="q-pa-md q-mb-md rounded-borders bg-grey-1">
+                <div v-for="(repo,index) in development.repositorios" :key="index" class="q-pa-md q-mb-md rounded-borders dev-block">
                   <div class="row q-col-gutter-sm">
                     <div class="col-6"><q-select v-model="repo.tipo" outlined dense :options="['frontend','backend','mobile','infra','otro']" label="Tipo"/></div>
                     <div class="col-6"><q-select v-model="repo.proveedor" outlined dense :options="['github','gitlab','bitbucket','otro']" label="Proveedor"/></div>
@@ -205,10 +189,10 @@ onMounted(load)
 
           <div class="col-12 col-xl-6">
             <q-card flat bordered>
-              <q-card-section class="row items-center"><div><div class="text-h6 text-weight-bold">Ambientes</div><div class="text-caption">Separación entre desarrollo, staging y producción.</div></div><q-space/><q-btn outline color="primary" icon="add" label="Ambiente" no-caps @click="addEnvironment"/></q-card-section>
+              <q-card-section class="row items-center"><div><div class="text-h6 text-weight-bold">Ambientes</div><div class="text-caption">URLs y hosting de prueba o producción, solo cuando existan.</div></div><q-space/><q-btn outline color="primary" icon="add" label="Ambiente" no-caps @click="addEnvironment"/></q-card-section>
               <q-separator/>
               <q-card-section>
-                <div v-for="(env,index) in development.ambientes" :key="index" class="q-pa-md q-mb-md rounded-borders bg-grey-1">
+                <div v-for="(env,index) in development.ambientes" :key="index" class="q-pa-md q-mb-md rounded-borders dev-block">
                   <div class="row q-col-gutter-sm">
                     <div class="col-5"><q-select v-model="env.tipo" outlined dense :options="['desarrollo','staging','produccion']" label="Tipo"/></div>
                     <div class="col-7"><q-input v-model="env.nombre" outlined dense label="Nombre"/></div>
@@ -228,10 +212,10 @@ onMounted(load)
 
           <div class="col-12 col-xl-6">
             <q-card flat bordered>
-              <q-card-section class="row items-center"><div><div class="text-h6 text-weight-bold">Miembros</div><div class="text-caption">Personas asignadas al proyecto. La V2 usará selector de usuarios.</div></div><q-space/><q-btn outline color="primary" icon="person_add" label="Miembro" no-caps @click="addMember"/></q-card-section>
+              <q-card-section class="row items-center"><div><div class="text-h6 text-weight-bold">Miembros</div><div class="text-caption">Equipo técnico asignado, si corresponde.</div></div><q-space/><q-btn outline color="primary" icon="person_add" label="Miembro" no-caps @click="addMember"/></q-card-section>
               <q-separator/>
               <q-card-section>
-                <div v-for="(member,index) in development.miembros" :key="index" class="q-pa-md q-mb-md rounded-borders bg-grey-1">
+                <div v-for="(member,index) in development.miembros" :key="index" class="q-pa-md q-mb-md rounded-borders dev-block">
                   <div class="row q-col-gutter-sm items-center">
                     <div class="col-4"><q-input v-model.number="member.usuario_id" outlined dense type="number" label="ID usuario"/></div>
                     <div class="col-5"><q-select v-model="member.rol" outlined dense :options="['responsable','desarrollador','qa','devops','diseno','cliente_lector']" label="Rol"/></div>
@@ -245,10 +229,10 @@ onMounted(load)
 
           <div class="col-12 col-xl-6">
             <q-card flat bordered>
-              <q-card-section class="row items-center"><div><div class="text-h6 text-weight-bold">Dominios</div><div class="text-caption">Dominios vinculados a los ambientes del proyecto.</div></div><q-space/><q-btn outline color="primary" icon="language" label="Dominio" no-caps @click="addDomain"/></q-card-section>
+              <q-card-section class="row items-center"><div><div class="text-h6 text-weight-bold">Dominios</div><div class="text-caption">Dominios reales del sistema, cuando estén disponibles.</div></div><q-space/><q-btn outline color="primary" icon="language" label="Dominio" no-caps @click="addDomain"/></q-card-section>
               <q-separator/>
               <q-card-section>
-                <div v-for="(domain,index) in development.dominios" :key="index" class="q-pa-md q-mb-md rounded-borders bg-grey-1">
+                <div v-for="(domain,index) in development.dominios" :key="index" class="q-pa-md q-mb-md rounded-borders dev-block">
                   <div class="row q-col-gutter-sm">
                     <div class="col-8"><q-input v-model="domain.dominio" outlined dense label="Dominio"/></div>
                     <div class="col-4"><q-select v-model="domain.tipo" outlined dense :options="['web','api','staging','otro']" label="Tipo"/></div>
@@ -265,8 +249,13 @@ onMounted(load)
         </div>
       </q-card-section>
       <q-separator/>
-      <q-card-actions align="right" class="q-pa-md"><q-btn flat label="Cancelar" v-close-popup/><q-btn color="primary" unelevated icon="save" label="Guardar Centro de Desarrollo" no-caps @click="saveDevelopment"/></q-card-actions>
+      <q-card-actions align="right" class="q-pa-md"><q-btn flat label="Cancelar" v-close-popup/><q-btn color="primary" unelevated icon="save" label="Guardar detalles técnicos" no-caps @click="saveDevelopment"/></q-card-actions>
     </q-card>
   </q-dialog>
 </q-page>
 </template>
+
+<style scoped>
+.dev-block{background:#081a2c;border:1px solid rgba(68,103,137,.28)}
+.q-dialog :deep(.q-card){background:#0a1d31;color:#edf4fb}.q-dialog :deep(.q-card.q-pa-md),.q-dialog :deep(.q-card[bordered]){border-color:rgba(68,103,137,.28)}
+</style>

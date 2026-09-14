@@ -19,8 +19,8 @@ const clientSteps = [
   { icon:'person_add', title:'Registro', text:'Tus datos personales y los datos básicos de tu negocio se registran una sola vez.', action:'Mi cuenta', to:'/mi-cuenta' },
   { icon:'workspace_premium', title:'Plan', text:'Compara VITI Inicial, Profesional, Empresa o una cotización personalizada según el alcance que necesitas.', action:'Nueva solicitud', actionKey:'request' },
   { icon:'tune', title:'Configuración corta', text:'Solo respondes algunas preguntas útiles para tu plan. Esta parte puede omitirse y completarse durante la revisión.', action:'Mis solicitudes', to:'/mi-cuenta' },
-  { icon:'handshake', title:'Acuerdo inicial', text:'Confirmas plan, forma de pago y modalidad de suscripción. AGR Studio valida el alcance antes de iniciar.', action:'Mis pagos', to:'/mi-pagos' },
-  { icon:'manage_search', title:'Revisión', text:'AGR Studio revisa la solicitud y puede pedir una aclaración directamente por el buzón.', action:'Mi buzón', to:'/mi-buzon' },
+  { icon:'handshake', title:'Acuerdo inicial', text:'Confirmas plan, forma de pago y modalidad de suscripción. VITI valida el alcance antes de iniciar.', action:'Mis pagos', to:'/mi-pagos' },
+  { icon:'manage_search', title:'Revisión', text:'VITI revisa la solicitud y puede pedir una aclaración directamente por el buzón.', action:'Mi buzón', to:'/mi-buzon' },
   { icon:'account_tree', title:'Proyecto', text:'Al aprobarse la solicitud se crea el proyecto. Allí ves avance, decisiones, fechas y archivos.', action:'Mi proyecto', to:'/mi-proyecto' },
   { icon:'science', title:'Prueba y entrega', text:'La aplicación puede pasar por beta antes de producción. La entrega y el acceso se habilitan de forma controlada.', action:'Aplicaciones', to:'/mi-aplicaciones' },
   { icon:'support_agent', title:'Operación y soporte', text:'Después de la entrega sigues usando VITI para pagos, mensajes, soporte e historial de tu solución.', action:'Mi buzón', to:'/mi-buzon' },
@@ -50,9 +50,9 @@ const modulesClient = [
   ['Mi negocio','storefront','Datos de tu empresa y contexto activo dentro de VITI.','/mi-negocio'],
   ['Solicitudes','assignment','Nuevas necesidades, plan elegido y estado de revisión.','/mi-cuenta'],
   ['Mi proyecto','account_tree','Progreso, avances y archivos del proyecto aprobado.','/mi-proyecto'],
-  ['Aplicaciones','apps','Acceso a los sistemas que AGR Studio ya te entregó.','/mi-aplicaciones'],
+  ['Aplicaciones','apps','Acceso a los sistemas que VITI ya te entregó.','/mi-aplicaciones'],
   ['Mis pagos','payments','Implementación, suscripción, saldos y comprobantes.','/mi-pagos'],
-  ['Mi buzón','forum','Comunicación directa con AGR Studio y documentos privados.','/mi-buzon'],
+  ['Mi buzón','forum','Comunicación directa con soporte VITI y documentos privados.','/mi-buzon'],
 ]
 
 const modules = computed(() => isAdmin.value ? modulesAdmin : modulesClient)
@@ -111,11 +111,11 @@ onMounted(load)
 <template>
   <q-page class="viti-page guide-page">
     <q-inner-loading :showing="loading" />
-    <PageHeader eyebrow="AGR Studio · VITI" title="Guía VITI" subtitle="Qué hace cada módulo y cuál es el siguiente paso. Sin manuales eternos ni funciones que ya no existen." />
+    <PageHeader eyebrow="VITI" title="Guía VITI" subtitle="Qué hace cada módulo y cuál es el siguiente paso. Sin manuales eternos ni funciones que ya no existen." />
 
     <q-banner rounded class="guide-summary q-mb-lg">
       <template #avatar><q-icon name="route" color="primary" size="30px" /></template>
-      <div class="text-weight-bold">{{ isAdmin ? 'Flujo de trabajo de AGR Studio' : 'Así avanza tu solicitud dentro de VITI' }}</div>
+      <div class="text-weight-bold">{{ isAdmin ? 'Flujo de trabajo VITI' : 'Así avanza tu solicitud dentro de VITI' }}</div>
       <div class="text-body2 text-grey-6">El paso resaltado es una orientación según la actividad actual. Puedes entrar directamente a cualquier módulo desde las tarjetas.</div>
     </q-banner>
 
@@ -155,7 +155,7 @@ onMounted(load)
           <q-list separator>
             <q-item><q-item-section avatar><q-icon name="fact_check" color="primary" /></q-item-section><q-item-section><q-item-label>Solicitud ≠ proyecto</q-item-label><q-item-label caption>Primero se revisa alcance y acuerdo. Después se convierte.</q-item-label></q-item-section></q-item>
             <q-item><q-item-section avatar><q-icon name="science" color="primary" /></q-item-section><q-item-section><q-item-label>Beta ≠ entrega</q-item-label><q-item-label caption>Una prueba puede existir antes de habilitar el acceso definitivo.</q-item-label></q-item-section></q-item>
-            <q-item><q-item-section avatar><q-icon name="payments" color="primary" /></q-item-section><q-item-section><q-item-label>Comprobante ≠ pago confirmado</q-item-label><q-item-label caption>AGR Studio revisa el comprobante antes de modificar el saldo.</q-item-label></q-item-section></q-item>
+            <q-item><q-item-section avatar><q-icon name="payments" color="primary" /></q-item-section><q-item-section><q-item-label>Comprobante ≠ pago confirmado</q-item-label><q-item-label caption>VITI revisa el comprobante antes de modificar el saldo.</q-item-label></q-item-section></q-item>
             <q-item><q-item-section avatar><q-icon name="forum" color="primary" /></q-item-section><q-item-section><q-item-label>El buzón conserva contexto</q-item-label><q-item-label caption>Usa mensajes, documentos y respuestas rápidas para coordinar sin perder trazabilidad.</q-item-label></q-item-section></q-item>
           </q-list>
         </q-card>

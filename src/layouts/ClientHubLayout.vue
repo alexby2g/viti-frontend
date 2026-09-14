@@ -13,8 +13,8 @@ const creating = ref(false)
 
 const nav = [
   { label: 'Mi espacio', icon: 'home', to: '/mi-cuenta' },
-  { label: 'Mi aplicación', icon: 'apps', to: '/mi-aplicaciones' },
   { label: 'Mi proyecto', icon: 'account_tree', to: '/mi-proyecto' },
+  { label: 'Mis sistemas', icon: 'apps', to: '/mi-aplicaciones' },
   { label: 'Atención', icon: 'support_agent', to: '/mi-buzon' },
 ]
 
@@ -84,7 +84,7 @@ onMounted(() => { auth.initialize().catch(() => {}) })
           <div class="hub-welcome">
             <div class="hub-kicker">Espacio VITI</div>
             <div class="hub-title">{{ auth.user?.nombre || 'Tu espacio' }}</div>
-            <div class="hub-subtitle">Aquí solo verás lo que necesitas para seguir tu sistema.</div>
+            <div class="hub-subtitle">Solicitudes, avances, entregas y atención en un solo lugar.</div>
           </div>
 
           <q-list class="hub-nav" padding>
@@ -103,7 +103,7 @@ onMounted(() => { auth.initialize().catch(() => {}) })
 
           <div class="hub-sidebar-bottom">
             <q-btn outline color="primary" no-caps icon="add" class="full-width" label="Nueva solicitud" :loading="creating" @click="newRequest" />
-            <div class="hub-trust"><q-icon name="verified_user" /> Gestionado por AGR Studio</div>
+            <div class="hub-trust"><q-icon name="verified_user" /> Plataforma VITI · por AGR Studio</div>
           </div>
         </aside>
 
@@ -116,5 +116,5 @@ onMounted(() => { auth.initialize().catch(() => {}) })
 </template>
 
 <style scoped>
-.client-hub-layout{background:#f5f9fb;color:#102a43}.hub-header{background:rgba(255,255,255,.96);border-bottom:1px solid #dbe5ea;color:#102a43}.hub-toolbar{min-height:70px;padding:0 22px}.brand-link{display:flex;text-decoration:none}.profile-trigger{margin-left:8px}.hub-shell{min-height:calc(100vh - 70px);display:grid;grid-template-columns:245px 1fr}.hub-sidebar{background:#fff;border-right:1px solid #dbe5ea;padding:28px 18px;display:flex;flex-direction:column}.hub-welcome{padding:6px 8px 24px}.hub-kicker{font-size:10px;font-weight:900;text-transform:uppercase;letter-spacing:.15em;color:#0b7593}.hub-title{font-size:24px;font-weight:800;margin-top:7px;letter-spacing:-.03em}.hub-subtitle{font-size:12px;line-height:1.55;color:#61798a;margin-top:6px}.hub-nav{margin-top:2px}.hub-nav :deep(.q-item){border-radius:12px;min-height:48px;color:#536c7b;margin:3px 0}.hub-nav-active{background:#e8f5f8;color:#075f78!important;font-weight:800}.hub-sidebar-bottom{margin-top:auto;padding:8px}.hub-trust{display:flex;gap:6px;align-items:center;justify-content:center;font-size:10px;color:#78909e;margin-top:14px}.hub-content{min-width:0;padding:30px 34px}@media(max-width:900px){.hub-shell{grid-template-columns:1fr}.hub-sidebar{display:none}.hub-content{padding:20px 16px}}@media(max-width:600px){.hub-toolbar{padding:0 14px;min-height:64px}}
+.client-hub-layout{background:#061425;color:#edf4fb}.hub-header{background:rgba(6,17,31,.94);border-bottom:1px solid rgba(95,128,158,.22);color:#edf4fb;backdrop-filter:blur(16px)}.hub-toolbar{min-height:70px;padding:0 22px}.brand-link{display:flex;text-decoration:none}.profile-trigger{margin-left:8px}.hub-shell{min-height:calc(100vh - 70px);display:grid;grid-template-columns:245px 1fr}.hub-sidebar{background:linear-gradient(180deg,#081a2d,#0a223a);border-right:1px solid rgba(95,128,158,.22);padding:28px 18px;display:flex;flex-direction:column}.hub-welcome{padding:6px 8px 24px}.hub-kicker{font-size:10px;font-weight:900;text-transform:uppercase;letter-spacing:.15em;color:#f28b30}.hub-title{font-size:24px;font-weight:800;margin-top:7px;letter-spacing:-.03em;color:#f4f8fc}.hub-subtitle{font-size:12px;line-height:1.55;color:#97abba;margin-top:6px}.hub-nav{margin-top:2px}.hub-nav :deep(.q-item){border-radius:12px;min-height:48px;color:#b2c2cf;margin:3px 0;transition:.16s ease}.hub-nav :deep(.q-item:hover){background:rgba(255,255,255,.04);color:#fff}.hub-nav-active{background:rgba(242,139,48,.10)!important;color:#ffad62!important;font-weight:800;border:1px solid rgba(242,139,48,.14)}.hub-sidebar-bottom{margin-top:auto;padding:8px}.hub-sidebar-bottom :deep(.q-btn){border-color:rgba(242,139,48,.42)!important;color:#ffad62!important;background:rgba(242,139,48,.035)}.hub-trust{display:flex;gap:6px;align-items:center;justify-content:center;font-size:10px;color:#738ca1;margin-top:14px}.hub-content{min-width:0;padding:30px 34px;background:radial-gradient(circle at 95% 0,rgba(20,87,184,.09),transparent 25rem),#061425}@media(max-width:900px){.hub-shell{grid-template-columns:1fr}.hub-sidebar{display:none}.hub-content{padding:20px 16px}}@media(max-width:600px){.hub-toolbar{padding:0 14px;min-height:64px}}
 </style>

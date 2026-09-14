@@ -36,7 +36,7 @@ const columns = [
   { name:'nombre', label:'Persona', field:r=>`${r.nombre} ${r.apellido||''}`, align:'left' },
   { name:'usuario', label:'Usuario', field:'usuario', align:'left' },
   { name:'documento', label:'CI', field:'documento', align:'left' },
-  { name:'telefono', label:'Teléfono', field:'telefono', align:'left' },
+  { name:'telefono', label:'Celular', field:'telefono', align:'left' },
   { name:'rol', label:'Tipo de cuenta', field:roleLabel, align:'left' },
   { name:'estado', label:'Estado', field:'estado', align:'left' },
   { name:'ultimo_acceso', label:'Último acceso', field:'ultimo_acceso', align:'left' },
@@ -134,7 +134,7 @@ onMounted(load)
           <div class="col q-ml-md min-width-0">
             <div class="text-subtitle1 text-weight-bold ellipsis">{{row.nombre}} {{row.apellido}}</div>
             <div class="text-primary text-weight-medium">@{{row.usuario}}</div>
-            <div class="text-caption text-grey-6 q-mt-xs">CI {{row.documento || 'sin registrar'}} · {{row.telefono || 'Sin teléfono'}}</div>
+            <div class="text-caption text-grey-6 q-mt-xs">CI {{row.documento || 'sin registrar'}} · {{row.telefono || 'Sin celular'}}</div>
             <div class="text-caption text-grey-6">{{roleLabel(row)}}</div>
             <q-badge class="q-mt-sm" outline :color="row.estado==='activo'?'positive':'grey'">{{row.estado}}</q-badge>
           </div>
@@ -158,7 +158,7 @@ onMounted(load)
           <div class="col-12 col-sm-6"><q-input v-model="form.apellido" outlined label="Apellido" /></div>
           <div class="col-12 col-sm-6"><q-input v-model="form.usuario" outlined label="Usuario *" autocomplete="username" @update:model-value="v=>form.usuario=String(v||'').toLowerCase().replace(/\s+/g,'')" /></div>
           <div class="col-12 col-sm-6"><q-input v-model="form.documento" outlined :label="editing?'CI':'CI *'" inputmode="numeric" maxlength="15" hint="También sirve para iniciar sesión." @update:model-value="v=>form.documento=String(v||'').replace(/\D/g,'')" /></div>
-          <div class="col-12 col-sm-6"><q-input v-model="form.telefono" outlined label="Teléfono" inputmode="numeric" @update:model-value="v=>form.telefono=String(v||'').replace(/\D/g,'')" /></div>
+          <div class="col-12 col-sm-6"><q-input v-model="form.telefono" outlined label="Celular" inputmode="numeric" @update:model-value="v=>form.telefono=String(v||'').replace(/\D/g,'')" /></div>
           <div class="col-12"><q-input v-model="form.correo" outlined label="Correo opcional" type="email" /></div>
           <div class="col-12 col-sm-6"><q-select v-model="form.rol" outlined emit-value map-options :options="roleOptions" label="Tipo de cuenta" :disable="roleLocked" /></div>
           <div class="col-12 col-sm-6"><q-select v-model="form.estado" outlined :options="['activo','inactivo']" label="Estado" :disable="stateLocked" /></div>

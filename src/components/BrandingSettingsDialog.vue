@@ -154,7 +154,7 @@ async function save() {
 
             <q-banner rounded class="bg-blue-1 text-primary q-mt-md">
               <template #avatar><q-icon name="info" /></template>
-              Los cambios de nombre y color se aplican a la identidad general. Los nombres propios de aplicaciones como Electrofrío o Soporte Vital permanecen independientes.
+              Los cambios de nombre y color se aplican a la identidad general de VITI. Cada sistema de cliente conserva su propia identidad y configuración.
             </q-banner>
           </div>
         </div>

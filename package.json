@@ -9,7 +9,15 @@
     "lint": "eslint .",
     "test:viti-stability": "node scripts/check-viti-stability.mjs",
     "test:viti-public": "node scripts/check-viti-public-presentation.mjs",
-    "test:viti-peluqueria-modules": "node scripts/check-viti-peluqueria-modules.mjs"
+    "test:viti-peluqueria-modules": "node scripts/check-viti-peluqueria-modules.mjs",
+    "test:viti-studio": "node scripts/check-viti-studio.mjs",
+    "test:viti-contrast": "node scripts/check-viti-contrast.mjs",
+    "test:viti-clean": "node scripts/check-viti-clean-pro.mjs",
+    "test:viti-flow-100": "node scripts/check-viti-flow-100.mjs",
+    "test:viti-simple-flow": "node scripts/check-viti-simple-e2e.mjs",
+    "test:viti-phase1": "node scripts/check-viti-phase1-ux.mjs",
+    "test:viti-account-order": "node scripts/check-viti-account-request-order.mjs",
+    "test:viti-forms": "node scripts/check-viti-forms-admin.mjs"
   },
   "dependencies": {
     "@quasar/extras": "^1.16.17",

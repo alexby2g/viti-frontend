@@ -84,5 +84,5 @@ onBeforeUnmount(() => {
 .viti006-power-off span{margin-left:5px;color:#7f9eaa;font-size:9px}
 .viti006-power-on{width:42px;height:42px;opacity:.84}
 .viti006-power-off:hover,.viti006-power-on:hover{border-color:rgba(101,220,255,.55);box-shadow:0 6px 28px rgba(0,0,0,.3),0 0 20px rgba(74,210,255,.16)}
-@media (max-width:640px){.viti006-power-off,.viti006-power-on{right:12px;bottom:12px}}
+@media (max-width:640px){.viti006-power-off,.viti006-power-on{right:10px;bottom:10px}.viti006-power-off{padding:6px 8px;font-size:9px}.viti006-power-off span{font-size:8px}.viti006-power-on{width:34px;height:34px;font-size:9px}}
 </style>

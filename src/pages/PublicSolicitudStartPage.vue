@@ -1,406 +1,279 @@
 <script setup>
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { useQuasar } from 'quasar'
+import { useRoute } from 'vue-router'
 import { api } from '../boot/axios'
+import { publicPlanFallback } from '../composables/useVitiPublicPlans'
 import AppBrand from '../components/AppBrand.vue'
 
 const $q = useQuasar()
+const route = useRoute()
 const loading = ref(true)
 const submitting = ref(false)
 const step = ref(1)
 const sent = ref(false)
 const result = ref(null)
 const plans = ref([])
-const sections = ref([])
-const questionnaire = ref(null)
-const answers = reactive({})
-const otherAnswers = reactive({})
 
 const form = reactive({
-  nombre: '', correo: '', telefono: '', whatsapp: '', documento: '', ci_expedido: '', ciudad: '', direccion: '',
-  empresa_nombre: '', empresa_actividad: '', empresa_telefono: '', empresa_whatsapp: '', empresa_ciudad: '', empresa_direccion: '',
-  titulo_sistema: '', resumen: '',
-  plan_codigo: '', forma_pago_preferida: '', frecuencia_suscripcion_preferida: '',
-  declaracion_aceptada: false, declaracion_nombre: '', declaracion_fecha: new Date().toISOString().slice(0, 10),
-  acuerdo_comercial_aceptado: false, acuerdo_comercial_nombre: '', acuerdo_comercial_fecha: new Date().toISOString().slice(0, 10),
+  empresa_nombre: '',
+  empresa_actividad: '',
+  titulo_sistema: '',
+  resumen: '',
+  nombre: '',
+  celular: '',
+  whatsapp_same: true,
+  whatsapp: '',
+  business_whatsapp_different: false,
+  whatsapp_business: '',
+  correo: '',
+  ciudad: '',
+  plan_codigo: '',
+  frecuencia_suscripcion_preferida: 'mensual',
+  terminos_aceptados: false,
 })
 
 const selectedPlan = computed(() => plans.value.find(plan => plan.codigo === form.plan_codigo) || null)
-const selectedKey = computed(() => planKey(selectedPlan.value))
-const allQuestions = computed(() => sections.value.flatMap(section => section.preguntas || []))
-const visibleQuestions = computed(() => allQuestions.value.filter(question => shouldShowQuestion(question)))
-const requiredQuestions = computed(() => visibleQuestions.value.filter(question => Boolean(question.obligatoria)))
-const selectedPlanBenefits = computed(() => planBenefits(selectedKey.value))
-const paymentOptions = computed(() => paymentOptionsFor(selectedPlan.value))
+const isCustom = computed(() => String(selectedPlan.value?.codigo || '').toLowerCase().includes('personalizado'))
+const progress = computed(() => sent.value ? 100 : ((step.value - 1) / 2) * 100)
+const effectiveWhatsapp = computed(() => form.whatsapp_same ? form.celular : form.whatsapp)
+const registerLink = computed(() => ({
+  path: '/registro',
+  query: {
+    correo: result.value?.correo || form.correo,
+    nombre: form.nombre,
+    celular: form.celular,
+    whatsapp: effectiveWhatsapp.value || '',
+    origen: 'solicitud',
+  },
+}))
 
-const progress = computed(() => sent.value ? 100 : ((step.value - 1) / 4) * 100)
-
-function planKey(plan) {
-  const code = String(plan?.codigo || '').toLowerCase()
-  if (code.includes('personalizado')) return 'custom'
-  if (code.includes('empresa')) return 'enterprise'
-  if (code.includes('profesional')) return 'professional'
-  return 'initial'
-}
-
-function operationNumbersForKey(key) {
-  const numbers = [12, 13, 17, 18, 19]
-  if (key === 'professional') numbers.push(32, 35)
-  if (key === 'enterprise') numbers.push(27, 32, 35)
-  if (key === 'custom') numbers.push(70)
-  return numbers
-}
-
-function shouldShowQuestion(question) {
-  const operationNumbers = [12, 13, 17, 18, 19, 27, 32, 35, 70]
-  const number = Number(question.numero)
-  return !operationNumbers.includes(number) || operationNumbersForKey(selectedKey.value).includes(number)
-}
-
-function optionsFor(question) {
-  const options = Array.isArray(question.opciones) ? question.opciones : []
-  if (Number(question.numero) !== 17) return options
-  const allowed = new Set([
-    'Registro de clientes','Registro de trabajadores','Registro de productos','Registro de servicios','Inventario',
-    'Reservas o citas','Órdenes de trabajo','Control de pagos','Cuentas por cobrar','Garantías','Historial de clientes',
-    'Reportes','Agenda o calendario','Archivos y documentos','Fotografías','Otro',
-  ])
-  if (selectedKey.value === 'initial') {
-    return options.filter(option => ['Registro de clientes','Registro de trabajadores','Registro de servicios','Reservas o citas','Órdenes de trabajo','Historial de clientes','Agenda o calendario','Archivos y documentos','Fotografías','Otro'].includes(option))
-  }
-  if (selectedKey.value === 'professional') {
-    return options.filter(option => ['Registro de clientes','Registro de trabajadores','Registro de servicios','Reservas o citas','Órdenes de trabajo','Control de pagos','Cuentas por cobrar','Garantías','Historial de clientes','Reportes','Agenda o calendario','Archivos y documentos','Fotografías','Otro'].includes(option))
-  }
-  return options.filter(option => allowed.has(option))
-}
-
-function planBenefits(key) {
-  return ({
-    initial: ['1 aplicación VITI', 'Hasta 3 usuarios', 'Base operativa para clientes, servicios, agenda y seguimiento'],
-    professional: ['1 aplicación VITI', 'Hasta 6 usuarios', 'Pagos, saldos, comprobantes y garantías'],
-    enterprise: ['Hasta 3 aplicaciones', 'Hasta 15 usuarios', 'Inventario técnico y operación avanzada'],
-    custom: ['AGR Studio revisa el alcance contigo', 'Plan y presupuesto a medida', 'Diseño antes de iniciar el desarrollo'],
-  })[key] || []
-}
-
-function paymentOptionsFor(plan) {
-  const key = planKey(plan)
-  if (!plan) return []
-  if (key === 'custom') return [{ value: 'por_definir', label: 'Definir con AGR Studio', description: 'Se acuerda después de revisar el alcance.' }]
-  const options = [
-    { value: 'contado', label: 'Pago completo de implementación', description: 'Un solo desembolso para la implementación.' },
-    { value: 'por_definir', label: 'Acordarlo con AGR Studio', description: 'Lo definimos durante la revisión.' },
-  ]
-  if (key === 'initial') options.unshift({ value: '50_50', label: '50% al iniciar / 50% al entregar', description: 'Dos hitos claros.' })
-  else options.unshift({ value: 'tres_partes', label: '40% al iniciar / 30% en avance / 30% al entregar', description: 'Tres hitos claros.' })
-  return options
-}
+watch(() => form.celular, value => {
+  if (form.whatsapp_same) form.whatsapp = normalizePhone(value)
+})
+watch(() => form.whatsapp_same, enabled => {
+  if (enabled) form.whatsapp = normalizePhone(form.celular)
+})
+watch(() => form.business_whatsapp_different, enabled => {
+  if (!enabled) form.whatsapp_business = ''
+})
 
 function money(value) {
   if (value === null || value === undefined || value === '') return 'A cotizar'
   return `${Number(value).toFixed(0)} Bs`
 }
-
-function formatPlanPrice(plan) {
-  if (!plan) return ''
-  const project = money(plan.precio_proyecto)
-  if (plan.precio_mensual !== null || plan.precio_anual !== null) return `${project} + suscripción`
-  return project
-}
-
-function questionValue(question) {
-  const value = answers[question.id]
-  return Array.isArray(value) ? value : (value ?? '')
-}
-
-function hasValue(value) {
-  return Array.isArray(value) ? value.length > 0 : String(value ?? '').trim().length > 0
-}
-
-function selectedOther(question) {
-  const value = answers[question.id]
-  return Array.isArray(value) ? value.includes('Otro') : value === 'Otro'
-}
-
-function normalizedValue(question) {
-  const value = answers[question.id]
-  const custom = String(otherAnswers[question.id] || '').trim()
-  if (Array.isArray(value)) return value.map(item => item === 'Otro' && custom ? `Otro: ${custom}` : item)
-  return value === 'Otro' && custom ? `Otro: ${custom}` : value
-}
-
-function setPlan(plan) {
+function normalizePhone(value) { return String(value ?? '').replace(/\D/g, '').slice(0, 15) }
+function selectPlan(plan) {
   form.plan_codigo = plan.codigo
-  form.forma_pago_preferida = ''
-  form.frecuencia_suscripcion_preferida = planKey(plan) === 'custom' ? '' : (plan.precio_mensual !== null && plan.precio_anual !== null ? 'mensual' : '')
-  for (const question of allQuestions.value) {
-    const n = Number(question.numero)
-    if ([12,13,17,18,19,27,32,35,70].includes(n) && !operationNumbersForKey(planKey(plan)).includes(n)) {
-      answers[question.id] = question.tipo === 'seleccion_multiple' ? [] : ''
-      otherAnswers[question.id] = ''
-    }
-  }
+  if (String(plan.codigo || '').toLowerCase().includes('personalizado')) form.frecuencia_suscripcion_preferida = ''
+  else if (!form.frecuencia_suscripcion_preferida) form.frecuencia_suscripcion_preferida = 'mensual'
 }
+function warn(message) { $q.notify({ type:'warning', message }) }
 
+function validateNeed() {
+  if (!form.empresa_nombre.trim()) return warn('Escribe el nombre de tu negocio, institución o proyecto.'), false
+  if (!form.titulo_sistema.trim()) return warn('Cuéntanos qué sistema necesitas.'), false
+  if (form.titulo_sistema.trim().length < 3) return warn('Describe un poco mejor qué sistema necesitas.'), false
+  if (!form.resumen.trim()) return warn('Cuéntanos qué quieres mejorar o resolver.'), false
+  if (form.resumen.trim().length < 8) return warn('Cuéntanos un poco más sobre lo que quieres resolver.'), false
+  return true
+}
+function validateContact() {
+  if (!form.nombre.trim()) return warn('Escribe tu nombre completo.'), false
+  if (!/^\d{7,15}$/.test(form.celular)) return warn('El celular debe tener entre 7 y 15 dígitos.'), false
+  if (!form.whatsapp_same && !/^\d{7,15}$/.test(form.whatsapp)) return warn('Escribe un WhatsApp válido o marca que es el mismo celular.'), false
+  if (form.business_whatsapp_different && !/^\d{7,15}$/.test(form.whatsapp_business)) return warn('Escribe un WhatsApp del negocio válido.'), false
+  if (!/.+@.+\..+/.test(form.correo.trim())) return warn('Escribe un correo electrónico válido.'), false
+  return true
+}
 function next() {
-  if (step.value === 2 && !form.plan_codigo) return $q.notify({ type: 'warning', message: 'Selecciona un plan para continuar.' })
-  if (step.value === 3 && !validateIdentity()) return
-  if (step.value === 4 && !validateQuestions()) return
-  if (step.value < 5) step.value += 1
+  if (step.value === 1 && !validateNeed()) return
+  if (step.value === 2 && !validateContact()) return
+  if (step.value < 3) step.value += 1
 }
-
-function back() {
-  if (step.value > 1) step.value -= 1
-}
-
-function validateIdentity() {
-  const required = [
-    [form.nombre, 'Ingresa tu nombre completo.'], [form.correo, 'Ingresa tu correo electrónico.'],
-    [form.telefono, 'Ingresa tu teléfono.'], [form.ciudad, 'Indica tu ciudad.'],
-    [form.empresa_nombre, 'Ingresa el nombre del negocio o proyecto.'], [form.titulo_sistema, 'Describe qué sistema necesitas.'],
-  ]
-  const missing = required.find(([value]) => !String(value || '').trim())
-  if (missing) { $q.notify({ type: 'warning', message: missing[1] }); return false }
-  if (!/^\d{7,15}$/.test(String(form.telefono))) { $q.notify({ type: 'warning', message: 'El teléfono debe contener entre 7 y 15 dígitos.' }); return false }
-  if (form.whatsapp && !/^\d{7,15}$/.test(String(form.whatsapp))) { $q.notify({ type: 'warning', message: 'El WhatsApp debe contener entre 7 y 15 dígitos.' }); return false }
-  return true
-}
-
-function validateQuestions() {
-  if (!form.forma_pago_preferida) { $q.notify({ type: 'warning', message: 'Selecciona cómo prefieres manejar el pago de implementación.' }); return false }
-  if (selectedPlan.value?.precio_mensual !== null && selectedPlan.value?.precio_anual !== null && selectedKey.value !== 'custom' && !form.frecuencia_suscripcion_preferida) {
-    $q.notify({ type: 'warning', message: 'Selecciona mensual o anual para continuar.' }); return false
-  }
-  for (const question of requiredQuestions.value) {
-    const value = answers[question.id]
-    if (!hasValue(value)) { $q.notify({ type: 'warning', message: `Completa la pregunta ${question.numero}.` }); return false }
-    if (selectedOther(question) && !String(otherAnswers[question.id] || '').trim()) { $q.notify({ type: 'warning', message: `Completa la opción “Otro” de la pregunta ${question.numero}.` }); return false }
-  }
-  return true
-}
-
+function back() { if (step.value > 1) step.value -= 1 }
 function buildPayload() {
+  const today = new Date().toISOString().slice(0, 10)
   return {
-    ...form,
-    respuestas: visibleQuestions.value.filter(question => hasValue(answers[question.id])).map(question => ({
-      pregunta_id: Number(question.id),
-      valor: normalizedValue(question),
-    })),
+    nombre: form.nombre.trim(),
+    correo: form.correo.trim().toLowerCase(),
+    telefono: form.celular,
+    whatsapp: effectiveWhatsapp.value || form.celular,
+    whatsapp_business: form.business_whatsapp_different ? form.whatsapp_business : null,
+    ciudad: form.ciudad.trim() || null,
+    empresa_nombre: form.empresa_nombre.trim(),
+    empresa_actividad: form.empresa_actividad.trim() || null,
+    empresa_telefono: form.celular,
+    empresa_whatsapp: form.business_whatsapp_different ? form.whatsapp_business : (effectiveWhatsapp.value || form.celular),
+    empresa_ciudad: form.ciudad.trim() || null,
+    titulo_sistema: form.titulo_sistema.trim(),
+    resumen: form.resumen.trim(),
+    plan_codigo: form.plan_codigo,
+    frecuencia_suscripcion_preferida: isCustom.value ? null : form.frecuencia_suscripcion_preferida,
+    forma_pago_preferida: 'por_definir',
+    terminos_aceptados: form.terminos_aceptados,
+    declaracion_aceptada: form.terminos_aceptados,
+    declaracion_nombre: form.nombre.trim(),
+    declaracion_fecha: today,
+    acuerdo_comercial_aceptado: form.terminos_aceptados,
+    acuerdo_comercial_nombre: form.nombre.trim(),
+    acuerdo_comercial_fecha: today,
+    respuestas: [],
   }
 }
-
 async function submit() {
-  if (!validateIdentity() || !validateQuestions()) { step.value = 4; return }
-  if (!form.declaracion_aceptada || !form.declaracion_nombre) { $q.notify({ type: 'warning', message: 'Confirma que los datos de la solicitud son correctos.' }); return }
-  if (!form.acuerdo_comercial_aceptado || !form.acuerdo_comercial_nombre) { $q.notify({ type: 'warning', message: 'Acepta el acuerdo comercial inicial para enviar la solicitud.' }); return }
-
+  if (!validateNeed()) { step.value = 1; return }
+  if (!validateContact()) { step.value = 2; return }
+  if (!form.plan_codigo) return warn('Selecciona un plan o cotización personalizada.')
+  if (!form.terminos_aceptados) return warn('Confirma que los datos son correctos para enviar tu solicitud.')
   submitting.value = true
   try {
-    const { data } = await api.post('/publico/solicitud/enviar', buildPayload(), { timeout: 30000 })
+    const { data } = await api.post('/publico/solicitud/enviar', buildPayload(), { timeout:30000 })
     result.value = data?.data || null
     sent.value = true
-    step.value = 6
+    window.scrollTo({ top:0, behavior:'smooth' })
   } catch (error) {
-    $q.notify({ type: 'negative', message: error?.response?.data?.message || 'No pudimos enviar tu solicitud. Revisa los datos e inténtalo nuevamente.' })
-    if (Number(error?.response?.status) === 422) step.value = 4
-  } finally {
-    submitting.value = false
-  }
+    const errors = error?.response?.data?.errors
+    const first = errors ? Object.values(errors).flat()[0] : null
+    $q.notify({ type:'negative', message:first || error?.response?.data?.message || 'No pudimos enviar la solicitud. Revisa los datos e inténtalo otra vez.' })
+  } finally { submitting.value = false }
 }
-
-async function loadCatalog() {
+async function load() {
   loading.value = true
   try {
     const { data } = await api.get('/publico/solicitud/catalogo')
-    plans.value = data?.data?.planes || []
-    questionnaire.value = data?.data?.cuestionario || null
-    sections.value = questionnaire.value?.secciones || []
-  } catch (error) {
-    $q.notify({ type: 'negative', message: error?.response?.data?.message || 'No pudimos cargar la información pública de VITI.' })
-  } finally {
+    plans.value = data?.data?.planes?.length ? data.data.planes : publicPlanFallback
+  } catch { plans.value = publicPlanFallback }
+  finally {
+    const requested = String(route.query.plan || '')
+    if (requested && plans.value.some(plan => plan.codigo === requested)) form.plan_codigo = requested
     loading.value = false
   }
 }
-
-onMounted(loadCatalog)
+onMounted(load)
 </script>
 
 <template>
-  <q-page class="viti-application-page">
-    <q-inner-loading :showing="loading" />
-
-    <div v-if="!loading" class="application-shell">
-      <div class="application-header row items-center justify-between q-gutter-md">
-        <AppBrand />
-        <q-badge outline color="primary" class="q-px-md q-py-sm">Solicitud VITI</q-badge>
-      </div>
-
-      <div class="application-intro">
-        <div class="section-kicker">AGR STUDIO · VITI</div>
-        <h1>Cuéntanos qué necesitas. Nosotros evaluamos cómo hacerlo.</h1>
-        <p>Primero conocerás VITI, después elegirás el plan que mejor encaje con tu presupuesto y recién entonces te mostraremos las preguntas necesarias para entender tu sistema.</p>
-      </div>
-
-      <div v-if="!sent" class="progress-wrap q-mt-xl">
-        <div class="progress-top row items-center justify-between">
-          <span>Paso {{ step }} de 5</span>
-          <span>{{ Math.round(progress) }}%</span>
+  <q-page class="request-page">
+    <q-inner-loading :showing="loading" dark />
+    <div class="request-shell">
+      <header class="request-topbar">
+        <router-link to="/viti" class="brand-link"><AppBrand /></router-link>
+        <div class="top-actions">
+          <q-btn flat no-caps label="Ver precios" to="/viti/planes" />
+          <q-btn flat no-caps label="Crear cuenta" to="/registro" />
+          <q-btn outline no-caps label="Ingresar" to="/login" />
         </div>
-        <q-linear-progress :value="progress / 100" rounded color="primary" track-color="blue-1" size="8px" />
-      </div>
+      </header>
 
-      <q-card v-if="!sent" flat class="application-card q-mt-lg">
-        <q-card-section v-if="step === 1" class="q-pa-xl">
-          <div class="step-chip">01 · CONOCE VITI</div>
-          <h2>Antes de pedir tu sistema, conoce cómo trabajamos.</h2>
-          <p class="lead">VITI es la plataforma de AGR Studio para centralizar tu operación, tus aplicaciones, tus solicitudes, tu seguimiento y el desarrollo de soluciones digitales.</p>
-          <div class="row q-col-gutter-lg q-mt-md">
-            <div class="col-12 col-md-4"><q-card flat bordered class="info-card"><q-icon name="travel_explore" color="primary" size="32px"/><div class="text-h6 q-mt-md">1. Conocemos tu necesidad</div><p>Reunimos la información esencial y entendemos qué quieres resolver.</p></q-card></div>
-            <div class="col-12 col-md-4"><q-card flat bordered class="info-card"><q-icon name="fact_check" color="primary" size="32px"/><div class="text-h6 q-mt-md">2. Evaluamos la viabilidad</div><p>AGR Studio revisa alcance, presupuesto, plan y respuestas antes de aprobar.</p></q-card></div>
-            <div class="col-12 col-md-4"><q-card flat bordered class="info-card"><q-icon name="construction" color="primary" size="32px"/><div class="text-h6 q-mt-md">3. Trabajamos contigo</div><p>Si es viable, te orientamos, capacitamos y comenzamos a trabajar en tu sistema.</p></q-card></div>
+      <template v-if="!sent">
+        <section class="request-intro">
+          <div class="eyebrow">SOLICITAR UN SISTEMA</div>
+          <h1>Cuéntanos lo esencial. <span>VITI organiza el resto.</span></h1>
+          <p>No necesitas saber de programación. Primero entendemos tu necesidad; después definimos contigo el alcance y los detalles.</p>
+        </section>
+
+        <div class="stepbar" aria-label="Progreso de la solicitud">
+          <div v-for="item in [{n:1,t:'Tu necesidad'},{n:2,t:'Tus datos'},{n:3,t:'Plan y envío'}]" :key="item.n" class="stepbar-item" :class="{active:step>=item.n}">
+            <span>{{ item.n }}</span><b>{{ item.t }}</b>
           </div>
-          <q-banner class="q-mt-lg access-note" rounded><template #avatar><q-icon name="lock" color="primary" /></template><strong>Importante:</strong> completar esta solicitud no crea una cuenta ni entrega códigos de acceso. El acceso se habilita únicamente después de la aprobación de AGR Studio.</q-banner>
-        </q-card-section>
+          <q-linear-progress :value="progress/100" color="orange" track-color="blue-grey-10" rounded size="4px" />
+        </div>
 
-        <q-card-section v-else-if="step === 2" class="q-pa-xl">
-          <div class="step-chip">02 · ELIGE TU PLAN</div>
-          <h2>Selecciona el nivel que mejor encaje con tu presupuesto.</h2>
-          <p class="lead">Las preguntas posteriores se adaptarán al plan que elijas para no pedirte información que no necesitamos.</p>
-          <div class="row q-col-gutter-lg q-mt-md">
-            <div v-for="plan in plans" :key="plan.id" class="col-12 col-md-6 col-lg-3">
-              <q-card flat bordered :class="['plan-card', { selected: form.plan_codigo === plan.codigo }]" @click="setPlan(plan)">
-                <q-card-section>
-                  <div class="row items-center justify-between"><q-badge color="primary" outline>{{ plan.nombre }}</q-badge><q-icon v-if="form.plan_codigo === plan.codigo" name="check_circle" color="positive" /></div>
-                  <div class="plan-price q-mt-md">{{ formatPlanPrice(plan) }}</div>
-                  <div class="text-caption text-grey-6 q-mt-sm">{{ plan.descripcion || 'Plan VITI para tu operación.' }}</div>
-                  <ul class="plan-list"><li v-for="benefit in planBenefits(planKey(plan))" :key="benefit">{{ benefit }}</li></ul>
-                  <div class="text-caption text-primary q-mt-md">{{ plan.max_usuarios ? `Hasta ${plan.max_usuarios} usuarios` : 'Usuarios a definir' }}</div>
-                </q-card-section>
-              </q-card>
+        <q-card flat class="request-card">
+          <q-card-section v-if="step===1" class="request-section">
+            <div class="section-head"><div><small>PASO 1 DE 3</small><h2>¿Qué necesitas resolver?</h2></div><q-icon name="lightbulb_outline" /></div>
+            <p class="section-help">Empieza por tu necesidad. No tienes que decidir tecnologías, módulos ni servidores.</p>
+            <div class="form-grid">
+              <q-input v-model="form.empresa_nombre" outlined class="span-2" label="Negocio, institución o proyecto *" />
+              <q-input v-model="form.empresa_actividad" outlined class="span-2" label="¿A qué se dedica? (opcional)" />
+              <div class="span-2 field-block">
+                <label>¿Qué sistema necesitas? *</label>
+                <p>Por ejemplo: pedidos, reservas, ventas, inventario o gestión de servicios.</p>
+                <q-input v-model="form.titulo_sistema" outlined type="textarea" autogrow placeholder="Describe brevemente el sistema" />
+              </div>
+              <div class="span-2 field-block">
+                <label>¿Qué quieres mejorar o resolver? *</label>
+                <p>Cuéntalo con tus palabras. VITI convierte esa necesidad en una propuesta técnica.</p>
+                <q-input v-model="form.resumen" outlined type="textarea" autogrow placeholder="Ej.: quiero reducir pedidos por WhatsApp y controlar entregas" />
+              </div>
             </div>
-          </div>
-        </q-card-section>
+          </q-card-section>
 
-        <q-card-section v-else-if="step === 3" class="q-pa-xl">
-          <div class="step-chip">03 · TUS DATOS</div>
-          <h2>Necesitamos saber quién está solicitando y qué quieres construir.</h2>
-          <p class="lead">Estos datos acompañarán tu solicitud; no crean una cuenta de acceso.</p>
-          <div class="row q-col-gutter-md">
-            <div class="col-12 col-md-8"><q-input v-model="form.nombre" outlined label="Nombre completo *" /></div>
-            <div class="col-12 col-md-4"><q-input v-model="form.telefono" outlined label="Teléfono *" inputmode="numeric" /></div>
-            <div class="col-12 col-md-6"><q-input v-model="form.correo" outlined label="Correo electrónico *" type="email" /></div>
-            <div class="col-12 col-md-6"><q-input v-model="form.whatsapp" outlined label="WhatsApp" inputmode="numeric" /></div>
-            <div class="col-12 col-md-4"><q-input v-model="form.documento" outlined label="CI / documento" /></div>
-            <div class="col-12 col-md-4"><q-input v-model="form.ci_expedido" outlined label="Expedido" /></div>
-            <div class="col-12 col-md-4"><q-input v-model="form.ciudad" outlined label="Ciudad *" /></div>
-            <div class="col-12"><q-input v-model="form.direccion" outlined label="Dirección / zona" /></div>
-            <div class="col-12 col-md-6"><q-input v-model="form.empresa_nombre" outlined label="Negocio, institución o proyecto *" /></div>
-            <div class="col-12 col-md-6"><q-input v-model="form.empresa_actividad" outlined label="Actividad / rubro" /></div>
-            <div class="col-12 col-md-4"><q-input v-model="form.empresa_telefono" outlined label="Teléfono del negocio" /></div>
-            <div class="col-12 col-md-4"><q-input v-model="form.empresa_whatsapp" outlined label="WhatsApp del negocio" /></div>
-            <div class="col-12 col-md-4"><q-input v-model="form.empresa_ciudad" outlined label="Ciudad del negocio" /></div>
-            <div class="col-12"><q-input v-model="form.empresa_direccion" outlined label="Dirección del negocio" /></div>
-            <div class="col-12"><q-input v-model="form.titulo_sistema" outlined label="¿Qué sistema necesitas? *" /></div>
-            <div class="col-12"><q-input v-model="form.resumen" outlined type="textarea" autogrow label="Cuéntanos brevemente qué quieres resolver" /></div>
-          </div>
-        </q-card-section>
-
-        <q-card-section v-else-if="step === 4" class="q-pa-xl">
-          <div class="step-chip">04 · CONFIGURACIÓN</div>
-          <h2>Ahora sí: las preguntas que corresponden a tu plan.</h2>
-          <p class="lead">Plan elegido: <strong>{{ selectedPlan?.nombre }}</strong>. Solo mostramos la información que necesitamos para dimensionar el sistema.</p>
-
-          <q-banner class="q-mb-lg" rounded><template #avatar><q-icon name="payments" color="primary" /></template><div class="text-weight-medium">Presupuesto / forma de pago</div><div class="text-caption q-mt-xs">Selecciona cómo prefieres manejar la implementación. Esto se revisará junto con tu solicitud.</div></q-banner>
-          <div class="row q-col-gutter-md q-mb-xl">
-            <div v-for="option in paymentOptions" :key="option.value" class="col-12 col-md-6">
-              <q-card flat bordered :class="['option-card', { selected: form.forma_pago_preferida === option.value }]" @click="form.forma_pago_preferida = option.value">
-                <q-card-section><div class="text-weight-medium">{{ option.label }}</div><div class="text-caption text-grey-6 q-mt-xs">{{ option.description }}</div></q-card-section>
-              </q-card>
+          <q-card-section v-else-if="step===2" class="request-section">
+            <div class="section-head"><div><small>PASO 2 DE 3</small><h2>¿Cómo te contactamos?</h2></div><q-icon name="person_outline" /></div>
+            <p class="section-help">Estos datos sirven para identificar tu solicitud y comunicarnos contigo.</p>
+            <div class="form-grid">
+              <q-input v-model="form.nombre" outlined class="span-2" label="Nombre completo *" autocomplete="name" />
+              <q-input :model-value="form.celular" outlined label="Celular *" inputmode="numeric" maxlength="15" autocomplete="tel" @update:model-value="v=>form.celular=normalizePhone(v)" />
+              <q-input v-model="form.correo" outlined type="email" label="Correo electrónico *" autocomplete="email" />
+              <div class="span-2 toggle-card">
+                <q-toggle v-model="form.whatsapp_same" color="orange" label="Mi celular también tiene WhatsApp" />
+                <q-input v-if="!form.whatsapp_same" :model-value="form.whatsapp" outlined label="Número de WhatsApp *" inputmode="numeric" maxlength="15" @update:model-value="v=>form.whatsapp=normalizePhone(v)" />
+              </div>
+              <div class="span-2 toggle-card">
+                <q-toggle v-model="form.business_whatsapp_different" color="orange" label="Mi negocio atiende desde otro WhatsApp" />
+                <q-input v-if="form.business_whatsapp_different" :model-value="form.whatsapp_business" outlined label="WhatsApp del negocio *" inputmode="numeric" maxlength="15" @update:model-value="v=>form.whatsapp_business=normalizePhone(v)" />
+              </div>
+              <q-input v-model="form.ciudad" outlined class="span-2" label="Ciudad (opcional)" />
             </div>
-            <div v-if="selectedPlan?.precio_mensual !== null && selectedPlan?.precio_anual !== null && selectedKey !== 'custom'" class="col-12"><q-option-group v-model="form.frecuencia_suscripcion_preferida" :options="[{label:'Mensual',value:'mensual'},{label:'Anual',value:'anual'}]" inline /></div>
-          </div>
+          </q-card-section>
 
-          <div v-for="question in visibleQuestions" :key="question.id" class="question-block">
-            <div class="question-heading"><q-badge outline color="primary">{{ question.numero }}</q-badge><div><div class="question-title">{{ question.enunciado }}<span v-if="question.obligatoria"> *</span></div><div v-if="question.ayuda" class="text-caption text-grey-6">{{ question.ayuda }}</div></div></div>
+          <q-card-section v-else class="request-section">
+            <div class="section-head"><div><small>PASO 3 DE 3</small><h2>Elige una referencia y envía</h2></div><q-icon name="sell" /></div>
+            <p class="section-help">El plan sirve como referencia comercial. La revisión de VITI confirma el alcance antes de iniciar cualquier desarrollo.</p>
+            <div class="plan-grid">
+              <button v-for="plan in plans" :key="plan.codigo" type="button" class="plan-option" :class="{selected:form.plan_codigo===plan.codigo}" @click="selectPlan(plan)">
+                <div class="plan-check"><q-icon :name="form.plan_codigo===plan.codigo?'check':'arrow_forward'" /></div>
+                <div class="plan-name">{{ plan.nombre }}</div>
+                <p>{{ plan.descripcion }}</p>
+                <div class="plan-price"><small>IMPLEMENTACIÓN</small><strong>{{ money(plan.precio_proyecto) }}</strong></div>
+                <div v-if="!String(plan.codigo||'').toLowerCase().includes('personalizado')" class="plan-service"><span>Servicio mensual</span><b>{{ money(plan.precio_mensual) }}</b></div>
+              </button>
+            </div>
+            <div v-if="selectedPlan && !isCustom" class="billing-choice">
+              <div><b>¿Cómo prefieres la suscripción?</b><small>La implementación es el desarrollo inicial. La suscripción cubre servicios continuos según tu plan.</small></div>
+              <q-btn-toggle v-model="form.frecuencia_suscripcion_preferida" no-caps unelevated toggle-color="orange" color="transparent" text-color="grey-4" :options="[{label:'Mensual',value:'mensual'},{label:'Anual',value:'anual'}]" />
+            </div>
+            <div class="summary-grid q-mt-lg">
+              <article><small>NECESIDAD</small><b>{{ form.titulo_sistema }}</b><span>{{ form.empresa_nombre }}</span></article>
+              <article><small>CONTACTO</small><b>{{ form.nombre }}</b><span>{{ form.celular }} · {{ form.correo }}</span></article>
+            </div>
+            <q-checkbox v-model="form.terminos_aceptados" color="orange" class="confirm-check"><span>Confirmo que estos datos son correctos y autorizo a VITI a contactarme para evaluar esta solicitud.</span></q-checkbox>
+            <div class="privacy-note"><q-icon name="lock" /> Enviar una solicitud no genera cobros. También puedes crear tu cuenta antes o después; VITI vinculará todo con el mismo correo.</div>
+          </q-card-section>
 
-            <q-select v-if="question.tipo === 'seleccion'" v-model="answers[question.id]" outlined emit-value map-options :options="optionsFor(question).map(option => ({label: option, value: option}))" class="q-mt-md" />
-            <q-select v-else-if="question.tipo === 'seleccion_multiple'" v-model="answers[question.id]" outlined multiple use-chips emit-value map-options :options="optionsFor(question).map(option => ({label: option, value: option}))" class="q-mt-md" />
-            <q-input v-else-if="question.tipo === 'numero'" v-model.number="answers[question.id]" outlined type="number" class="q-mt-md" />
-            <q-input v-else-if="question.tipo === 'texto_largo'" v-model="answers[question.id]" outlined type="textarea" autogrow class="q-mt-md" />
-            <q-input v-else v-model="answers[question.id]" outlined type="text" class="q-mt-md" />
+          <q-separator />
+          <q-card-actions class="request-actions">
+            <q-btn v-if="step>1" flat no-caps icon="arrow_back" label="Atrás" @click="back" />
+            <q-space />
+            <q-btn v-if="step<3" outline no-caps color="orange" label="Continuar" icon-right="arrow_forward" @click="next" />
+            <q-btn v-else unelevated no-caps color="primary" label="Enviar mi solicitud" icon-right="send" :loading="submitting" @click="submit" />
+          </q-card-actions>
+        </q-card>
+      </template>
 
-            <q-input v-if="selectedOther(question)" v-model="otherAnswers[question.id]" outlined label="Especifica cuál" class="q-mt-sm" />
-          </div>
-        </q-card-section>
+      <section v-else class="success-card">
+        <div class="success-icon"><q-icon name="done" /></div>
+        <div class="eyebrow">SOLICITUD RECIBIDA</div>
+        <h1>Listo. VITI ya tiene tu solicitud.</h1>
+        <p v-if="result?.cuenta_existente">Ya tienes una cuenta VITI. Inicia sesión para consultar tus solicitudes y seguir el proceso desde tu espacio.</p>
+        <p v-else>Puedes crear tu cuenta ahora o esperar la revisión. Si usas el mismo correo, VITI vinculará esta solicitud automáticamente.</p>
+        <div class="request-code"><small>CÓDIGO DE SOLICITUD</small><strong>{{ result?.codigo }}</strong></div>
+        <div class="success-flow"><span class="done">Solicitud recibida</span><q-icon name="east"/><span>Revisión</span><q-icon name="east"/><span>Propuesta</span></div>
+        <div class="success-actions">
+          <q-btn v-if="result?.cuenta_existente" color="primary" unelevated no-caps label="Iniciar sesión" to="/login" />
+          <q-btn v-else color="primary" unelevated no-caps label="Crear mi cuenta" :to="registerLink" />
+          <q-btn outline no-caps color="orange" label="Volver a VITI" to="/viti" />
+        </div>
+      </section>
 
-        <q-card-section v-else-if="step === 5" class="q-pa-xl">
-          <div class="step-chip">05 · REVISAR Y ENVIAR</div>
-          <h2>Todo listo para AGR Studio.</h2>
-          <p class="lead">Revisa el resumen. Al enviar, la solicitud pasará directamente a evaluación. No se generará ningún acceso todavía.</p>
-
-          <div class="summary-grid">
-            <div><div class="summary-label">Responsable</div><div class="summary-value">{{ form.nombre }}</div><div class="text-caption text-grey-6">{{ form.correo }} · {{ form.telefono }}</div></div>
-            <div><div class="summary-label">Negocio / proyecto</div><div class="summary-value">{{ form.empresa_nombre }}</div><div class="text-caption text-grey-6">{{ form.empresa_actividad || 'Actividad no especificada' }}</div></div>
-            <div><div class="summary-label">Plan</div><div class="summary-value">{{ selectedPlan?.nombre }}</div><div class="text-caption text-grey-6">{{ formatPlanPrice(selectedPlan) }}</div></div>
-            <div><div class="summary-label">Pago</div><div class="summary-value">{{ paymentOptions.find(option => option.value === form.forma_pago_preferida)?.label || 'Por definir' }}</div><div class="text-caption text-grey-6">{{ form.frecuencia_suscripcion_preferida || 'Sin frecuencia' }}</div></div>
-          </div>
-
-          <q-list bordered separator class="rounded-borders q-mt-lg">
-            <q-item><q-item-section><q-item-label overline>Sistema solicitado</q-item-label><q-item-label>{{ form.titulo_sistema }}</q-item-label><q-item-label caption>{{ form.resumen || 'Sin resumen adicional.' }}</q-item-label></q-item-section></q-item>
-            <q-item><q-item-section><q-item-label overline>Preguntas respondidas</q-item-label><q-item-label>{{ requiredQuestions.length }} preguntas clave según el plan</q-item-label></q-item-section></q-item>
-          </q-list>
-
-          <q-checkbox v-model="form.declaracion_aceptada" class="q-mt-lg" label="Confirmo que los datos enviados son correctos y autorizo a AGR Studio a utilizarlos para evaluar mi solicitud." />
-          <q-input v-model="form.declaracion_nombre" outlined label="Nombre para confirmar la declaración" class="q-mt-md" />
-          <q-checkbox v-model="form.acuerdo_comercial_aceptado" class="q-mt-md" label="Acepto el acuerdo comercial inicial y entiendo que la aprobación final depende de la evaluación de AGR Studio." />
-          <q-input v-model="form.acuerdo_comercial_nombre" outlined label="Nombre para aceptar el acuerdo" class="q-mt-md" />
-
-          <q-banner class="q-mt-lg access-note" rounded><template #avatar><q-icon name="lock" color="primary" /></template>Después de enviar, tu solicitud quedará en <strong>revisión</strong>. Si es viable, te contactaremos en privado para orientarte, capacitarte y habilitar tu acceso cuando corresponda.</q-banner>
-        </q-card-section>
-      </q-card>
-
-      <div v-if="!sent" class="application-actions row justify-between q-gutter-sm q-mt-lg">
-        <q-btn v-if="step > 1" flat no-caps label="Atrás" icon="arrow_back" @click="back" />
-        <q-space />
-        <q-btn v-if="step < 5" color="primary" unelevated no-caps :label="step === 1 ? 'Conocer los planes' : step === 2 ? 'Continuar con este plan' : 'Continuar'" @click="next" />
-        <q-btn v-else color="primary" unelevated no-caps label="Enviar solicitud a AGR Studio" icon-right="send" :loading="submitting" @click="submit" />
-      </div>
-
-      <q-card v-else flat class="success-card q-mt-xl">
-        <q-card-section class="q-pa-xl text-center">
-          <q-icon name="verified_user" color="positive" size="74px" />
-          <div class="text-h4 text-weight-bold q-mt-md">Solicitud recibida</div>
-          <p class="lead">Tu información ya está en manos de AGR Studio. No necesitas crear una cuenta ni conseguir un código ahora.</p>
-          <div class="request-code">{{ result?.codigo || 'SOL-VITI' }}</div>
-          <div class="text-body1 q-mt-lg">Estado actual: <strong>En revisión</strong></div>
-
-          <div class="status-track q-mt-xl">
-            <div class="track-item active"><div class="track-dot">1</div><span>Recibida</span></div>
-            <div class="track-line"></div>
-            <div class="track-item"><div class="track-dot">2</div><span>Evaluación</span></div>
-            <div class="track-line"></div>
-            <div class="track-item"><div class="track-dot">3</div><span>Resultado</span></div>
-            <div class="track-line"></div>
-            <div class="track-item"><div class="track-dot">4</div><span>Orientación</span></div>
-            <div class="track-line"></div>
-            <div class="track-item"><div class="track-dot">5</div><span>Acceso</span></div>
-            <div class="track-line"></div>
-            <div class="track-item"><div class="track-dot">6</div><span>Desarrollo</span></div>
-          </div>
-
-          <q-banner rounded class="q-mt-xl access-note text-left"><template #avatar><q-icon name="support_agent" color="primary" /></template>AGR Studio te responderá por el canal privado disponible para tu solicitud. Allí podrás recibir orientación, capacitación y seguimiento del trabajo sin tener que perseguir códigos de acceso antes de tiempo.</q-banner>
-          <q-btn flat color="primary" no-caps class="q-mt-lg" label="Volver al inicio de VITI" to="/acceso" />
-        </q-card-section>
-      </q-card>
-
-      <div class="application-footer q-mt-xl">AGR Studio · VITI · Solicitud de solución digital</div>
+      <footer class="request-footer">VITI · Desarrollo, implementación y seguimiento de sistemas. <span>· Tecnología desarrollada por AGR Studio.</span></footer>
     </div>
   </q-page>
 </template>
 
 <style scoped>
-.viti-application-page{min-height:100vh;background:linear-gradient(180deg,#071426 0%,#0a1c33 100%);padding:28px 18px 60px;color:#eaf7ff}
-.application-shell{width:min(1180px,100%);margin:0 auto}.application-header{padding-bottom:12px}.application-intro{max-width:860px;padding:40px 0 8px}.section-kicker,.step-chip{font-size:12px;letter-spacing:.16em;text-transform:uppercase;color:#7ce7ff;font-weight:800}.application-intro h1{font-size:clamp(34px,5vw,64px);line-height:1.02;margin:10px 0 18px;font-weight:900}.application-intro p,.lead{font-size:17px;line-height:1.65;color:#b8cfdf;max-width:900px}.progress-wrap{max-width:720px}.progress-top{font-size:12px;color:#86aabd;margin-bottom:8px}.application-card{background:rgba(9,23,39,.92);border:1px solid rgba(124,223,255,.15);border-radius:24px;box-shadow:0 28px 80px rgba(0,0,0,.32);color:#eaf7ff}.application-card h2{font-size:clamp(28px,4vw,44px);line-height:1.1;margin:12px 0 12px}.info-card,.plan-card,.option-card{height:100%;background:rgba(255,255,255,.035);border-color:rgba(124,223,255,.14);color:#eaf7ff;border-radius:18px}.info-card{padding:20px}.info-card p{color:#9eb9c8;line-height:1.55}.plan-card{cursor:pointer;transition:.2s;border-width:1px}.plan-card:hover,.plan-card.selected,.option-card.selected{border-color:#62e6ff;box-shadow:0 0 0 1px rgba(98,230,255,.25),0 20px 40px rgba(18,135,190,.08);transform:translateY(-2px)}.plan-price{font-size:27px;font-weight:900}.plan-list{margin:16px 0 0;padding-left:18px;color:#b8cfdf;line-height:1.8}.option-card{cursor:pointer}.question-block{padding:20px 0;border-top:1px solid rgba(255,255,255,.08)}.question-heading{display:flex;gap:12px;align-items:flex-start}.question-title{font-size:18px;font-weight:700;line-height:1.4}.question-title span{color:#ff9b83}.summary-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;margin-top:22px}.summary-grid>div{padding:18px;border:1px solid rgba(124,223,255,.13);border-radius:16px;background:rgba(255,255,255,.03)}.summary-label{font-size:11px;text-transform:uppercase;letter-spacing:.12em;color:#82a8ba}.summary-value{font-size:19px;font-weight:800;margin-top:5px}.access-note{background:rgba(66,188,236,.08);color:#dff7ff;border:1px solid rgba(98,230,255,.17)}.success-card{background:rgba(9,23,39,.96);border:1px solid rgba(95,250,166,.2);border-radius:24px;color:#eaf7ff}.request-code{display:inline-block;margin-top:18px;padding:12px 18px;border-radius:12px;background:rgba(98,230,255,.08);border:1px dashed rgba(98,230,255,.25);font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:22px;letter-spacing:.12em}.status-track{display:flex;align-items:center;justify-content:center;gap:10px;overflow:auto;padding-bottom:8px}.track-item{min-width:84px;text-align:center;color:#6f8c9b;font-size:11px}.track-item.active{color:#7ce7ff}.track-dot{width:30px;height:30px;border-radius:50%;display:grid;place-items:center;margin:0 auto 7px;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.04)}.track-item.active .track-dot{border-color:#62e6ff;background:rgba(98,230,255,.1);color:#7ce7ff;box-shadow:0 0 16px rgba(98,230,255,.18)}.track-line{width:34px;height:1px;background:rgba(255,255,255,.12)}.application-footer{text-align:center;color:#6f8c9b;font-size:12px}
-:deep(.q-field--outlined .q-field__control){border-color:rgba(133,220,255,.16);background:rgba(255,255,255,.02);color:#fff}.body--light :deep(.q-field--outlined .q-field__control){background:#fff;color:#111}:deep(.q-field__label),:deep(.q-field__native){color:#a9cedd}.body--light :deep(.q-field__label),.body--light :deep(.q-field__native){color:#536b7a}
-@media(max-width:800px){.summary-grid{grid-template-columns:1fr}.status-track{justify-content:flex-start}.application-intro{padding-top:24px}.application-card .q-card__section{padding:22px!important}}
+.request-page{min-height:100vh;background:radial-gradient(circle at 88% 4%,rgba(28,94,181,.16),transparent 28rem),linear-gradient(180deg,#06111f,#09192b 62%,#071321);color:#edf4fb;padding:0 18px 46px}.request-shell{width:min(1060px,100%);margin:0 auto}.request-topbar{min-height:82px;display:flex;align-items:center;justify-content:space-between;gap:20px;border-bottom:1px solid rgba(103,137,171,.18)}.brand-link{text-decoration:none;color:inherit}.top-actions{display:flex;gap:8px}.top-actions :deep(.q-btn){color:#c7d3df;border-color:rgba(199,211,223,.28);border-radius:12px}.request-intro{max-width:830px;padding:54px 0 26px}.eyebrow{font-size:12px;font-weight:900;letter-spacing:.16em;color:#f28b30}.request-intro h1,.success-card h1{font-size:clamp(38px,5vw,62px);line-height:1.02;letter-spacing:-.045em;margin:14px 0;color:#f7fbff}.request-intro h1 span{color:#7fb1f4}.request-intro p,.success-card>p{max-width:760px;color:#adbdcc;font-size:18px;line-height:1.65}.stepbar{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:18px}.stepbar-item{display:flex;align-items:center;gap:9px;color:#6f8498;font-size:12px}.stepbar-item span{width:27px;height:27px;border-radius:50%;display:grid;place-items:center;background:#0b1a2b;border:1px solid #2a425a;font-weight:800}.stepbar-item.active{color:#dfe8f1}.stepbar-item.active span{border-color:#f28b30;color:#ffad64;background:rgba(242,139,48,.08)}.stepbar .q-linear-progress{grid-column:1/-1}.request-card{background:linear-gradient(180deg,rgba(12,31,52,.97),rgba(10,27,46,.97))!important;border:1px solid rgba(76,111,145,.34);border-radius:24px;overflow:hidden;box-shadow:0 28px 70px rgba(0,0,0,.22)}.request-section{padding:32px}.section-head{display:flex;justify-content:space-between;gap:18px;align-items:start}.section-head small{color:#f28b30;font-weight:900;letter-spacing:.13em}.section-head h2{font-size:28px;margin:6px 0 0;color:#f3f7fb}.section-head>.q-icon{font-size:34px;color:#f28b30}.section-help{color:#9fb0c0;line-height:1.6;margin:9px 0 26px}.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}.span-2{grid-column:1/-1}.field-block>label{display:block;color:#eaf1f7;font-weight:700;margin:0 0 4px}.field-block>p{margin:0 0 10px;color:#8097ab;font-size:12px;line-height:1.45}.toggle-card{padding:13px 15px;border:1px solid #294761;border-radius:15px;background:#07192a}.toggle-card :deep(.q-field){margin-top:10px}.request-card :deep(.q-field--outlined .q-field__control){background:#07192a!important;border-radius:15px;min-height:56px}.request-card :deep(.q-field--outlined .q-field__control:before){border-color:#294761!important}.request-card :deep(.q-field--focused .q-field__control:before){border-color:#f28b30!important}.request-card :deep(.q-field__native),.request-card :deep(.q-field__input){color:#edf4fb!important}.request-card :deep(.q-field__label){color:#8fa5b9!important}.request-card :deep(.q-field--focused .q-field__label){color:#ffad64!important}.request-card :deep(textarea){line-height:1.45;min-height:60px!important}.plan-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:14px}.plan-option{position:relative;text-align:left;border:1px solid #294761;background:linear-gradient(180deg,#08192a,#0b2036);color:#e7eef6;border-radius:18px;padding:22px;cursor:pointer;transition:.18s ease}.plan-option:hover{transform:translateY(-2px);border-color:#496b8a;background:#0d243d}.plan-option.selected{border-color:#f28b30;box-shadow:0 0 0 1px rgba(242,139,48,.22),0 16px 34px rgba(0,0,0,.16);background:linear-gradient(180deg,#0c2238,#102b49)}.plan-check{position:absolute;right:16px;top:16px;width:30px;height:30px;border-radius:50%;display:grid;place-items:center;border:1px solid rgba(143,165,185,.3);color:#91a7bb}.plan-option.selected .plan-check{background:#f28b30;color:#071321;border-color:#f28b30}.plan-name{font-size:21px;font-weight:850;padding-right:40px}.plan-option p{color:#a5b6c6;line-height:1.5;min-height:48px}.plan-price{margin-top:18px}.plan-price small,.plan-price strong{display:block}.plan-price small{font-size:10px;letter-spacing:.13em;color:#f28b30;font-weight:900}.plan-price strong{font-size:29px;margin-top:4px}.plan-service{display:flex;justify-content:space-between;gap:12px;margin-top:14px;padding-top:14px;border-top:1px solid rgba(100,132,162,.18);color:#9fb0c0}.plan-service b{color:#dfe8f1}.billing-choice{margin-top:18px;padding:18px 20px;border-radius:16px;background:rgba(7,21,37,.72);border:1px solid rgba(76,111,145,.28);display:flex;justify-content:space-between;align-items:center;gap:18px}.billing-choice b,.billing-choice small{display:block}.billing-choice small{color:#8fa3b7;margin-top:4px;max-width:610px}.summary-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}.summary-grid article{padding:18px;background:#07192a;border:1px solid #294761;border-radius:15px}.summary-grid small,.summary-grid b,.summary-grid span{display:block}.summary-grid small{color:#f28b30;font-weight:900;letter-spacing:.11em;font-size:10px}.summary-grid b{margin:7px 0 5px;font-size:16px}.summary-grid span{color:#9fb0c0;font-size:13px}.confirm-check{margin-top:22px;color:#d7e0e9}.privacy-note{margin-top:12px;color:#849aaf;font-size:12px;display:flex;align-items:flex-start;gap:7px;line-height:1.5}.request-actions{padding:18px 26px}.request-actions :deep(.q-btn){min-height:44px;border-radius:12px}.success-card{max-width:760px;margin:72px auto 40px;padding:46px;text-align:center;background:linear-gradient(180deg,#0d2036,#09192b);border:1px solid rgba(242,139,48,.28);border-radius:28px;box-shadow:0 30px 80px rgba(0,0,0,.25)}.success-icon{width:72px;height:72px;border-radius:50%;display:grid;place-items:center;margin:0 auto 22px;background:rgba(242,139,48,.12);border:1px solid rgba(242,139,48,.38);color:#f28b30;font-size:34px}.success-card>p{margin-left:auto;margin-right:auto}.request-code{display:inline-flex;flex-direction:column;margin:20px 0;padding:14px 24px;border-radius:14px;background:#07192a;border:1px solid #294761}.request-code small{color:#8ea3b6;font-size:9px;letter-spacing:.13em}.request-code strong{font-size:20px;margin-top:4px}.success-flow{display:flex;justify-content:center;align-items:center;flex-wrap:wrap;gap:10px;color:#899eb1;margin:18px 0 28px}.success-flow .done{color:#ffad64}.success-actions{display:flex;justify-content:center;gap:8px;flex-wrap:wrap}.success-actions :deep(.q-btn){border-radius:12px}.request-footer{text-align:center;color:#61788e;font-size:11px;padding:28px 0}.request-footer span{opacity:.78}.request-card :deep(.q-separator){background:rgba(76,111,145,.22)}
+@media(max-width:760px){.request-page{padding:0 10px 80px}.request-shell{width:100%}.request-topbar{min-height:68px}.top-actions .q-btn:first-child{display:none}.top-actions .q-btn{padding-left:8px;padding-right:8px}.request-intro{padding:34px 8px 22px}.request-intro h1{font-size:40px}.request-intro p{font-size:16px}.form-grid,.plan-grid,.summary-grid{grid-template-columns:1fr}.span-2{grid-column:1}.billing-choice{align-items:flex-start;flex-direction:column}.request-section{padding:22px 16px}.section-head h2{font-size:25px}.stepbar{padding:0 6px}.stepbar-item b{display:none}.request-card{border-radius:20px}.success-card{padding:28px 18px;margin:36px 0}.request-actions{padding:14px 14px}.request-actions .q-space{display:none}.request-actions{justify-content:space-between}.request-actions :deep(.q-btn){flex:1}.success-actions{display:grid}.success-actions :deep(.q-btn){width:100%}}
 </style>

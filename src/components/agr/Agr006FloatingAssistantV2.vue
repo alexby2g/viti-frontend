@@ -335,3 +335,14 @@ onBeforeUnmount(() => {
 @keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-7px)}}@keyframes spin{to{transform:rotate(382deg)}}@keyframes spinReverse{to{transform:rotate(-382deg)}}@keyframes pulse{50%{opacity:.35}}@keyframes breathe{0%,100%{transform:scale(.96);opacity:.75}50%{transform:scale(1.04);opacity:1}}@keyframes materialize{from{opacity:0;transform:scale(.96) translateY(20px);filter:drop-shadow(0 0 2px rgba(72,214,255,.2))}to{opacity:1;transform:scale(1) translateY(0)}}@keyframes mouthTalk{0%,100%{transform:scaleY(.35)}50%{transform:scaleY(1.25)}}@keyframes wave{from{height:7px;opacity:.45}to{height:24px;opacity:1}}
 @media (max-width:640px){.agr006-root{right:14px;bottom:14px}.agr006-orb{width:68px;height:68px}.agr006-panel{bottom:82px}.hologram-layer{place-items:center}.hologram{width:92vw;height:78vh}.holo-caption{bottom:60px}}
 </style>
+
+<style>
+@media (max-width:640px){
+  .agr006-root{right:10px!important;bottom:60px!important}
+  .agr006-orb{width:48px!important;height:48px!important;animation:none!important}
+  .agr006-core{inset:11px!important;font-size:9px!important}
+  .agr006-ring{inset:3px!important}.agr006-ring.ring-b{inset:7px!important}
+  .agr006-status-dot{width:7px!important;height:7px!important;right:4px!important;bottom:5px!important}
+  .agr006-panel{right:0!important;bottom:58px!important;width:min(360px,calc(100vw - 20px))!important;max-height:68vh!important}
+}
+</style>
