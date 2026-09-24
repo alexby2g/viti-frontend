@@ -1,15 +1,12 @@
 <script setup>
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { useQuasar } from 'quasar'
 import { useAuthStore } from '../stores/auth'
 import AppBrand from '../components/AppBrand.vue'
 
 const auth = useAuthStore()
 const router = useRouter()
 const route = useRoute()
-const $q = useQuasar()
-const creating = ref(false)
 
 const nav = [
   { label: 'Mi espacio', icon: 'home', to: '/mi-cuenta' },
@@ -25,20 +22,9 @@ function go(path) {
   router.push(path)
 }
 
-async function newRequest() {
-  if (creating.value) return
-  creating.value = true
-  try {
-    const { data } = await (await import('../boot/axios')).api.post('/mi/solicitud')
-    const link = data?.data?.enlace_publico
-    if (link) window.location.href = link
-    else throw new Error('missing_link')
-  } catch (error) {
-    const message = error?.response?.data?.message || 'No pudimos iniciar una nueva solicitud desde tu cuenta.'
-    $q.notify({ type: 'negative', message })
-  } finally {
-    creating.value = false
-  }
+function newRequest() {
+  // Una sola puerta para pedir sistemas: el formulario oficial con plan y forma de pago.
+  router.push('/solicitud')
 }
 
 async function logout() {
@@ -102,7 +88,7 @@ onMounted(() => { auth.initialize().catch(() => {}) })
           </q-list>
 
           <div class="hub-sidebar-bottom">
-            <q-btn outline color="primary" no-caps icon="add" class="full-width" label="Nueva solicitud" :loading="creating" @click="newRequest" />
+            <q-btn outline color="primary" no-caps icon="add" class="full-width" label="Nueva solicitud" @click="newRequest" />
             <div class="hub-trust"><q-icon name="verified_user" /> Plataforma VITI · por AGR Studio</div>
           </div>
         </aside>

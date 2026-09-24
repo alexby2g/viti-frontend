@@ -35,5 +35,11 @@ jobs:
       - name: VITI public presentation smoke
         run: npm run test:viti-public
 
+      - name: VITI access control smoke
+        run: npm run test:viti-access
+
+      - name: VITI phase 1 UX smoke
+        run: npm run test:viti-phase1
+
       - name: Production build
         run: npm run build

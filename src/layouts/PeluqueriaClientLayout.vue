@@ -39,8 +39,14 @@ async function loadState(){
     appInfo.value=(await api.get('/mi/apps/peluqueria/estado')).data.data
     ensureAllowedRoute()
   }catch(e){
-    $q.notify({type:'negative',message:e.response?.data?.message||'No se pudo abrir Peluquería.'})
     sessionStorage.setItem('viti-app-explicit-exit','1')
+    const block=e.response?.data?.bloqueo
+    if(block&&block.estado!=='bloqueado_pago'){
+      // Mantenimiento o bloqueo manual: se muestra el aviso completo en lugar de un mensaje suelto.
+      router.replace({path:'/servicio-no-disponible',query:{estado:block.estado,sistema:block.aplicacion||'Peluquería',mensaje:block.mensaje||e.response?.data?.message||'',hasta:block.hasta||undefined,volver:'/mi-aplicaciones'}})
+      return
+    }
+    $q.notify({type:'negative',message:e.response?.data?.message||'No se pudo abrir Peluquería.'})
     router.replace(e.response?.status===402?'/mi-pagos':'/mi-aplicaciones')
   }finally{loading.value=false;ensureAllowedRoute()}
 }

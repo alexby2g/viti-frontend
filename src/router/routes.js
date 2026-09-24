@@ -42,7 +42,9 @@ export default [
   { path: '/registro', component: AuthLayout, children: [{ path: '', name: 'client-register', component: () => import('../pages/ClientRegisterPage.vue') }] },
   { path: '/registro-cliente/:token', component: AuthLayout, children: [{ path: '', name: 'client-onboarding', component: () => import('../pages/ClientOnboardingPage.vue') }] },
   { path: '/acceso', redirect: '/solicitud' },
-  { path: '/solicitud', component: AuthLayout, children: [{ path: '', name: 'public-application', component: () => import('../pages/PublicSolicitudStartPage.vue') }] },
+  // Ver VITI es libre; pedir un sistema exige iniciar sesión con una cuenta de cliente.
+  { path: '/solicitud', component: AuthLayout, meta: { requiresAuth:true, clientOnly:true }, children: [{ path: '', name: 'public-application', component: () => import('../pages/PublicSolicitudStartPage.vue'), meta: { requiresAuth:true, clientOnly:true } }] },
+  { path: '/servicio-no-disponible', component: AuthLayout, meta: { publicLanding:true }, children: [{ path: '', name: 'service-unavailable', component: () => import('../pages/ServiceUnavailablePage.vue'), meta: { publicLanding:true } }] },
   { path: '/solicitar/:token', component: AuthLayout, children: [{ path: '', name: 'public-request', component: () => import('../pages/IdeaBuilderPage.vue') }] },
   { path: '/login', component: AuthLayout, children: [{ path: '', name: 'login', component: () => import('../pages/LoginPage.vue') }] },
   { path:'/electrofrio/acceso',component:AuthLayout,children:[{path:'',name:'electro-customer-login',component:()=>import('../pages/ElectrofrioCustomerLoginPage.vue')}]},
@@ -124,6 +126,7 @@ export default [
       { path: 'proyectos', name: 'proyectos', component: () => import('../pages/ProyectosPage.vue'), meta:{adminOnly:true} },
       { path: 'proyectos/:id', name: 'proyecto-detalle', component: () => import('../pages/ProyectoDetallePage.vue'), meta:{adminOnly:true} },
       { path: 'aplicaciones', name: 'aplicaciones', component: () => import('../pages/AplicacionesPage.vue'), meta:{adminOnly:true} },
+      { path: 'accesos', name: 'accesos', component: () => import('../pages/AccesosPage.vue'), meta:{adminOnly:true} },
       { path: 'apphub', redirect: '/aplicaciones' },
       { path: 'apps/externa/:id', name: 'external-app', component: () => import('../pages/ExternalAppPage.vue') },
       { path: 'saas', name: 'saas', component: () => import('../pages/SaasPage.vue'), meta:{adminOnly:true,superAdminOnly:true} },

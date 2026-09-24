@@ -10,10 +10,38 @@ const solutions = [
 ]
 
 const workflow = [
-  { number:'01', title:'Nos cuentas qué necesitas', text:'Completa una solicitud corta. No necesitas saber de programación ni definir detalles técnicos.' },
+  { number:'01', title:'Nos cuentas qué necesitas', text:'Inicia sesión, describe tu necesidad y elige tu plan y forma de pago. No necesitas saber de programación.' },
   { number:'02', title:'VITI revisa y cotiza', text:'Revisamos el alcance, el precio de implementación y el servicio que realmente necesitas antes de iniciar.' },
   { number:'03', title:'Desarrollamos y pruebas', text:'Puedes seguir el avance y, cuando corresponda, probar una versión beta antes de la entrega.' },
   { number:'04', title:'Recibes tu sistema', text:'Entregamos el acceso web, panel o APK acordado y mantenemos el soporte según tu plan.' },
+]
+
+const pillars = [
+  { icon:'person_pin', title:'Para ti, como cliente', text:'Un Centro VITI donde pides tu sistema, eliges tu plan, ves el avance, pagas y entras a tus sistemas entregados.' },
+  { icon:'dashboard_customize', title:'Para el equipo VITI', text:'Un panel administrativo que ordena solicitudes, proyectos, cobros, suscripciones y el acceso a cada sistema publicado.' },
+  { icon:'apps', title:'Tu sistema', text:'La aplicación web o APK de tu negocio, con los módulos que necesitas y conectada a VITI para soporte y continuidad.' },
+]
+
+const achievements = [
+  { icon:'ac_unit', title:'Servicio técnico y refrigeración', text:'Órdenes de trabajo, agenda de técnicos, clientes, equipos, garantías e historial en un solo sistema en producción.' },
+  { icon:'content_cut', title:'Peluquería y estética', text:'Reservas, catálogo de servicios, productos, reportes y un espacio propio para los clientes del negocio.' },
+  { icon:'hub', title:'Centro VITI', text:'La misma plataforma con la que VITI recibe solicitudes, cotiza, cobra y entrega los sistemas a sus clientes.' },
+]
+
+const modules = [
+  { icon:'assignment', title:'Solicitudes y propuestas', text:'Tu necesidad, el alcance acordado y la cotización, siempre a la vista.' },
+  { icon:'timeline', title:'Seguimiento del proyecto', text:'Estado, avances, versión beta y fecha de entrega.' },
+  { icon:'receipt_long', title:'Pagos y comprobantes', text:'Cuotas de implementación, suscripción y comprobantes en un mismo lugar.' },
+  { icon:'forum', title:'Atención VITI', text:'Mensajes con el equipo para dudas, cambios e incidencias.' },
+  { icon:'launch', title:'Mis sistemas', text:'Acceso directo a los sistemas entregados y a su estado de servicio.' },
+  { icon:'dns', title:'Dominios y mantenimiento', text:'VITI administra los dominios de tu sistema y avisa cuando hay una actualización programada.' },
+]
+
+const payments = [
+  { icon:'payments', title:'Implementación', text:'Se paga una vez por el desarrollo: al contado, en 50% y 50%, o en tres partes (40%, 30% y 30%) según el plan.' },
+  { icon:'event_repeat', title:'Suscripción mensual o anual', text:'Mantiene tu sistema publicado, con soporte y mantenimiento. La anual cuesta menos que pagar doce meses.' },
+  { icon:'schedule', title:'Días de gracia', text:'Si una cuota vence, tu sistema sigue funcionando durante los días de gracia de tu plan mientras regularizas el pago.' },
+  { icon:'lock_clock', title:'Pausa sin perder datos', text:'Si el pago no se regulariza, el acceso se pausa. Tus datos quedan guardados y el sistema vuelve apenas se confirma el pago.' },
 ]
 
 const subscription = [
@@ -30,10 +58,11 @@ const subscription = [
       <div class="landing-container nav-inner">
         <router-link to="/viti" class="brand-link"><AppBrand /></router-link>
         <nav class="nav-links">
+          <a href="#que-es">Qué es VITI</a>
           <a href="#que-hacemos">Qué hacemos</a>
           <a href="#como-funciona">Cómo funciona</a>
           <a href="#planes">Precios</a>
-          <a href="#suscripcion">Suscripción</a>
+          <a href="#pagos">Pagos</a>
         </nav>
         <div class="nav-actions">
           <q-btn flat no-caps class="nav-login" label="Demo" to="/demo" />
@@ -51,7 +80,7 @@ const subscription = [
             <h1>Creamos el sistema que tu negocio necesita. <span>Sin complicarte con lo técnico.</span></h1>
             <p class="hero-lead">VITI recibe tu solicitud, organiza el desarrollo y te permite seguir el proyecto hasta la entrega. Tú explicas qué necesitas; VITI se encarga de convertirlo en una solución clara.</p>
             <div class="hero-actions">
-              <q-btn color="primary" unelevated no-caps size="lg" icon-right="arrow_forward" label="Solicitar evaluación" to="/solicitud" />
+              <q-btn color="primary" unelevated no-caps size="lg" icon-right="arrow_forward" label="Solicitar mi sistema" to="/solicitud" />
               <q-btn outline no-caps size="lg" class="btn-outline" label="Ver demo" to="/demo" />
               <q-btn flat no-caps size="lg" class="btn-text" label="Ver precios" to="/viti/planes" />
             </div>
@@ -60,6 +89,7 @@ const subscription = [
               <span><q-icon name="check_circle" /> Presupuesto claro</span>
               <span><q-icon name="check_circle" /> Seguimiento del proyecto</span>
             </div>
+            <div class="free-note"><q-icon name="visibility" /> Ver VITI, sus planes y la demo es libre. Para enviar una solicitud inicia sesión o crea tu cuenta gratis y elige cómo pagar.</div>
           </div>
 
           <div class="customer-preview" aria-label="Cómo verá el cliente su proyecto en VITI">
@@ -80,7 +110,25 @@ const subscription = [
         </div>
       </section>
 
-      <section id="que-hacemos" class="landing-section surface-section">
+      <section id="que-es" class="landing-section">
+        <div class="landing-container">
+          <div class="section-heading"><div class="section-kicker">Qué es VITI</div><h2>Una empresa digital que convierte tus procesos en sistemas.</h2><p>VITI recibe la necesidad de negocios y empresas, la transforma en un sistema a medida y lo mantiene funcionando después de la entrega. Todo el proceso vive en una sola plataforma.</p></div>
+          <div class="pillar-grid q-mt-xl">
+            <article v-for="item in pillars" :key="item.title" class="pillar-card"><q-icon :name="item.icon"/><h3>{{item.title}}</h3><p>{{item.text}}</p></article>
+          </div>
+        </div>
+      </section>
+
+      <section id="logros" class="landing-section surface-section">
+        <div class="landing-container">
+          <div class="section-heading"><div class="section-kicker">Logros</div><h2>Sistemas que ya están funcionando.</h2><p>Estos son proyectos reales construidos y administrados con VITI.</p></div>
+          <div class="achievement-grid q-mt-xl">
+            <article v-for="item in achievements" :key="item.title" class="achievement-card"><div class="solution-icon"><q-icon :name="item.icon"/></div><div><h3>{{item.title}}</h3><p>{{item.text}}</p></div><q-badge rounded color="positive" label="En funcionamiento"/></article>
+          </div>
+        </div>
+      </section>
+
+      <section id="que-hacemos" class="landing-section">
         <div class="landing-container">
           <div class="section-heading"><div class="section-kicker">Qué hacemos</div><h2>Soluciones digitales para hacer más simple tu operación.</h2><p>No vendemos una plantilla cerrada. Revisamos tu necesidad y preparamos el sistema adecuado para tu negocio.</p></div>
           <div class="solution-grid q-mt-xl">
@@ -89,7 +137,7 @@ const subscription = [
         </div>
       </section>
 
-      <section id="como-funciona" class="landing-section">
+      <section id="como-funciona" class="landing-section surface-section">
         <div class="landing-container">
           <div class="section-heading"><div class="section-kicker">Cómo funciona</div><h2>Del primer mensaje a un sistema funcionando.</h2><p>El proceso está pensado para que tú nos expliques el problema y nosotros nos encarguemos de convertirlo en una solución.</p></div>
           <div class="workflow-grid q-mt-xl">
@@ -98,10 +146,31 @@ const subscription = [
         </div>
       </section>
 
+      <section id="modulos" class="landing-section">
+        <div class="landing-container modules-grid">
+          <div class="modules-copy">
+            <div class="section-kicker">Panel y módulos</div>
+            <h2>Todo tu proyecto en un solo panel.</h2>
+            <p>Al crear tu cuenta tienes tu Centro VITI. Desde ahí pides nuevos sistemas, pagas y entras a los que ya tienes. El equipo VITI trabaja en su panel administrativo con la misma información, sin mensajes perdidos.</p>
+            <q-btn outline no-caps class="btn-outline q-mt-md" icon="visibility" label="Ver demo" to="/demo"/>
+          </div>
+          <div class="module-cards"><article v-for="item in modules" :key="item.title"><q-icon :name="item.icon"/><div><b>{{item.title}}</b><span>{{item.text}}</span></div></article></div>
+        </div>
+      </section>
+
       <section id="planes" class="landing-section plans-section">
         <div class="landing-container">
           <div class="price-explain q-mb-xl"><div><div class="section-kicker">Precios claros</div><h2>Una cosa es desarrollar. Otra, mantener el servicio.</h2></div><div class="price-columns"><div><q-icon name="construction"/><b>Implementación</b><span>Pago por analizar, desarrollar, configurar y poner en marcha tu sistema.</span></div><div><q-icon name="autorenew"/><b>Servicio</b><span>Pago mensual o anual por alojamiento, mantenimiento y soporte incluidos.</span></div></div></div>
           <PublicPlansCatalog :show-intro="false" />
+        </div>
+      </section>
+
+      <section id="pagos" class="landing-section">
+        <div class="landing-container">
+          <div class="section-heading"><div class="section-kicker">Pagos</div><h2>Cómo pagas tu sistema.</h2><p>Al enviar tu solicitud eliges el plan, la suscripción mensual o anual y la forma de pago de la implementación. Así VITI puede atenderte sin idas y vueltas.</p></div>
+          <div class="payment-grid q-mt-xl">
+            <article v-for="item in payments" :key="item.title" class="payment-card"><q-icon :name="item.icon"/><h3>{{item.title}}</h3><p>{{item.text}}</p></article>
+          </div>
         </div>
       </section>
 
@@ -114,7 +183,7 @@ const subscription = [
 
       <section class="cta-section">
         <div class="landing-container cta-inner">
-          <div><div class="section-kicker">Empecemos</div><h2>Cuéntanos qué quieres resolver.</h2><p>La solicitud toma pocos minutos. Si tu proyecto es viable, VITI te mostrará el siguiente paso para confirmar alcance, precio y forma de trabajo.</p></div>
+          <div><div class="section-kicker">Empecemos</div><h2>Cuéntanos qué quieres resolver.</h2><p>La solicitud toma pocos minutos: inicia sesión, describe tu necesidad y elige tu plan y forma de pago. VITI confirma el alcance y el precio final antes de cobrar.</p></div>
           <div class="cta-actions"><q-btn color="primary" unelevated no-caps size="lg" label="Solicitar mi sistema" to="/solicitud"/><q-btn outline no-caps size="lg" class="btn-outline" label="Crear cuenta" to="/registro"/><q-btn flat no-caps size="lg" class="btn-text" label="Ya tengo acceso" to="/login"/></div>
         </div>
       </section>
@@ -129,4 +198,6 @@ const subscription = [
 @media(max-width:1050px){.nav-links{display:none}.hero-grid,.price-explain,.subscription-grid{grid-template-columns:1fr}.solution-grid,.workflow-grid{grid-template-columns:repeat(2,1fr)}.customer-preview{max-width:700px}.price-explain{gap:24px}}
 @media(max-width:700px){.landing-container{width:min(100% - 24px,1180px)}.nav-actions .nav-login{display:none}.hero-section{padding:58px 0 74px}.hero-copy h1{font-size:clamp(40px,12vw,60px)}.hero-lead{font-size:17px}.landing-section{padding:68px 0}.solution-grid,.workflow-grid,.subscription-cards,.price-columns{grid-template-columns:1fr}.preview-steps{grid-template-columns:repeat(3,1fr)}.cta-inner,.footer-inner{flex-direction:column;align-items:flex-start}.cta-actions{width:100%}.cta-actions .q-btn{flex:1}.footer-links{align-items:flex-start}}
 @media(max-width:480px){.hero-actions .q-btn,.cta-actions .q-btn{width:100%;flex:auto}.hero-points{display:grid}.preview-body{padding:18px}.preview-steps{grid-template-columns:1fr 1fr}}
+.free-note{display:flex;gap:9px;align-items:flex-start;max-width:620px;margin-top:20px;padding:12px 15px;border-radius:14px;background:rgba(116,173,246,.07);border:1px solid rgba(116,173,246,.2);color:#b9cde2;font-size:13px;line-height:1.55}.free-note .q-icon{color:#74adf6;font-size:18px;margin-top:1px}.pillar-grid,.achievement-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:18px}.pillar-card,.achievement-card,.payment-card{padding:26px;border-radius:22px;border:1px solid rgba(92,130,165,.24);background:linear-gradient(180deg,rgba(14,36,60,.8),rgba(10,27,46,.8))}.pillar-card>.q-icon,.payment-card>.q-icon{font-size:30px;color:#f28b30}.pillar-card h3,.achievement-card h3,.payment-card h3{font-size:19px;margin:14px 0 8px;color:#f3f7fb;line-height:1.25}.pillar-card p,.achievement-card p,.payment-card p{color:#a9b9c8;line-height:1.6;margin:0}.achievement-card{display:flex;flex-direction:column;gap:12px}.achievement-card h3{margin-top:4px}.achievement-card .q-badge{align-self:flex-start;padding:5px 10px}.modules-grid{display:grid;grid-template-columns:.9fr 1.1fr;gap:48px;align-items:center}.modules-copy h2{font-size:clamp(32px,4vw,46px);line-height:1.08;letter-spacing:-.035em;margin:12px 0 16px}.modules-copy p{color:#adbdcc;line-height:1.7;font-size:16px}.module-cards{display:grid;grid-template-columns:1fr 1fr;gap:12px}.module-cards article{display:flex;gap:12px;padding:16px;border-radius:16px;background:rgba(8,22,38,.7);border:1px solid rgba(92,130,165,.22)}.module-cards .q-icon{font-size:22px;color:#74adf6;margin-top:2px}.module-cards b,.module-cards span{display:block}.module-cards b{color:#eef4fa}.module-cards span{color:#9fb0c0;font-size:13px;line-height:1.5;margin-top:3px}.payment-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px}
+@media(max-width:1000px){.pillar-grid,.achievement-grid{grid-template-columns:1fr}.modules-grid{grid-template-columns:1fr}.payment-grid{grid-template-columns:1fr 1fr}}@media(max-width:620px){.module-cards,.payment-grid{grid-template-columns:1fr}}
 </style>

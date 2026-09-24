@@ -72,6 +72,12 @@ export default defineRouter(({ store }) => {
 
     const auth = useAuthStore(store)
     if (auth.setupRequired === null) await auth.checkSetup()
+
+    // Un visitante sin sesión que entra a la raíz ve primero la presentación de VITI.
+    if (to.path === '/' && !auth.setupRequired) {
+      await auth.initialize()
+      if (!auth.isAuthenticated) return { name:'viti-landing' }
+    }
     if (auth.setupRequired && to.name !== 'setup') return { name:'setup' }
     if (!auth.setupRequired && to.name === 'setup') return auth.isAuthenticated ? homeFor(auth.user) : { name:'login' }
 

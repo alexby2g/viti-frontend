@@ -13,7 +13,8 @@ const showPassword = ref(false)
 const formRef = ref(null)
 
 const googleMode = computed(() => String(route.query.google || '') === 'created' && Boolean(route.query.token))
-const fromRequest = computed(() => String(route.query.origen || '') === 'solicitud')
+const fromRequest = computed(() => String(route.query.origen || '') === 'solicitud' || String(route.query.redirect || '').startsWith('/solicitud'))
+const loginLink = computed(() => typeof route.query.redirect === 'string' ? { path:'/login', query:{ redirect:route.query.redirect } } : '/login')
 const form = reactive({
   nombre:'', correo:'', celular:'', whatsapp_same:true, whatsapp:'',
   business_whatsapp_different:false, whatsapp_business:'', password:'', password_confirmation:'',
@@ -46,8 +47,9 @@ async function submit() {
         password:form.password, password_confirmation:form.password_confirmation,
       })
     }
-    $q.notify({type:'positive',message:fromRequest.value?'Tu cuenta está lista y tu solicitud quedó vinculada.':'Tu cuenta VITI está lista.'})
-    await router.replace('/mi-cuenta?bienvenida=1')
+    $q.notify({type:'positive',message:fromRequest.value?'Tu cuenta está lista. Continúa con tu solicitud.':'Tu cuenta VITI está lista.'})
+    const requested=typeof route.query.redirect==='string'?route.query.redirect:''
+    await router.replace(requested.startsWith('/solicitud')||requested.startsWith('/mi-')?requested:'/mi-cuenta?bienvenida=1')
   } catch(error) {
     const message=errorMessage(error)
     if (/ya (?:existe|tienes) una cuenta|inicia sesi[oó]n/i.test(message)) {
@@ -55,7 +57,7 @@ async function submit() {
         title:'Ya tienes una cuenta VITI',
         message:'No necesitas registrarte otra vez. Inicia sesión y VITI mantendrá tus solicitudes vinculadas.',
         ok:{label:'Iniciar sesión',color:'primary',unelevated:true}, cancel:{label:'Quedarme aquí',flat:true},
-      }).onOk(()=>router.push({path:'/login',query:{correo:form.correo}}))
+      }).onOk(()=>router.push({path:'/login',query:{correo:form.correo,...(typeof route.query.redirect==='string'?{redirect:route.query.redirect}:{})}}))
       return
     }
     $q.notify({type:'negative',message})
@@ -81,14 +83,14 @@ onMounted(async()=>{
   <q-page class="register-page">
     <header class="register-header">
       <router-link to="/viti" class="brand-link"><AppBrand /></router-link>
-      <div class="header-actions"><q-btn flat no-caps label="Ver demo" to="/demo"/><q-btn outline no-caps color="orange" label="Ya tengo cuenta" to="/login"/></div>
+      <div class="header-actions"><q-btn flat no-caps label="Ver demo" to="/demo"/><q-btn outline no-caps color="orange" label="Ya tengo cuenta" :to="loginLink"/></div>
     </header>
 
     <main class="register-shell">
       <section class="register-copy">
         <div class="eyebrow">CREAR CUENTA VITI</div>
-        <h1>{{ fromRequest ? 'Tu solicitud ya está guardada.' : 'Empieza sin elegir un plan.' }}</h1>
-        <p v-if="fromRequest">Crea tu acceso con el mismo correo y VITI vinculará automáticamente la solicitud que acabas de enviar.</p>
+        <h1>{{ fromRequest ? 'Crea tu cuenta y envía tu solicitud.' : 'Empieza sin elegir un plan.' }}</h1>
+        <p v-if="fromRequest">Con tu cuenta describes lo que necesitas, eliges tu plan y cómo pagar, y sigues el avance hasta la entrega. Toma menos de un minuto.</p>
         <p v-else>Tu cuenta sirve para guardar solicitudes, revisar avances y recibir tus sistemas. Puedes elegir un plan después.</p>
         <div class="benefits"><div><q-icon name="check_circle"/> Sin plan obligatorio</div><div><q-icon name="check_circle"/> Sin datos técnicos</div><div><q-icon name="check_circle"/> Solicitudes vinculadas por correo</div></div>
       </section>

@@ -17,7 +17,8 @@
     "test:viti-simple-flow": "node scripts/check-viti-simple-e2e.mjs",
     "test:viti-phase1": "node scripts/check-viti-phase1-ux.mjs",
     "test:viti-account-order": "node scripts/check-viti-account-request-order.mjs",
-    "test:viti-forms": "node scripts/check-viti-forms-admin.mjs"
+    "test:viti-forms": "node scripts/check-viti-forms-admin.mjs",
+    "test:viti-access": "node scripts/check-viti-access-control.mjs"
   },
   "dependencies": {
     "@quasar/extras": "^1.16.17",
