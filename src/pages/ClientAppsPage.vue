@@ -7,13 +7,15 @@ import PageHeader from '../components/PageHeader.vue'
 const router = useRouter()
 const loading = ref(true)
 const apps = ref([])
-const available = computed(() => apps.value.filter(app => ['activa','gracia','suspendida'].includes(app.estado_servicio)))
-const pending = computed(() => apps.value.filter(app => !['activa','gracia','suspendida'].includes(app.estado_servicio)))
+const serviceStates = ['activa','gracia','suspendida','mantenimiento','bloqueado_manual']
+const available = computed(() => apps.value.filter(app => serviceStates.includes(app.estado_servicio)))
+const pending = computed(() => apps.value.filter(app => !serviceStates.includes(app.estado_servicio)))
 
-function pretty(value) { return String(value || '').replaceAll('_',' ').replace(/\b\w/g, char => char.toUpperCase()) }
+const labels = { mantenimiento:'En mantenimiento', bloqueado_manual:'Acceso suspendido', suspendida:'Pausado por pago' }
+function pretty(value) { if (labels[value]) return labels[value]; return String(value || '').replaceAll('_',' ').replace(/\b\w/g, char => char.toUpperCase()) }
 function openApp(app) { if (app.ruta) router.push(app.ruta) }
 function openExternal(url) { if (url && /^https?:\/\//i.test(url)) window.open(url, '_blank', 'noopener,noreferrer') }
-function color(state) { return ({activa:'positive',gracia:'orange',suspendida:'negative',lista_entrega:'teal',pruebas:'orange',preparacion:'blue',cancelada:'grey'}[state] || 'grey') }
+function color(state) { return ({activa:'positive',gracia:'orange',suspendida:'negative',mantenimiento:'blue',bloqueado_manual:'deep-orange',lista_entrega:'teal',pruebas:'orange',preparacion:'blue',cancelada:'grey'}[state] || 'grey') }
 function icon(app) { return app.catalogo?.icono || (app.tipo==='movil'?'smartphone':'apps') }
 
 onMounted(async () => {
@@ -37,11 +39,13 @@ onMounted(async () => {
           </div>
           <p>{{app.estado_mensaje || 'Tu sistema está disponible para continuar.'}}</p>
           <div class="delivery-options">
-            <button v-if="app.ruta" type="button" @click="openApp(app)"><q-icon name="launch"/><span><small>SISTEMA</small><b>Abrir ahora</b></span></button>
+            <button v-if="app.ruta && app.puede_usar!==false" type="button" @click="openApp(app)"><q-icon name="launch"/><span><small>SISTEMA</small><b>Abrir ahora</b></span></button>
             <button v-if="app.entrega?.apk_url" type="button" @click="openExternal(app.entrega.apk_url)"><q-icon name="android"/><span><small>APK</small><b>{{app.entrega.apk_version || 'Descargar'}}</b></span></button>
             <button v-if="app.entrega?.beta_url" type="button" @click="openExternal(app.entrega.beta_url)"><q-icon name="science"/><span><small>PRUEBA</small><b>Abrir beta</b></span></button>
           </div>
-          <div v-if="app.estado_servicio==='suspendida'" class="service-note danger"><q-icon name="lock"/> El acceso está pausado temporalmente. Tus datos permanecen guardados.</div>
+          <div v-if="app.estado_servicio==='mantenimiento'" class="service-note"><q-icon name="construction"/> Estamos actualizando este sistema. Vuelve en unos minutos; tus datos están a salvo.</div>
+          <div v-else-if="app.estado_servicio==='bloqueado_manual'" class="service-note danger"><q-icon name="block"/> El acceso está suspendido. Escribe a Atención VITI para más información.</div>
+          <div v-else-if="app.estado_servicio==='suspendida'" class="service-note danger"><q-icon name="lock"/> El acceso está pausado por un pago pendiente. Tus datos permanecen guardados. <router-link to="/mi-pagos">Ver mis pagos</router-link></div>
           <div v-else-if="app.estado_servicio==='gracia'" class="service-note"><q-icon name="schedule"/> El sistema continúa disponible durante el periodo indicado.</div>
         </article>
       </section>

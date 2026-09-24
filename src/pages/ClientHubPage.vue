@@ -114,7 +114,7 @@ onMounted(load)
           <q-card-section>
             <div class="kicker">Tu próxima acción</div>
             <h3>{{ currentRequest?.estado === 'borrador' ? 'Termina tu nueva solicitud.' : currentRequest ? 'Estamos trabajando con la información de tu solicitud.' : 'Cuéntanos qué quieres construir.' }}</h3>
-            <p>{{ currentRequest?.estado === 'borrador' ? 'Solo dinos qué necesitas y elige un plan de referencia. Nosotros revisamos lo demás.' : currentRequest ? 'Cuando necesitemos una aclaración, te aparecerá aquí o en Atención.' : 'Puedes empezar una solicitud sin estudiar VITI ni elegir un plan primero.' }}</p>
+            <p>{{ currentRequest?.estado === 'borrador' ? 'Solo dinos qué necesitas y elige un plan de referencia. Nosotros revisamos lo demás.' : currentRequest ? 'Cuando necesitemos una aclaración, te aparecerá aquí o en Atención.' : 'Describe tu necesidad, elige tu plan y cómo pagar. Así VITI puede atenderte enseguida.' }}</p>
             <q-btn v-if="currentRequest?.estado === 'borrador' && currentRequest.enlace_publico" color="primary" unelevated no-caps icon="edit_note" label="Continuar solicitud" :href="currentRequest.enlace_publico" />
             <q-btn v-else-if="!currentRequest" color="primary" unelevated no-caps icon="rocket_launch" label="Empezar ahora" :loading="creating" @click="startRequest" />
           </q-card-section>

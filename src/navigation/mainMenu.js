@@ -23,6 +23,7 @@ export function buildMainMenu({
     { label: 'Proyectos', icon: 'account_tree', to: '/proyectos' },
     { label: 'Empresas', icon: 'business', to: '/empresas' },
     { label: 'Sistemas', icon: 'grid_view', to: '/aplicaciones' },
+    { label: 'Dominios y acceso', icon: 'dns', to: '/accesos' },
     { label: 'Atención', icon: 'forum', children: [
       { label: 'Mensajes', icon: 'mark_chat_unread', to: '/buzon', badge: unreadCount },
       { label: 'Soporte', icon: 'support_agent', to: '/mantenimientos' },
@@ -30,7 +31,7 @@ export function buildMainMenu({
   ]
 
   if (isSuperAdmin) {
-    items.splice(5, 0, {
+    items.splice(6, 0, {
       label: 'Planes y cobros',
       icon: 'sell',
       children: [

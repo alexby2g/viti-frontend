@@ -1,0 +1,1413 @@
+From 61ddfa2647b4f1f685be2cba91c0b98faf1250f2 Mon Sep 17 00:00:00 2001
+From: Arena Agent <agent@arena.ai>
+Date: Thu, 24 Sep 2026 15:42:19 +0000
+Subject: [PATCH] =?UTF-8?q?Control=20de=20acceso=20de=20sistemas=20entrega?=
+ =?UTF-8?q?dos=20y=20solicitud=20con=20sesi=C3=B3n?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+- Dominios por sistema (aplicacion_dominios), mantenimiento temporal y bloqueo manual.
+- AppAccessService: bloqueo por pago según plan, gracia, mantenimiento (503), bloqueo manual (423).
+- API admin: /accesos, dominios, mantenimiento, bloqueo y política de pago por sistema.
+- Consulta pública /publico/acceso para el script viti-guard.js (CORS abierto, sin datos sensibles).
+- Enviar una solicitud exige cuenta de cliente y forma de pago: POST /mi/solicitud/enviar.
+- Pruebas: AppAccessControlTest y AccessInvitationFlowTest actualizados.
+---
+ app/Http/Controllers/AplicacionController.php |  22 +-
+ app/Http/Controllers/AppAccessController.php  | 255 ++++++++++++++++++
+ app/Http/Controllers/ClientAppsController.php |  10 +-
+ .../PublicApplicationController.php           |  69 +++--
+ .../Middleware/OpenPublicAccessCheckCors.php  |  29 ++
+ app/Models/Aplicacion.php                     |   5 +-
+ app/Models/AplicacionDominio.php              |  36 +++
+ app/Services/AppAccessService.php             | 127 +++++++++
+ app/Services/SubscriptionAccessService.php    |  39 ++-
+ bootstrap/app.php                             |   1 +
+ ...09_24_100000_create_app_access_control.php |  76 ++++++
+ routes/commercial.php                         |  14 +-
+ routes/public-commercial.php                  |   3 +-
+ tests/Feature/AccessInvitationFlowTest.php    | 177 ++++++------
+ tests/Feature/AppAccessControlTest.php        | 246 +++++++++++++++++
+ 15 files changed, 983 insertions(+), 126 deletions(-)
+ create mode 100644 app/Http/Controllers/AppAccessController.php
+ create mode 100644 app/Http/Middleware/OpenPublicAccessCheckCors.php
+ create mode 100644 app/Models/AplicacionDominio.php
+ create mode 100644 app/Services/AppAccessService.php
+ create mode 100644 database/migrations/2026_09_24_100000_create_app_access_control.php
+ create mode 100644 tests/Feature/AppAccessControlTest.php
+
+diff --git a/app/Http/Controllers/AplicacionController.php b/app/Http/Controllers/AplicacionController.php
+index eac2adf..97f1bc3 100644
+--- a/app/Http/Controllers/AplicacionController.php
++++ b/app/Http/Controllers/AplicacionController.php
+@@ -2,7 +2,7 @@
+ 
+ namespace App\Http\Controllers;
+ 
+-use App\Models\{AlertaSaas,Aplicacion,Empresa,Proyecto,Usuario};
++use App\Models\{AlertaSaas,Aplicacion,AplicacionDominio,Empresa,Proyecto,Usuario};
+ use App\Services\FeatureGateService;
+ use App\Support\Audit;
+ use Illuminate\Http\JsonResponse;
+@@ -70,6 +70,7 @@ class AplicacionController extends Controller
+             return Aplicacion::create($d+['slug'=>$slug]);
+         });
+ 
++        $this->syncDomains($a);
+         Audit::log($r,$cloneFromId?'aplicacion_clonada':'aplicacion_integrada',$a,$cloneFromId?'Se clonó una aplicación desde AppHub.':'Se integró una aplicación a VITI.');
+         return response()->json(['data'=>$a->fresh()->load(['empresa','catalogo','origen'])],201);
+     }
+@@ -77,7 +78,7 @@ class AplicacionController extends Controller
+     public function show(Aplicacion $aplicacion): JsonResponse
+     {
+         return response()->json(['data'=>$aplicacion->load([
+-            'empresa','proyecto','catalogo','suscripcion','mantenimientos','archivos','origen',
++            'empresa','proyecto','catalogo','suscripcion','mantenimientos','archivos','origen','dominios',
+             'usuarios:id,nombre,apellido,usuario,correo'
+         ])]);
+     }
+@@ -120,6 +121,7 @@ class AplicacionController extends Controller
+         $data=$this->data($r,$aplicacion);
+         unset($data['empresa_id'],$data['proyecto_id'],$data['catalogo_aplicacion_id'],$data['entorno'],$data['estado'],$data['acceso_cliente']);
+         $aplicacion->update($data);
++        $this->syncDomains($aplicacion);
+         Audit::log($r,'aplicacion_actualizada',$aplicacion,'Se actualizó una aplicación.');
+         return response()->json(['data'=>$aplicacion->fresh()->load(['empresa','catalogo','origen'])]);
+     }
+@@ -187,6 +189,22 @@ class AplicacionController extends Controller
+         $aplicacion->delete();Audit::log($r,'aplicacion_eliminada',$aplicacion);return response()->json(status:204);
+     }
+ 
++    /**
++     * Automatización: la URL pública y la de administración quedan registradas como
++     * dominios controlados por VITI sin que el administrador tenga que repetirlas.
++     * Nunca se roba un dominio que ya pertenece a otro sistema.
++     */
++    private function syncDomains(Aplicacion $app): void
++    {
++        foreach (['principal'=>$app->url,'administracion'=>$app->url_administracion] as $type=>$url) {
++            $host=AplicacionDominio::normalize($url);
++            if(!$host) continue;
++            $existing=AplicacionDominio::query()->where('dominio',$host)->first();
++            if($existing) continue;
++            AplicacionDominio::create(['aplicacion_id'=>$app->id,'dominio'=>$host,'tipo'=>$type,'activo'=>true]);
++        }
++    }
++
+     private function data(Request $r,?Aplicacion $a=null): array
+     {
+         return $r->validate([
+diff --git a/app/Http/Controllers/AppAccessController.php b/app/Http/Controllers/AppAccessController.php
+new file mode 100644
+index 0000000..ac60810
+--- /dev/null
++++ b/app/Http/Controllers/AppAccessController.php
+@@ -0,0 +1,255 @@
++<?php
++
++namespace App\Http\Controllers;
++
++use App\Models\{Aplicacion, AplicacionDominio};
++use App\Services\AppAccessService;
++use App\Support\Audit;
++use Illuminate\Http\JsonResponse;
++use Illuminate\Http\Request;
++use Illuminate\Validation\Rule;
++
++/**
++ * Panel "Dominios y acceso": un solo lugar para ver qué sistemas están activos,
++ * cuáles están bloqueados por pago, cuáles en mantenimiento y qué dominios controla VITI.
++ */
++class AppAccessController extends Controller
++{
++    public function index(Request $request, AppAccessService $access): JsonResponse
++    {
++        $query = Aplicacion::query()
++            ->with([
++                'empresa:id,nombre_comercial,plan_viti_id',
++                'empresa.planViti:id,codigo,nombre,precio_mensual,precio_anual',
++                'suscripcion',
++                'dominios',
++            ])
++            ->where('es_plantilla', false)
++            ->where('estado', '!=', 'retirado')
++            ->latest('id');
++
++        if ($request->filled('buscar')) {
++            $term = '%'.trim((string) $request->string('buscar')).'%';
++            $query->where(fn ($q) => $q->where('nombre', 'like', $term)
++                ->orWhereHas('empresa', fn ($e) => $e->where('nombre_comercial', 'like', $term))
++                ->orWhereHas('dominios', fn ($d) => $d->where('dominio', 'like', $term)));
++        }
++
++        $items = $query->get()->map(fn (Aplicacion $app) => $this->present($app, $access))->values();
++
++        $filter = (string) $request->query('estado', '');
++        $summary = collect(AppAccessService::STATES)->mapWithKeys(fn ($state) => [$state => $items->where('acceso.estado', $state)->count()]);
++
++        if ($filter !== '' && in_array($filter, AppAccessService::STATES, true)) {
++            $items = $items->where('acceso.estado', $filter)->values();
++        } elseif ($filter === 'bloqueados') {
++            $items = $items->whereIn('acceso.estado', ['bloqueado_pago', 'bloqueado_manual', 'mantenimiento'])->values();
++        }
++
++        return response()->json([
++            'data' => $items,
++            'resumen' => $summary->all() + [
++                'total' => $summary->sum(),
++                'dominios' => AplicacionDominio::query()->where('activo', true)->count(),
++            ],
++        ]);
++    }
++
++    public function storeDomain(Request $request, Aplicacion $aplicacion): JsonResponse
++    {
++        $data = $request->validate([
++            'dominio' => ['required', 'string', 'max:255'],
++            'tipo' => ['nullable', Rule::in(['principal', 'alias', 'administracion', 'api'])],
++            'notas' => ['nullable', 'string', 'max:255'],
++        ]);
++
++        $host = AplicacionDominio::normalize($data['dominio']);
++        abort_unless($host, 422, 'Escribe un dominio o URL válido. Ejemplo: minegocio.com');
++
++        $existing = AplicacionDominio::query()->where('dominio', $host)->first();
++        if ($existing && (int) $existing->aplicacion_id !== (int) $aplicacion->id) {
++            abort(422, "El dominio {$host} ya está asignado a otro sistema.");
++        }
++
++        $domain = AplicacionDominio::updateOrCreate(
++            ['dominio' => $host],
++            [
++                'aplicacion_id' => $aplicacion->id,
++                // Volver a registrar un dominio existente no debe cambiar su tipo ni borrar sus notas.
++                'tipo' => $data['tipo'] ?? $existing?->tipo ?? ($aplicacion->dominios()->exists() ? 'alias' : 'principal'),
++                'activo' => true,
++                'notas' => array_key_exists('notas', $data) ? $data['notas'] : $existing?->notas,
++            ]
++        );
++
++        Audit::log($request, 'dominio_registrado', $aplicacion, "Se registró el dominio {$host} para el sistema.", ['dominio' => $host]);
++
++        return response()->json(['message' => "Dominio {$host} registrado.", 'data' => $domain], $domain->wasRecentlyCreated ? 201 : 200);
++    }
++
++    public function updateDomain(Request $request, Aplicacion $aplicacion, AplicacionDominio $dominio): JsonResponse
++    {
++        abort_unless((int) $dominio->aplicacion_id === (int) $aplicacion->id, 404);
++        $data = $request->validate([
++            'activo' => ['sometimes', 'boolean'],
++            'tipo' => ['sometimes', Rule::in(['principal', 'alias', 'administracion', 'api'])],
++            'notas' => ['nullable', 'string', 'max:255'],
++        ]);
++        $dominio->update($data);
++        Audit::log($request, 'dominio_actualizado', $aplicacion, "Se actualizó el dominio {$dominio->dominio}.", ['dominio' => $dominio->dominio] + $data);
++
++        return response()->json(['message' => 'Dominio actualizado.', 'data' => $dominio->fresh()]);
++    }
++
++    public function destroyDomain(Request $request, Aplicacion $aplicacion, AplicacionDominio $dominio): JsonResponse
++    {
++        abort_unless((int) $dominio->aplicacion_id === (int) $aplicacion->id, 404);
++        $host = $dominio->dominio;
++        $dominio->delete();
++        Audit::log($request, 'dominio_eliminado', $aplicacion, "Se quitó el dominio {$host} del sistema.", ['dominio' => $host]);
++
++        return response()->json(['message' => "Dominio {$host} eliminado."]);
++    }
++
++    public function maintenance(Request $request, Aplicacion $aplicacion, AppAccessService $access): JsonResponse
++    {
++        $data = $request->validate([
++            'activo' => ['required', 'boolean'],
++            'mensaje' => ['nullable', 'string', 'max:500'],
++            'hasta' => ['nullable', 'date', 'after:now'],
++        ], [
++            'hasta.after' => 'La hora de finalización debe estar en el futuro.',
++        ]);
++
++        $active = (bool) $data['activo'];
++        $aplicacion->update([
++            'mantenimiento_activo' => $active,
++            'mantenimiento_mensaje' => $active ? ($data['mensaje'] ?? null) : null,
++            'mantenimiento_hasta' => $active ? ($data['hasta'] ?? null) : null,
++        ]);
++
++        Audit::log($request, $active ? 'aplicacion_mantenimiento_activado' : 'aplicacion_mantenimiento_finalizado', $aplicacion,
++            $active ? 'Se deshabilitó temporalmente el sistema por mantenimiento.' : 'Se finalizó el mantenimiento del sistema.',
++            ['hasta' => $data['hasta'] ?? null]);
++
++        return response()->json([
++            'message' => $active ? 'Sistema en mantenimiento. Los usuarios verán el aviso hasta que lo finalices.' : 'Mantenimiento finalizado. El sistema vuelve a estar disponible.',
++            'data' => $this->present($aplicacion->fresh(['empresa.planViti', 'suscripcion', 'dominios']), $access),
++        ]);
++    }
++
++    public function block(Request $request, Aplicacion $aplicacion, AppAccessService $access): JsonResponse
++    {
++        $data = $request->validate([
++            'activo' => ['required', 'boolean'],
++            'motivo' => ['nullable', 'string', 'max:500'],
++        ]);
++
++        $active = (bool) $data['activo'];
++        $aplicacion->update([
++            'bloqueo_manual' => $active,
++            'bloqueo_motivo' => $active ? ($data['motivo'] ?? null) : null,
++        ]);
++
++        Audit::log($request, $active ? 'aplicacion_bloqueada' : 'aplicacion_desbloqueada', $aplicacion,
++            $active ? 'Se bloqueó manualmente el acceso al sistema.' : 'Se retiró el bloqueo manual del sistema.');
++
++        return response()->json([
++            'message' => $active ? 'Acceso bloqueado.' : 'Bloqueo retirado.',
++            'data' => $this->present($aplicacion->fresh(['empresa.planViti', 'suscripcion', 'dominios']), $access),
++        ]);
++    }
++
++    public function policy(Request $request, Aplicacion $aplicacion, AppAccessService $access): JsonResponse
++    {
++        $data = $request->validate([
++            'control_pago' => ['required', 'boolean'],
++        ]);
++
++        $config = is_array($aplicacion->configuracion) ? $aplicacion->configuracion : [];
++        $license = is_array($config['license'] ?? null) ? $config['license'] : [];
++        $license['payment_required'] = (bool) $data['control_pago'];
++        $config['license'] = $license;
++        $aplicacion->update(['configuracion' => $config]);
++
++        Audit::log($request, 'aplicacion_politica_acceso', $aplicacion,
++            $data['control_pago'] ? 'El acceso del sistema vuelve a depender del pago del plan.' : 'El acceso del sistema dejó de depender del pago.');
++
++        return response()->json([
++            'message' => $data['control_pago'] ? 'Bloqueo automático por falta de pago activado.' : 'Bloqueo automático por falta de pago desactivado.',
++            'data' => $this->present($aplicacion->fresh(['empresa.planViti', 'suscripcion', 'dominios']), $access),
++        ]);
++    }
++
++    /**
++     * Consulta pública usada por los sistemas entregados (script viti-guard.js o su servidor)
++     * para saber si deben mostrarse o bloquearse. No expone datos privados.
++     */
++    public function publicCheck(Request $request, AppAccessService $access): JsonResponse
++    {
++        $raw = $request->query('dominio') ?: $request->query('url') ?: $request->headers->get('Origin') ?: $request->headers->get('Referer');
++        $host = AplicacionDominio::normalize(is_string($raw) ? $raw : null);
++
++        $headers = ['Access-Control-Allow-Origin' => '*', 'Cache-Control' => 'no-store'];
++        if (!$host) {
++            return response()->json(['gestionado' => false, 'permitido' => true, 'message' => 'Indica el dominio a consultar.'], 422, $headers);
++        }
++
++        $domain = AplicacionDominio::query()->where('dominio', $host)->where('activo', true)
++            ->with(['aplicacion' => fn ($q) => $q->with('suscripcion')])
++            ->first();
++
++        if (!$domain || !$domain->aplicacion) {
++            // Un dominio no registrado no es administrado por VITI: no se bloquea.
++            return response()->json(['gestionado' => false, 'dominio' => $host, 'permitido' => true], 404, $headers);
++        }
++
++        $app = $domain->aplicacion;
++        $result = $access->evaluate($app);
++
++        if (!$domain->ultima_consulta_at || $domain->ultima_consulta_at->lt(now()->subMinutes(10))) {
++            $domain->forceFill(['ultima_consulta_at' => now()])->saveQuietly();
++        }
++
++        return response()->json([
++            'gestionado' => true,
++            'dominio' => $host,
++            'sistema' => $app->nombre,
++            'permitido' => $result['permitido'],
++            'estado' => $result['estado'],
++            'titulo' => $result['titulo'],
++            'mensaje' => $result['mensaje'],
++            'hasta' => $result['hasta'],
++            'aviso' => $result['aviso'],
++            'consultado_at' => now()->toIso8601String(),
++        ], 200, $headers);
++    }
++
++    private function present(Aplicacion $app, AppAccessService $access): array
++    {
++        $evaluation = $access->evaluate($app);
++        $plan = $app->empresa?->planViti;
++
++        return [
++            'id' => $app->id,
++            'nombre' => $app->nombre,
++            'slug' => $app->slug,
++            'url' => $app->url,
++            'url_administracion' => $app->url_administracion,
++            'entorno' => $app->entorno,
++            'estado' => $app->estado,
++            'acceso_cliente' => (bool) $app->acceso_cliente,
++            'entregado_at' => $app->entregado_at?->toIso8601String(),
++            'empresa' => $app->empresa ? ['id' => $app->empresa->id, 'nombre_comercial' => $app->empresa->nombre_comercial] : null,
++            'plan' => $plan ? ['codigo' => $plan->codigo, 'nombre' => $plan->nombre] : null,
++            'dominios' => $app->dominios->map(fn (AplicacionDominio $d) => [
++                'id' => $d->id,
++                'dominio' => $d->dominio,
++                'tipo' => $d->tipo,
++                'activo' => (bool) $d->activo,
++                'ultima_consulta_at' => $d->ultima_consulta_at?->toIso8601String(),
++            ])->values(),
++            'acceso' => $evaluation,
++        ];
++    }
++}
+diff --git a/app/Http/Controllers/ClientAppsController.php b/app/Http/Controllers/ClientAppsController.php
+index 6f875aa..d25125a 100644
+--- a/app/Http/Controllers/ClientAppsController.php
++++ b/app/Http/Controllers/ClientAppsController.php
+@@ -3,7 +3,7 @@
+ namespace App\Http\Controllers;
+ 
+ use App\Models\{Aplicacion,PeluqueriaAtencion,PeluqueriaCita,PeluqueriaCliente,PeluqueriaPago,PeluqueriaPersonal,PeluqueriaServicio};
+-use App\Services\{AppLifecycleService,SubscriptionAccessService,TenantContext};
++use App\Services\{AppAccessService,AppLifecycleService,SubscriptionAccessService,TenantContext};
+ use Illuminate\Http\JsonResponse;
+ use Illuminate\Http\Request;
+ 
+@@ -135,6 +135,14 @@ class ClientAppsController extends Controller
+             $message = 'Aplicación activa sin control periódico de pago.';
+         }
+ 
++        // Mantenimiento temporal y bloqueo manual se deciden en AppAccessService.
++        $access = app(AppAccessService::class)->evaluate($app);
++        if (in_array($access['estado'], ['mantenimiento','bloqueado_manual'], true)) {
++            $allowed = false;
++            $state = $access['estado'];
++            $message = $access['mensaje'];
++        }
++
+         return [
+             'permitida'=>$allowed,
+             'estado'=>$state,
+diff --git a/app/Http/Controllers/PublicApplicationController.php b/app/Http/Controllers/PublicApplicationController.php
+index 7f45673..eb0b270 100644
+--- a/app/Http/Controllers/PublicApplicationController.php
++++ b/app/Http/Controllers/PublicApplicationController.php
+@@ -43,6 +43,19 @@ class PublicApplicationController extends Controller
+ 
+     public function submit(Request $request): JsonResponse
+     {
++        // Ver la presentación y los planes es libre; pedir un sistema exige una cuenta VITI.
++        $user = $request->user('sanctum') ?? $request->user();
++        abort_unless($user, 401, 'Inicia sesión o crea tu cuenta VITI para enviar tu solicitud.');
++        abort_unless($user->rol === 'cliente', 403, 'Solo las cuentas de clientes pueden solicitar un sistema. Usa una cuenta de cliente.');
++
++        // La identidad sale de la cuenta, no de lo que escriba el formulario.
++        $accountName = trim(implode(' ', array_filter([(string) $user->nombre, (string) $user->apellido])));
++        $request->merge([
++            'nombre' => trim((string) $request->input('nombre')) ?: $accountName,
++            'correo' => filled($user->correo) ? $user->correo : $request->input('correo'),
++            'telefono' => $request->input('telefono') ?: $user->telefono,
++        ]);
++
+         $today = now()->toDateString();
+         $accepted = $request->boolean('terminos_aceptados')
+             || $request->boolean('declaracion_aceptada')
+@@ -98,7 +111,8 @@ class PublicApplicationController extends Controller
+             ->where('activo', true)
+             ->with(['secciones.preguntas'])
+             ->latest('id')
+-            ->firstOrFail();
++            ->first();
++        abort_unless($questionnaire, 422, 'VITI no tiene la configuración de solicitudes activa en este momento. Escríbenos por Atención y te ayudamos.');
+ 
+         $plan = PlanViti::query()
+             ->where('activo', true)
+@@ -116,20 +130,36 @@ class PublicApplicationController extends Controller
+             'La forma de pago seleccionada no corresponde al plan elegido.'
+         );
+ 
++        // Para ser atendida, la solicitud debe indicar cómo se pagará (salvo cotización a medida).
++        abort_if(
++            $this->planKey($plan) !== 'custom' && $data['forma_pago_preferida'] === 'por_definir',
++            422,
++            'Elige cómo pagarás la implementación para que VITI pueda atender tu solicitud.'
++        );
++
+         $questions = $questionnaire->secciones->flatMap(fn ($section) => $section->preguntas);
+         $questionsById = $questions->keyBy('id');
+         $questionsByNumber = $questions->keyBy(fn ($question) => (int) $question->numero);
+         $incoming = collect($data['respuestas'] ?? [])->keyBy(fn ($item) => (int) $item['pregunta_id']);
+ 
+-        [$solicitud, $cliente, $empresa] = DB::transaction(function () use ($data, $questionnaire, $plan, $questionsById, $questionsByNumber, $incoming, $request): array {
++        [$solicitud, $cliente, $empresa] = DB::transaction(function () use ($data, $questionnaire, $plan, $questionsById, $questionsByNumber, $incoming, $request, $user): array {
+             $documento = filled($data['documento'] ?? null) ? trim($data['documento']) : null;
+-            $byPhone = Cliente::query()->where('telefono', $data['telefono'])->first();
+-            $byEmail = Cliente::query()->where('correo', $data['correo'])->first();
+-
+-            abort_if($byPhone && $byEmail && (int) $byPhone->id !== (int) $byEmail->id, 422, 'El teléfono y el correo pertenecen a registros diferentes.');
+-            $cliente = $byPhone ?: $byEmail;
++            $cliente = $user->cliente_id ? Cliente::query()->find($user->cliente_id) : null;
++
++            if (!$cliente) {
++                $byPhone = Cliente::query()->where('telefono', $data['telefono'])->first();
++                $byEmail = Cliente::query()->where('correo', $data['correo'])->first();
++                abort_if($byPhone && $byEmail && (int) $byPhone->id !== (int) $byEmail->id, 422, 'El teléfono y el correo pertenecen a registros diferentes.');
++                $cliente = $byPhone ?: $byEmail;
++                abort_if($cliente && $cliente->usuario()->whereKeyNot($user->id)->exists(), 422, 'Ese teléfono o correo ya pertenece a otra cuenta VITI.');
++            }
+ 
+             if ($cliente) {
++                abort_if(
++                    Cliente::query()->where('telefono', $data['telefono'])->whereKeyNot($cliente->id)->exists(),
++                    422,
++                    'Ese celular ya está registrado con otro cliente. Usa el celular de tu cuenta.'
++                );
+                 if ($documento) {
+                     abort_if(Cliente::query()->where('documento', $documento)->whereKeyNot($cliente->id)->exists(), 422, 'Ese documento ya pertenece a otro cliente.');
+                 }
+@@ -186,14 +216,13 @@ class PublicApplicationController extends Controller
+                 ]);
+             }
+ 
+-            // Si el visitante ya creó su cuenta antes de solicitar, conservamos el mismo
+-            // responsable y vinculamos el nuevo negocio a su usuario automáticamente.
+-            $existingUser = $cliente->usuario()->first();
+-            if ($existingUser) {
+-                $empresa->usuarios()->syncWithoutDetaching([
+-                    $existingUser->id => ['rol_negocio'=>'propietario','activo'=>true],
+-                ]);
++            // La cuenta que envía queda como responsable del cliente y propietaria del negocio.
++            if ((int) $user->cliente_id !== (int) $cliente->id) {
++                $user->forceFill(['cliente_id' => $cliente->id])->save();
+             }
++            $empresa->usuarios()->syncWithoutDetaching([
++                $user->id => ['rol_negocio'=>'propietario','activo'=>true],
++            ]);
+ 
+             $solicitud = SolicitudSistema::create([
+                 'empresa_id' => $empresa->id,
+@@ -300,9 +329,19 @@ class PublicApplicationController extends Controller
+         return response()->json([
+             'message' => 'Solicitud recibida. VITI revisará tu necesidad y te mostrará el siguiente paso antes de iniciar el desarrollo.',
+             'data' => [
++                'id' => $solicitud->id,
+                 'codigo' => $solicitud->codigo,
+                 'estado' => 'en_revision',
+-                'plan' => ['codigo'=>$plan->codigo,'nombre'=>$plan->nombre],
++                'plan' => [
++                    'codigo'=>$plan->codigo,
++                    'nombre'=>$plan->nombre,
++                    'precio_proyecto'=>$plan->precio_proyecto !== null ? (float) $plan->precio_proyecto : null,
++                    'precio_mensual'=>$plan->precio_mensual !== null ? (float) $plan->precio_mensual : null,
++                    'precio_anual'=>$plan->precio_anual !== null ? (float) $plan->precio_anual : null,
++                ],
++                'forma_pago' => $data['forma_pago_preferida'],
++                'frecuencia' => $solicitud->frecuencia_suscripcion_preferida,
++                'empresa' => ['id'=>$empresa->id,'nombre_comercial'=>$empresa->nombre_comercial],
+                 'correo' => $cliente->correo,
+                 'cuenta_existente' => $cliente->usuario()->exists(),
+             ],
+diff --git a/app/Http/Middleware/OpenPublicAccessCheckCors.php b/app/Http/Middleware/OpenPublicAccessCheckCors.php
+new file mode 100644
+index 0000000..953ff0a
+--- /dev/null
++++ b/app/Http/Middleware/OpenPublicAccessCheckCors.php
+@@ -0,0 +1,29 @@
++<?php
++
++namespace App\Http\Middleware;
++
++use Closure;
++use Illuminate\Http\Request;
++use Symfony\Component\HttpFoundation\Response;
++
++/**
++ * La consulta pública de acceso por dominio (GET /api/v1/publico/acceso) la hacen
++ * los sistemas entregados desde sus propios dominios. Debe responder a cualquier
++ * origen, sin cookies. Se registra antes de HandleCors para tener la última palabra.
++ */
++class OpenPublicAccessCheckCors
++{
++    public function handle(Request $request, Closure $next): Response
++    {
++        $response = $next($request);
++
++        if ($request->is('api/v1/publico/acceso')) {
++            $response->headers->set('Access-Control-Allow-Origin', '*');
++            $response->headers->set('Access-Control-Allow-Methods', 'GET, OPTIONS');
++            $response->headers->remove('Access-Control-Allow-Credentials');
++            $response->headers->set('Vary', 'Origin');
++        }
++
++        return $response;
++    }
++}
+diff --git a/app/Models/Aplicacion.php b/app/Models/Aplicacion.php
+index 21e9e0a..6f8a7f8 100644
+--- a/app/Models/Aplicacion.php
++++ b/app/Models/Aplicacion.php
+@@ -6,14 +6,15 @@ class Aplicacion extends Model
+ {
+     use SoftDeletes;
+     protected $table='aplicaciones';
+-    protected $fillable=['empresa_id','proyecto_id','catalogo_aplicacion_id','aplicacion_origen_id','nombre','slug','descripcion','icono','color_primario','color_secundario','modulos','configuracion','es_plantilla','version','tipo','tecnologias','entorno','estado','acceso_cliente','entregado_at','provisionado_at','url','url_administracion','repositorio_url','proveedor_hosting','notas','publicado_at'];
+-    protected $casts=['publicado_at'=>'datetime','entregado_at'=>'datetime','provisionado_at'=>'datetime','acceso_cliente'=>'boolean','es_plantilla'=>'boolean','modulos'=>'array','configuracion'=>'array'];
++    protected $fillable=['empresa_id','proyecto_id','catalogo_aplicacion_id','aplicacion_origen_id','nombre','slug','descripcion','icono','color_primario','color_secundario','modulos','configuracion','es_plantilla','version','tipo','tecnologias','entorno','estado','acceso_cliente','mantenimiento_activo','mantenimiento_mensaje','mantenimiento_hasta','bloqueo_manual','bloqueo_motivo','entregado_at','provisionado_at','url','url_administracion','repositorio_url','proveedor_hosting','notas','publicado_at'];
++    protected $casts=['publicado_at'=>'datetime','entregado_at'=>'datetime','provisionado_at'=>'datetime','acceso_cliente'=>'boolean','mantenimiento_activo'=>'boolean','mantenimiento_hasta'=>'datetime','bloqueo_manual'=>'boolean','es_plantilla'=>'boolean','modulos'=>'array','configuracion'=>'array'];
+     public function empresa(){return $this->belongsTo(Empresa::class);}
+     public function proyecto(){return $this->belongsTo(Proyecto::class);}
+     public function catalogo(){return $this->belongsTo(CatalogoAplicacion::class,'catalogo_aplicacion_id');}
+     public function origen(){return $this->belongsTo(self::class,'aplicacion_origen_id');}
+     public function clones(){return $this->hasMany(self::class,'aplicacion_origen_id');}
+     public function usuarios(){return $this->belongsToMany(Usuario::class,'aplicacion_usuario','aplicacion_id','usuario_id')->withPivot(['rol','permisos','activo'])->withTimestamps();}
++    public function dominios(){return $this->hasMany(AplicacionDominio::class)->orderBy('id');}
+     public function suscripcion(){return $this->hasOne(Suscripcion::class);}
+     public function mantenimientos(){return $this->hasMany(Mantenimiento::class);}
+     public function archivos(){return $this->morphMany(Archivo::class,'adjuntable');}
+diff --git a/app/Models/AplicacionDominio.php b/app/Models/AplicacionDominio.php
+new file mode 100644
+index 0000000..0a91e22
+--- /dev/null
++++ b/app/Models/AplicacionDominio.php
+@@ -0,0 +1,36 @@
++<?php
++
++namespace App\Models;
++
++use Illuminate\Database\Eloquent\Model;
++
++class AplicacionDominio extends Model
++{
++    protected $table = 'aplicacion_dominios';
++
++    protected $fillable = ['aplicacion_id', 'dominio', 'tipo', 'activo', 'ultima_consulta_at', 'notas'];
++
++    protected $casts = ['activo' => 'boolean', 'ultima_consulta_at' => 'datetime'];
++
++    public function aplicacion()
++    {
++        return $this->belongsTo(Aplicacion::class);
++    }
++
++    /**
++     * Normaliza cualquier entrada ("https://www.MiNegocio.com/panel", "minegocio.com")
++     * al host que se guarda y se consulta: "minegocio.com".
++     */
++    public static function normalize(?string $value): ?string
++    {
++        $value = trim((string) $value);
++        if ($value === '') return null;
++        if (!preg_match('#^[a-z][a-z0-9+.-]*://#i', $value)) $value = 'https://'.$value;
++        $host = strtolower((string) parse_url($value, PHP_URL_HOST));
++        $host = preg_replace('/^www\./', '', $host);
++        $host = rtrim((string) $host, '.');
++        if ($host === '' || strlen($host) > 190) return null;
++        $validHost = filter_var($host, FILTER_VALIDATE_DOMAIN, FILTER_FLAG_HOSTNAME) !== false;
++        return $validHost ? $host : null;
++    }
++}
+diff --git a/app/Services/AppAccessService.php b/app/Services/AppAccessService.php
+new file mode 100644
+index 0000000..5c4d89a
+--- /dev/null
++++ b/app/Services/AppAccessService.php
+@@ -0,0 +1,127 @@
++<?php
++
++namespace App\Services;
++
++use App\Models\Aplicacion;
++use Illuminate\Support\Carbon;
++
++/**
++ * Decide, en un solo lugar, si un sistema entregado puede usarse ahora.
++ *
++ * Orden de prioridad (el primero que aplica gana):
++ *  1. retirado          -> el sistema ya no opera.
++ *  2. bloqueado_manual  -> VITI bloqueó el acceso a mano (motivo libre).
++ *  3. pausado           -> ciclo operativo pausado.
++ *  4. no_entregado      -> todavía no está en producción/entregado al cliente.
++ *  5. bloqueado_pago    -> el plan exige pago y la suscripción está suspendida.
++ *  6. mantenimiento     -> deshabilitado temporalmente por una actualización.
++ *  7. gracia            -> pago vencido, pero todavía dentro de los días de gracia (permitido).
++ *  8. activo            -> todo en orden.
++ */
++class AppAccessService
++{
++    public const STATES = ['activo', 'gracia', 'mantenimiento', 'bloqueado_pago', 'bloqueado_manual', 'pausado', 'no_entregado', 'retirado'];
++
++    public function __construct(private SubscriptionAccessService $subscriptions) {}
++
++    public function evaluate(Aplicacion $app): array
++    {
++        $this->expireMaintenance($app);
++
++        $config = is_array($app->configuracion) ? $app->configuracion : [];
++        $license = is_array($config['license'] ?? null) ? $config['license'] : [];
++        $paymentControl = ($license['payment_required'] ?? true) !== false;
++        $subscription = $this->subscriptions->statusFor($app);
++
++        $base = [
++            'control_pago' => $paymentControl,
++            'suscripcion' => $subscription,
++            'mantenimiento' => [
++                'activo' => (bool) $app->mantenimiento_activo,
++                'mensaje' => $app->mantenimiento_mensaje,
++                'hasta' => $app->mantenimiento_hasta?->toIso8601String(),
++            ],
++            'bloqueo_manual' => [
++                'activo' => (bool) $app->bloqueo_manual,
++                'motivo' => $app->bloqueo_motivo,
++            ],
++            'aviso' => null,
++        ];
++
++        if ($app->estado === 'retirado') {
++            return $this->result($base, 'retirado', false, 'Sistema retirado', 'Este sistema fue retirado y ya no está disponible.');
++        }
++
++        if ($app->bloqueo_manual) {
++            return $this->result($base, 'bloqueado_manual', false, 'Acceso suspendido',
++                trim((string) $app->bloqueo_motivo) ?: 'VITI suspendió temporalmente el acceso a este sistema. Comunícate con Atención VITI.');
++        }
++
++        if ($app->estado === 'pausado') {
++            return $this->result($base, 'pausado', false, 'Sistema pausado', 'El sistema está pausado temporalmente por VITI.');
++        }
++
++        $delivered = $app->entorno === 'produccion' && $app->estado === 'activo' && (bool) $app->acceso_cliente;
++        if (!$delivered) {
++            return $this->result($base, 'no_entregado', false, 'Aún no disponible', 'El sistema todavía está en preparación y no fue entregado.');
++        }
++
++        if ($paymentControl && $subscription && !$subscription['puede_usar']) {
++            return $this->result($base, 'bloqueado_pago', false, 'Servicio suspendido por falta de pago',
++                'La suscripción de este sistema está vencida. Regulariza el pago en VITI para volver a habilitar el acceso.');
++        }
++
++        if ($app->mantenimiento_activo) {
++            $until = $app->mantenimiento_hasta;
++            $message = trim((string) $app->mantenimiento_mensaje)
++                ?: 'Estamos actualizando este sistema para mejorarlo. Vuelve a intentarlo en unos minutos.';
++            return $this->result($base, 'mantenimiento', false, 'En mantenimiento', $message, $until);
++        }
++
++        if ($paymentControl && $subscription && ($subscription['estado'] ?? null) === 'gracia') {
++            $base['aviso'] = $subscription['mensaje_cobro'] ?? 'Pago pendiente dentro del periodo de gracia.';
++            return $this->result($base, 'gracia', true, 'Pago pendiente', 'El sistema sigue activo dentro del periodo de gracia.', null);
++        }
++
++        if ($paymentControl && $subscription && ($subscription['etapa_cobro'] ?? null) === 'por_vencer') {
++            $base['aviso'] = $subscription['mensaje_cobro'] ?? null;
++        }
++
++        return $this->result($base, 'activo', true, 'Activo', 'Sistema activo.');
++    }
++
++    /**
++     * Payload para respuestas HTTP que bloquean el uso de un sistema.
++     */
++    public static function httpStatusFor(string $state): int
++    {
++        return match ($state) {
++            'bloqueado_pago' => 402,
++            'mantenimiento' => 503,
++            'bloqueado_manual' => 423,
++            default => 403,
++        };
++    }
++
++    /**
++     * Un mantenimiento programado con fecha de fin se desactiva solo cuando esa fecha pasa.
++     */
++    public function expireMaintenance(Aplicacion $app): void
++    {
++        if (!$app->mantenimiento_activo || !$app->mantenimiento_hasta) return;
++        if ($app->mantenimiento_hasta->isFuture()) return;
++
++        $app->forceFill(['mantenimiento_activo' => false, 'mantenimiento_hasta' => null])->saveQuietly();
++    }
++
++    private function result(array $base, string $state, bool $allowed, string $title, string $message, ?Carbon $until = null): array
++    {
++        return $base + [
++            'estado' => $state,
++            'permitido' => $allowed,
++            'titulo' => $title,
++            'mensaje' => $message,
++            'hasta' => $until?->toIso8601String(),
++        ];
++    }
++}
+diff --git a/app/Services/SubscriptionAccessService.php b/app/Services/SubscriptionAccessService.php
+index 71467b3..f3c8625 100644
+--- a/app/Services/SubscriptionAccessService.php
++++ b/app/Services/SubscriptionAccessService.php
+@@ -5,6 +5,7 @@ namespace App\Services;
+ use App\Models\Aplicacion;
+ use App\Models\Suscripcion;
+ use App\Models\SuscripcionPago;
++use Illuminate\Http\Exceptions\HttpResponseException;
+ 
+ class SubscriptionAccessService
+ {
+@@ -120,10 +121,42 @@ class SubscriptionAccessService
+ 
+     public function assertCanUse(Aplicacion $app): void
+     {
+-        $status = $this->statusFor($app);
+-        if (!$status) return;
++        // Bloqueo manual y mantenimiento aplican aunque la suscripción esté al día.
++        if ($app->bloqueo_manual) {
++            $this->deny($app, 'bloqueado_manual', trim((string) $app->bloqueo_motivo)
++                ?: 'VITI suspendió temporalmente el acceso a este sistema. Comunícate con Atención VITI.');
++        }
++
++        $config = is_array($app->configuracion) ? $app->configuracion : [];
++        $license = is_array($config['license'] ?? null) ? $config['license'] : [];
++        $paymentControl = ($license['payment_required'] ?? true) !== false;
+ 
+-        abort_unless($status['puede_usar'], 402, 'Tu suscripción VITI está suspendida. Regulariza el pago para volver a utilizar la aplicación.');
++        $status = $paymentControl ? $this->statusFor($app) : null;
++        if ($status && !$status['puede_usar']) {
++            $this->deny($app, 'bloqueado_pago', 'Tu suscripción VITI está suspendida. Regulariza el pago para volver a utilizar la aplicación.');
++        }
++
++        if ($app->mantenimiento_activo) {
++            app(AppAccessService::class)->expireMaintenance($app);
++            if ($app->mantenimiento_activo) {
++                $this->deny($app, 'mantenimiento', trim((string) $app->mantenimiento_mensaje)
++                    ?: 'Estamos actualizando este sistema para mejorarlo. Vuelve a intentarlo en unos minutos.');
++            }
++        }
++    }
++
++    private function deny(Aplicacion $app, string $state, string $message): never
++    {
++        throw new HttpResponseException(response()->json([
++            'message' => $message,
++            'bloqueo' => [
++                'estado' => $state,
++                'aplicacion_id' => $app->id,
++                'aplicacion' => $app->nombre,
++                'mensaje' => $message,
++                'hasta' => $state === 'mantenimiento' ? $app->mantenimiento_hasta?->toIso8601String() : null,
++            ],
++        ], AppAccessService::httpStatusFor($state)));
+     }
+ 
+     private function firstChargeConfirmedAmount(Suscripcion $subscription, ?float $amount): float
+diff --git a/bootstrap/app.php b/bootstrap/app.php
+index 51f0cde..e5cf774 100644
+--- a/bootstrap/app.php
++++ b/bootstrap/app.php
+@@ -32,6 +32,7 @@ return Application::configure(basePath: dirname(__DIR__))
+     ->withMiddleware(function (Middleware $middleware): void {
+         $middleware->trustProxies(at: '*');
+         $middleware->statefulApi();
++        $middleware->prepend(\App\Http\Middleware\OpenPublicAccessCheckCors::class);
+         $middleware->append(SecurityHeaders::class);
+         $middleware->append(RejectLegacyVitiFlows::class);
+         $middleware->append(ProtectPublicDraftRevision::class);
+diff --git a/database/migrations/2026_09_24_100000_create_app_access_control.php b/database/migrations/2026_09_24_100000_create_app_access_control.php
+new file mode 100644
+index 0000000..d15bd71
+--- /dev/null
++++ b/database/migrations/2026_09_24_100000_create_app_access_control.php
+@@ -0,0 +1,76 @@
++<?php
++
++use Illuminate\Database\Migrations\Migration;
++use Illuminate\Database\Schema\Blueprint;
++use Illuminate\Support\Facades\DB;
++use Illuminate\Support\Facades\Schema;
++
++/**
++ * Control de acceso por dominio para los sistemas entregados por VITI.
++ *
++ * - aplicacion_dominios: URLs/dominios administrados que pertenecen a cada sistema.
++ * - mantenimiento_*: deshabilitación temporal por actualización.
++ * - bloqueo_*: bloqueo manual decidido por VITI (independiente del pago).
++ */
++return new class extends Migration
++{
++    public function up(): void
++    {
++        Schema::create('aplicacion_dominios', function (Blueprint $table): void {
++            $table->id();
++            $table->foreignId('aplicacion_id')->constrained('aplicaciones')->cascadeOnDelete();
++            $table->string('dominio', 190)->unique();
++            $table->string('tipo', 20)->default('principal');
++            $table->boolean('activo')->default(true);
++            $table->timestamp('ultima_consulta_at')->nullable();
++            $table->string('notas', 255)->nullable();
++            $table->timestamps();
++            $table->index(['aplicacion_id', 'activo']);
++        });
++
++        Schema::table('aplicaciones', function (Blueprint $table): void {
++            $table->boolean('mantenimiento_activo')->default(false)->after('acceso_cliente');
++            $table->string('mantenimiento_mensaje', 500)->nullable()->after('mantenimiento_activo');
++            $table->timestamp('mantenimiento_hasta')->nullable()->after('mantenimiento_mensaje');
++            $table->boolean('bloqueo_manual')->default(false)->after('mantenimiento_hasta');
++            $table->string('bloqueo_motivo', 500)->nullable()->after('bloqueo_manual');
++        });
++
++        // Los sistemas que ya tenían URL quedan administrados automáticamente.
++        $now = now();
++        $seen = [];
++        foreach (DB::table('aplicaciones')->whereNull('deleted_at')->orderBy('id')->get(['id', 'url', 'url_administracion']) as $app) {
++            foreach (['principal' => $app->url, 'administracion' => $app->url_administracion] as $type => $url) {
++                $host = self::host($url);
++                if (!$host || isset($seen[$host])) continue;
++                $seen[$host] = true;
++                DB::table('aplicacion_dominios')->insert([
++                    'aplicacion_id' => $app->id,
++                    'dominio' => $host,
++                    'tipo' => $type,
++                    'activo' => true,
++                    'created_at' => $now,
++                    'updated_at' => $now,
++                ]);
++            }
++        }
++    }
++
++    public function down(): void
++    {
++        Schema::table('aplicaciones', function (Blueprint $table): void {
++            $table->dropColumn(['mantenimiento_activo', 'mantenimiento_mensaje', 'mantenimiento_hasta', 'bloqueo_manual', 'bloqueo_motivo']);
++        });
++        Schema::dropIfExists('aplicacion_dominios');
++    }
++
++    private static function host(?string $url): ?string
++    {
++        $url = trim((string) $url);
++        if ($url === '') return null;
++        if (!preg_match('#^[a-z][a-z0-9+.-]*://#i', $url)) $url = 'https://'.$url;
++        $host = strtolower((string) parse_url($url, PHP_URL_HOST));
++        $host = preg_replace('/^www\./', '', $host);
++        return $host !== '' ? $host : null;
++    }
++};
+diff --git a/routes/commercial.php b/routes/commercial.php
+index 3aa4c71..0b1bb13 100644
+--- a/routes/commercial.php
++++ b/routes/commercial.php
+@@ -1,9 +1,12 @@
+ <?php
+ 
+-use App\Http\Controllers\{AgrSituationController,AplicacionController,BillingController,ChatDocumentController,ClientBillingController,ClientPaymentController,ClientPortalController,PaymentReviewController,SaasController};
++use App\Http\Controllers\{AppAccessController,AgrSituationController,AplicacionController,BillingController,ChatDocumentController,ClientBillingController,ClientPaymentController,ClientPortalController,PaymentReviewController,PublicApplicationController,SaasController};
+ use Illuminate\Support\Facades\Route;
+ 
+ Route::middleware(['auth:sanctum','throttle:api'])->group(function (): void {
++    // Solicitud de un sistema: requiere sesión. El controlador exige una cuenta de cliente.
++    Route::post('mi/solicitud/enviar', [PublicApplicationController::class,'submit'])->middleware('throttle:5,1');
++
+     Route::middleware('cliente')->group(function (): void {
+         Route::get('mi/solicitudes', [ClientPortalController::class,'requests']);
+         Route::post('mi/buzon/{conversacion}/documentos', [ChatDocumentController::class,'store'])->defaults('chat_access','viti-client');
+@@ -26,6 +29,15 @@ Route::middleware(['auth:sanctum','throttle:api'])->group(function (): void {
+         Route::post('aplicaciones/{aplicacion}/ciclo', [AplicacionController::class,'actualizarCiclo']);
+         Route::post('aplicaciones/{aplicacion}/entregar', [AplicacionController::class,'entregar']);
+         Route::post('aplicaciones/{aplicacion}/revocar', [AplicacionController::class,'revocar']);
++
++        // Dominios y acceso: bloqueo por pago, mantenimiento temporal y bloqueo manual.
++        Route::get('accesos', [AppAccessController::class,'index']);
++        Route::post('aplicaciones/{aplicacion}/dominios', [AppAccessController::class,'storeDomain']);
++        Route::put('aplicaciones/{aplicacion}/dominios/{dominio}', [AppAccessController::class,'updateDomain']);
++        Route::delete('aplicaciones/{aplicacion}/dominios/{dominio}', [AppAccessController::class,'destroyDomain']);
++        Route::put('aplicaciones/{aplicacion}/mantenimiento', [AppAccessController::class,'maintenance']);
++        Route::put('aplicaciones/{aplicacion}/bloqueo', [AppAccessController::class,'block']);
++        Route::put('aplicaciones/{aplicacion}/politica-acceso', [AppAccessController::class,'policy']);
+         Route::post('apps/electrofrio/buzon/{conversacion}/documentos', [ChatDocumentController::class,'store'])->defaults('chat_access','electro-admin');
+     });
+ 
+diff --git a/routes/public-commercial.php b/routes/public-commercial.php
+index 79990b9..8a6a889 100644
+--- a/routes/public-commercial.php
++++ b/routes/public-commercial.php
+@@ -1,10 +1,11 @@
+ <?php
+ 
+-use App\Http\Controllers\{PublicApplicationController,SaasController};
++use App\Http\Controllers\{AppAccessController,PublicApplicationController,SaasController};
+ use Illuminate\Support\Facades\Route;
+ 
+ Route::middleware('throttle:api')->group(function (): void {
+     Route::get('publico/planes', [SaasController::class, 'publicPlanes']);
++    Route::get('publico/acceso', [AppAccessController::class, 'publicCheck'])->withoutMiddleware('throttle:api')->middleware('throttle:120,1');
+     Route::get('publico/solicitud/catalogo', [PublicApplicationController::class, 'catalog']);
+     Route::post('publico/solicitud/enviar', [PublicApplicationController::class, 'submit'])->middleware('throttle:5,1');
+     Route::get('meta/version', fn () => response()->json([
+diff --git a/tests/Feature/AccessInvitationFlowTest.php b/tests/Feature/AccessInvitationFlowTest.php
+index d7b98e7..6d37776 100644
+--- a/tests/Feature/AccessInvitationFlowTest.php
++++ b/tests/Feature/AccessInvitationFlowTest.php
+@@ -30,134 +30,109 @@ class AccessInvitationFlowTest extends TestCase
+             ->assertStatus(410);
+     }
+ 
+-    public function test_official_viti_application_flow_creates_a_reviewable_request_without_account_access(): void
++    public function test_viewing_plans_is_public_but_sending_a_request_requires_login(): void
+     {
+         $this->seed(CuestionarioSeeder::class);
+ 
+-        $catalog = $this->getJson('/api/v1/publico/solicitud/catalogo')
+-            ->assertOk()
+-            ->json('data');
+-
+-        // Keep the integration test on a standard plan so it never depends on
+-        // database insertion order placing the custom quotation first.
+-        $plan = collect($catalog['planes'])->firstWhere('codigo', 'basico-1800')
+-            ?? collect($catalog['planes'])->first();
+-
+-        $questionnaire = Cuestionario::query()
+-            ->where('activo', true)
+-            ->with(['secciones.preguntas'])
+-            ->latest('id')
+-            ->firstOrFail();
+-
+-        $answers = collect($questionnaire->secciones)
+-            ->flatMap(fn ($section) => $section->preguntas)
+-            ->filter(fn ($question) => $question->obligatoria)
+-            ->map(fn ($question) => [
+-                'pregunta_id' => $question->id,
+-                'valor' => 'Respuesta de prueba',
+-            ])->values()->all();
+-
+-        $payload = [
+-            'nombre' => 'Roberto Pérez',
+-            'correo' => 'roberto-'.uniqid().'@example.com',
+-            'telefono' => '7777789',
+-            'whatsapp' => '7777789',
+-            'ciudad' => 'Santa Cruz',
+-            'empresa_nombre' => 'Trinicenter '.uniqid(),
+-            'empresa_actividad' => 'Servicios técnicos',
+-            'empresa_telefono' => '7777789',
+-            'empresa_whatsapp' => '7777789',
+-            'empresa_ciudad' => 'Santa Cruz',
+-            'titulo_sistema' => 'Clientes y pagos',
+-            'resumen' => 'Solicitud de prueba del flujo oficial.',
+-            'plan_codigo' => $plan['codigo'],
+-            'forma_pago_preferida' => in_array($plan['codigo'], ['personalizado'], true) ? 'por_definir' : 'contado',
+-            'frecuencia_suscripcion_preferida' => ($plan['precio_mensual'] !== null && $plan['precio_anual'] !== null) ? 'mensual' : null,
+-            'declaracion_aceptada' => true,
+-            'declaracion_nombre' => 'Roberto Pérez',
+-            'declaracion_fecha' => now()->toDateString(),
+-            'acuerdo_comercial_aceptado' => true,
+-            'acuerdo_comercial_nombre' => 'Roberto Pérez',
+-            'acuerdo_comercial_fecha' => now()->toDateString(),
+-            'respuestas' => $answers,
+-        ];
++        // Ver la presentación y los planes no exige cuenta.
++        $this->getJson('/api/v1/publico/planes')->assertOk();
++        $catalog = $this->getJson('/api/v1/publico/solicitud/catalogo')->assertOk()->json('data');
++        $plan = collect($catalog['planes'])->firstWhere('codigo', 'basico-1800') ?? collect($catalog['planes'])->first();
+ 
+-        $response = $this->postJson('/api/v1/publico/solicitud/enviar', $payload)
+-            ->assertCreated()
+-            ->assertJsonPath('data.estado', 'en_revision');
++        $clientsBefore = \App\Models\Cliente::query()->count();
++        $requestsBefore = \App\Models\SolicitudSistema::query()->count();
+ 
+-        $this->assertDatabaseHas('solicitudes_sistema', [
+-            'codigo' => $response->json('data.codigo'),
+-            'estado' => 'en_revision',
+-        ]);
++        // Pedir un sistema sí exige iniciar sesión, en cualquiera de las dos rutas.
++        $this->postJson('/api/v1/publico/solicitud/enviar', $this->requestPayload($plan, 'anonimo@example.com', '7777789'))
++            ->assertStatus(401)
++            ->assertJsonPath('message', 'Inicia sesión o crea tu cuenta VITI para enviar tu solicitud.');
++        $this->postJson('/api/v1/mi/solicitud/enviar', $this->requestPayload($plan, 'anonimo@example.com', '7777789'))
++            ->assertStatus(401);
+ 
+-        $this->assertDatabaseMissing('usuarios', [
+-            'correo' => $payload['correo'],
+-        ]);
++        $this->assertSame($clientsBefore, \App\Models\Cliente::query()->count());
++        $this->assertSame($requestsBefore, \App\Models\SolicitudSistema::query()->count());
+     }
+ 
+-    public function test_request_first_then_account_reuses_the_same_client_and_links_the_request(): void
++    public function test_logged_in_client_sends_request_with_plan_and_payment_and_it_is_linked_to_the_account(): void
+     {
+         $this->seed(CuestionarioSeeder::class);
+         $catalog = $this->getJson('/api/v1/publico/solicitud/catalogo')->assertOk()->json('data');
+         $plan = collect($catalog['planes'])->firstWhere('codigo', 'basico-1800') ?? collect($catalog['planes'])->first();
+-        $email = 'request-first-'.uniqid().'@example.com';
+-        $phone = '7777791';
+-
+-        $requestResponse = $this->postJson('/api/v1/publico/solicitud/enviar', [
+-            'nombre'=>'Carlos Cliente','correo'=>$email,'telefono'=>$phone,'whatsapp'=>$phone,
+-            'empresa_nombre'=>'Negocio Request First','titulo_sistema'=>'Sistema de pedidos',
+-            'resumen'=>'Quiero ordenar pedidos y entregas desde un solo lugar.',
+-            'plan_codigo'=>$plan['codigo'],'forma_pago_preferida'=>'por_definir',
+-            'frecuencia_suscripcion_preferida'=>($plan['precio_mensual']!==null&&$plan['precio_anual']!==null)?'mensual':null,
+-            'declaracion_aceptada'=>true,'declaracion_nombre'=>'Carlos Cliente','declaracion_fecha'=>now()->toDateString(),
+-            'acuerdo_comercial_aceptado'=>true,'acuerdo_comercial_nombre'=>'Carlos Cliente','acuerdo_comercial_fecha'=>now()->toDateString(),
+-            'terminos_aceptados'=>true,'respuestas'=>[],
+-        ])->assertCreated();
+-
+-        $codigo = $requestResponse->json('data.codigo');
+-        $solicitud = \App\Models\SolicitudSistema::query()->where('codigo',$codigo)->firstOrFail();
+-        $clientIdBefore = $solicitud->cliente_id;
++        $email = 'account-first-'.uniqid().'@example.com';
++        $phone = '7777792';
+ 
+-        $accountResponse = $this->postJson('/api/v1/auth/cliente/crear-cuenta', [
+-            'nombre'=>'Carlos Cliente','correo'=>$email,'celular'=>$phone,'whatsapp'=>$phone,
++        $account = $this->postJson('/api/v1/auth/cliente/crear-cuenta', [
++            'nombre'=>'Ana Cliente','correo'=>$email,'celular'=>$phone,'whatsapp'=>$phone,
+             'password'=>'Clave2026','password_confirmation'=>'Clave2026',
+         ])->assertCreated();
++        $clientId = (int) $account->json('usuario.cliente_id');
++        $user = \App\Models\Usuario::query()->where('correo', $email)->firstOrFail();
++        $clientsBefore = \App\Models\Cliente::query()->count();
+ 
+-        $this->assertSame($clientIdBefore, (int) $accountResponse->json('usuario.cliente_id'));
+-        $this->assertDatabaseCount('clientes', 1);
+-        $this->assertDatabaseHas('usuarios', ['correo'=>$email,'cliente_id'=>$clientIdBefore,'rol'=>'cliente']);
+-        $this->assertDatabaseHas('solicitudes_sistema', ['codigo'=>$codigo,'cliente_id'=>$clientIdBefore]);
++        // El correo lo decide la cuenta, aunque el formulario envíe otro.
++        $payload = $this->requestPayload($plan, 'otro-correo@example.com', $phone, 'Negocio Account First');
++        $response = $this->actingAs($user)->postJson('/api/v1/mi/solicitud/enviar', $payload)
++            ->assertCreated()
++            ->assertJsonPath('data.estado', 'en_revision')
++            ->assertJsonPath('data.forma_pago', 'contado')
++            ->assertJsonPath('data.frecuencia', 'anual')
++            ->assertJsonPath('data.correo', $email)
++            ->assertJsonPath('data.cuenta_existente', true);
++
++        $this->assertSame($clientsBefore, \App\Models\Cliente::query()->count());
++        $this->assertDatabaseHas('solicitudes_sistema', [
++            'codigo'=>$response->json('data.codigo'),'cliente_id'=>$clientId,
++            'forma_pago_preferida'=>'contado','frecuencia_suscripcion_preferida'=>'anual','estado'=>'en_revision',
++        ]);
++        $empresa = \App\Models\Empresa::query()->where('cliente_id', $clientId)->where('nombre_comercial', 'Negocio Account First')->firstOrFail();
++        $this->assertDatabaseHas('empresa_usuario', ['empresa_id'=>$empresa->id,'usuario_id'=>$user->id,'rol_negocio'=>'propietario']);
+     }
+ 
+-    public function test_account_first_then_public_request_uses_the_existing_client_account(): void
++    public function test_request_must_choose_how_to_pay_for_standard_plans(): void
+     {
+         $this->seed(CuestionarioSeeder::class);
+         $catalog = $this->getJson('/api/v1/publico/solicitud/catalogo')->assertOk()->json('data');
+         $plan = collect($catalog['planes'])->firstWhere('codigo', 'basico-1800') ?? collect($catalog['planes'])->first();
+-        $email = 'account-first-'.uniqid().'@example.com';
+-        $phone = '7777792';
+ 
+-        $account = $this->postJson('/api/v1/auth/cliente/crear-cuenta', [
+-            'nombre'=>'Ana Cliente','correo'=>$email,'celular'=>$phone,'whatsapp'=>$phone,
++        $this->postJson('/api/v1/auth/cliente/crear-cuenta', [
++            'nombre'=>'Pedro Cliente','correo'=>'pedro-'.uniqid().'@example.com','celular'=>'7777793',
+             'password'=>'Clave2026','password_confirmation'=>'Clave2026',
+         ])->assertCreated();
+-        $clientId = (int) $account->json('usuario.cliente_id');
++        $user = \App\Models\Usuario::query()->where('telefono', '7777793')->firstOrFail();
+ 
+-        $response = $this->postJson('/api/v1/publico/solicitud/enviar', [
+-            'nombre'=>'Ana Cliente','correo'=>$email,'telefono'=>$phone,'whatsapp'=>$phone,
+-            'empresa_nombre'=>'Negocio Account First','titulo_sistema'=>'Sistema de reservas',
+-            'resumen'=>'Quiero recibir reservas y controlar horarios de atención.',
+-            'plan_codigo'=>$plan['codigo'],'forma_pago_preferida'=>'por_definir',
+-            'frecuencia_suscripcion_preferida'=>($plan['precio_mensual']!==null&&$plan['precio_anual']!==null)?'mensual':null,
+-            'declaracion_aceptada'=>true,'declaracion_nombre'=>'Ana Cliente','declaracion_fecha'=>now()->toDateString(),
+-            'acuerdo_comercial_aceptado'=>true,'acuerdo_comercial_nombre'=>'Ana Cliente','acuerdo_comercial_fecha'=>now()->toDateString(),
+-            'terminos_aceptados'=>true,'respuestas'=>[],
+-        ])->assertCreated()->assertJsonPath('data.cuenta_existente', true);
++        $payload = $this->requestPayload($plan, $user->correo, '7777793');
++        $payload['forma_pago_preferida'] = 'por_definir';
++
++        $this->actingAs($user)->postJson('/api/v1/mi/solicitud/enviar', $payload)
++            ->assertStatus(422)
++            ->assertJsonPath('message', 'Elige cómo pagarás la implementación para que VITI pueda atender tu solicitud.');
++    }
+ 
+-        $this->assertDatabaseCount('clientes', 1);
+-        $this->assertDatabaseHas('solicitudes_sistema', ['codigo'=>$response->json('data.codigo'),'cliente_id'=>$clientId]);
+-        $this->assertDatabaseHas('empresas', ['cliente_id'=>$clientId,'nombre_comercial'=>'Negocio Account First']);
++    public function test_platform_admin_accounts_cannot_send_client_requests(): void
++    {
++        $this->seed(CuestionarioSeeder::class);
++        $catalog = $this->getJson('/api/v1/publico/solicitud/catalogo')->assertOk()->json('data');
++        $plan = collect($catalog['planes'])->first();
++        $admin = \App\Models\Usuario::create([
++            'nombre'=>'Admin','usuario'=>'admin_req_'.uniqid(),'documento'=>'9'.random_int(10000000, 99999999),
++            'telefono'=>'7'.random_int(1000000, 9999999),'password'=>'PruebaSegura123','rol'=>'administrador','estado'=>'activo',
++        ]);
++
++        $this->actingAs($admin)->postJson('/api/v1/mi/solicitud/enviar', $this->requestPayload($plan, 'a@example.com', '7777794'))
++            ->assertStatus(403);
+     }
+ 
++    private function requestPayload(array $plan, string $email, string $phone, string $company = 'Negocio de prueba'): array
++    {
++        $custom = str_contains((string) $plan['codigo'], 'personalizado');
++        return [
++            'nombre'=>'Cliente Prueba','correo'=>$email,'telefono'=>$phone,'whatsapp'=>$phone,
++            'empresa_nombre'=>$company,'titulo_sistema'=>'Sistema de reservas',
++            'resumen'=>'Quiero recibir reservas y controlar horarios de atención.',
++            'plan_codigo'=>$plan['codigo'],
++            'forma_pago_preferida'=>$custom ? 'por_definir' : 'contado',
++            'frecuencia_suscripcion_preferida'=>$custom ? null : 'anual',
++            'terminos_aceptados'=>true,'respuestas'=>[],
++        ];
++    }
+ }
+diff --git a/tests/Feature/AppAccessControlTest.php b/tests/Feature/AppAccessControlTest.php
+new file mode 100644
+index 0000000..ed0a341
+--- /dev/null
++++ b/tests/Feature/AppAccessControlTest.php
+@@ -0,0 +1,246 @@
++<?php
++
++namespace Tests\Feature;
++
++use App\Models\{AplicacionDominio, Suscripcion, Usuario};
++use Illuminate\Foundation\Testing\RefreshDatabase;
++use Illuminate\Support\Carbon;
++use Tests\{CreatesVitiTenants, TestCase};
++
++class AppAccessControlTest extends TestCase
++{
++    use CreatesVitiTenants, RefreshDatabase;
++
++    protected function tearDown(): void
++    {
++        Carbon::setTestNow();
++        parent::tearDown();
++    }
++
++    public function test_admin_registers_normalized_domain_and_it_cannot_be_reused_by_another_system(): void
++    {
++        $admin = $this->admin();
++        $a = $this->createTenant('DOM-A');
++        $b = $this->createTenant('DOM-B');
++
++        $this->actingAs($admin)->postJson("/api/v1/aplicaciones/{$a['app']->id}/dominios", ['dominio' => 'https://www.MiNegocio.com/panel?x=1'])
++            ->assertCreated()
++            ->assertJsonPath('data.dominio', 'minegocio.com')
++            ->assertJsonPath('data.tipo', 'principal');
++
++        // Registrar de nuevo el mismo dominio no lo degrada a alias.
++        $this->actingAs($admin)->postJson("/api/v1/aplicaciones/{$a['app']->id}/dominios", ['dominio' => 'minegocio.com'])
++            ->assertOk()
++            ->assertJsonPath('data.tipo', 'principal');
++
++        $this->actingAs($admin)->postJson("/api/v1/aplicaciones/{$b['app']->id}/dominios", ['dominio' => 'minegocio.com'])
++            ->assertStatus(422)
++            ->assertJsonPath('message', 'El dominio minegocio.com ya está asignado a otro sistema.');
++
++        $this->actingAs($admin)->postJson("/api/v1/aplicaciones/{$a['app']->id}/dominios", ['dominio' => 'no es un dominio'])
++            ->assertStatus(422);
++
++        $this->assertDatabaseHas('aplicacion_dominios', ['aplicacion_id' => $a['app']->id, 'dominio' => 'minegocio.com']);
++        $this->assertDatabaseHas('auditoria', ['accion' => 'dominio_registrado']);
++    }
++
++    public function test_updating_system_url_registers_its_domain_automatically(): void
++    {
++        $admin = $this->admin();
++        $t = $this->createTenant('AUTO-URL');
++
++        $this->actingAs($admin)->putJson("/api/v1/aplicaciones/{$t['app']->id}", [
++            'empresa_id' => $t['company']->id,
++            'nombre' => $t['app']->nombre,
++            'url' => 'https://reservas.cliente-demo.com/app',
++            'url_administracion' => 'https://admin.cliente-demo.com',
++        ])->assertOk();
++
++        $this->assertDatabaseHas('aplicacion_dominios', ['aplicacion_id' => $t['app']->id, 'dominio' => 'reservas.cliente-demo.com', 'tipo' => 'principal']);
++        $this->assertDatabaseHas('aplicacion_dominios', ['aplicacion_id' => $t['app']->id, 'dominio' => 'admin.cliente-demo.com', 'tipo' => 'administracion']);
++    }
++
++    public function test_public_check_ignores_unmanaged_domains_and_allows_active_systems_from_any_origin(): void
++    {
++        $t = $this->createTenant('PUBLIC-OK');
++        AplicacionDominio::create(['aplicacion_id' => $t['app']->id, 'dominio' => 'activo.example.com', 'tipo' => 'principal']);
++
++        $this->getJson('/api/v1/publico/acceso?dominio=desconocido.example.com')
++            ->assertStatus(404)
++            ->assertJsonPath('gestionado', false)
++            ->assertJsonPath('permitido', true);
++
++        $response = $this->getJson('/api/v1/publico/acceso?dominio=https://www.activo.example.com/ruta', ['Origin' => 'https://activo.example.com'])
++            ->assertOk()
++            ->assertJsonPath('gestionado', true)
++            ->assertJsonPath('permitido', true)
++            ->assertJsonPath('estado', 'activo');
++
++        $this->assertSame('*', $response->headers->get('Access-Control-Allow-Origin'));
++        $this->assertNull($response->headers->get('Access-Control-Allow-Credentials'));
++        $this->assertArrayNotHasKey('empresa', $response->json());
++
++        // Sin parámetro, se usa el Origin del sistema que consulta.
++        $this->getJson('/api/v1/publico/acceso', ['Origin' => 'https://activo.example.com'])
++            ->assertOk()->assertJsonPath('dominio', 'activo.example.com');
++    }
++
++    public function test_unpaid_subscription_blocks_domain_and_internal_app_until_payment_control_is_disabled(): void
++    {
++        Carbon::setTestNow('2026-09-24 10:00:00');
++        $admin = $this->admin();
++        $t = $this->createTenant('UNPAID');
++        AplicacionDominio::create(['aplicacion_id' => $t['app']->id, 'dominio' => 'moroso.example.com']);
++        $this->subscription($t, '2026-09-01', 3);
++
++        $this->getJson('/api/v1/publico/acceso?dominio=moroso.example.com')
++            ->assertOk()
++            ->assertJsonPath('permitido', false)
++            ->assertJsonPath('estado', 'bloqueado_pago');
++
++        $this->actingAs($t['user'])->getJson('/api/v1/mi/apps/electrofrio/resumen', $this->tenantHeaders($t))
++            ->assertStatus(402)
++            ->assertJsonPath('bloqueo.estado', 'bloqueado_pago');
++
++        $this->actingAs($admin)->putJson("/api/v1/aplicaciones/{$t['app']->id}/politica-acceso", ['control_pago' => false])
++            ->assertOk()
++            ->assertJsonPath('data.acceso.estado', 'activo')
++            ->assertJsonPath('data.acceso.control_pago', false);
++
++        $this->getJson('/api/v1/publico/acceso?dominio=moroso.example.com')
++            ->assertOk()->assertJsonPath('permitido', true);
++    }
++
++    public function test_grace_period_keeps_access_with_a_warning(): void
++    {
++        Carbon::setTestNow('2026-09-24 10:00:00');
++        $t = $this->createTenant('GRACE');
++        AplicacionDominio::create(['aplicacion_id' => $t['app']->id, 'dominio' => 'gracia.example.com']);
++        $this->subscription($t, '2026-09-22', 5);
++
++        $response = $this->getJson('/api/v1/publico/acceso?dominio=gracia.example.com')
++            ->assertOk()
++            ->assertJsonPath('permitido', true)
++            ->assertJsonPath('estado', 'gracia');
++        $this->assertNotEmpty($response->json('aviso'));
++    }
++
++    public function test_maintenance_temporarily_disables_system_and_expires_automatically(): void
++    {
++        Carbon::setTestNow('2026-09-24 10:00:00');
++        $admin = $this->admin();
++        $t = $this->createTenant('MAINT');
++        AplicacionDominio::create(['aplicacion_id' => $t['app']->id, 'dominio' => 'mantenimiento.example.com']);
++
++        $this->actingAs($admin)->putJson("/api/v1/aplicaciones/{$t['app']->id}/mantenimiento", [
++            'activo' => true, 'mensaje' => 'Actualizando a la versión 2.0', 'hasta' => '2026-09-24 12:00:00',
++        ])->assertOk()->assertJsonPath('data.acceso.estado', 'mantenimiento');
++
++        $this->getJson('/api/v1/publico/acceso?dominio=mantenimiento.example.com')
++            ->assertOk()
++            ->assertJsonPath('permitido', false)
++            ->assertJsonPath('estado', 'mantenimiento')
++            ->assertJsonPath('mensaje', 'Actualizando a la versión 2.0');
++
++        $this->actingAs($t['user'])->getJson('/api/v1/mi/apps/electrofrio/resumen', $this->tenantHeaders($t))
++            ->assertStatus(503)
++            ->assertJsonPath('bloqueo.estado', 'mantenimiento')
++            ->assertJsonPath('message', 'Actualizando a la versión 2.0');
++
++        $apps = $this->actingAs($t['user'])->getJson('/api/v1/mi/aplicaciones', $this->tenantHeaders($t))->assertOk();
++        $this->assertSame('mantenimiento', $apps->json('data.0.estado_servicio'));
++        $this->assertFalse($apps->json('data.0.puede_usar'));
++
++        // Pasada la hora indicada, el sistema vuelve solo.
++        Carbon::setTestNow('2026-09-24 12:01:00');
++        $this->getJson('/api/v1/publico/acceso?dominio=mantenimiento.example.com')
++            ->assertOk()->assertJsonPath('permitido', true)->assertJsonPath('estado', 'activo');
++        $this->assertDatabaseHas('aplicaciones', ['id' => $t['app']->id, 'mantenimiento_activo' => false]);
++    }
++
++    public function test_admin_can_finish_maintenance_manually_and_block_manually(): void
++    {
++        $admin = $this->admin();
++        $t = $this->createTenant('MANUAL');
++        AplicacionDominio::create(['aplicacion_id' => $t['app']->id, 'dominio' => 'manual.example.com']);
++
++        $this->actingAs($admin)->putJson("/api/v1/aplicaciones/{$t['app']->id}/mantenimiento", ['activo' => true])->assertOk();
++        $this->actingAs($admin)->putJson("/api/v1/aplicaciones/{$t['app']->id}/mantenimiento", ['activo' => false])
++            ->assertOk()->assertJsonPath('data.acceso.estado', 'activo');
++
++        $this->actingAs($admin)->putJson("/api/v1/aplicaciones/{$t['app']->id}/bloqueo", ['activo' => true, 'motivo' => 'Contrato en revisión'])
++            ->assertOk()->assertJsonPath('data.acceso.estado', 'bloqueado_manual');
++
++        $this->getJson('/api/v1/publico/acceso?dominio=manual.example.com')
++            ->assertOk()->assertJsonPath('permitido', false)->assertJsonPath('mensaje', 'Contrato en revisión');
++
++        $this->actingAs($t['user'])->getJson('/api/v1/mi/apps/electrofrio/resumen', $this->tenantHeaders($t))
++            ->assertStatus(423)->assertJsonPath('bloqueo.estado', 'bloqueado_manual');
++
++        $this->actingAs($admin)->putJson("/api/v1/aplicaciones/{$t['app']->id}/bloqueo", ['activo' => false])
++            ->assertOk()->assertJsonPath('data.acceso.estado', 'activo');
++
++        $this->assertDatabaseHas('auditoria', ['accion' => 'aplicacion_bloqueada']);
++        $this->assertDatabaseHas('auditoria', ['accion' => 'aplicacion_desbloqueada']);
++    }
++
++    public function test_access_panel_lists_systems_with_summary_and_filters(): void
++    {
++        $admin = $this->admin();
++        $ok = $this->createTenant('LIST-OK');
++        $blocked = $this->createTenant('LIST-BLOCK');
++        $blocked['app']->update(['bloqueo_manual' => true]);
++
++        $all = $this->actingAs($admin)->getJson('/api/v1/accesos')
++            ->assertOk()
++            ->assertJsonPath('resumen.bloqueado_manual', 1);
++        $ids = collect($all->json('data'))->pluck('id');
++        $this->assertTrue($ids->contains($ok['app']->id) && $ids->contains($blocked['app']->id));
++        $this->assertSame(count($all->json('data')), $all->json('resumen.total'));
++
++        $this->actingAs($admin)->getJson('/api/v1/accesos?estado=bloqueados')
++            ->assertOk()
++            ->assertJsonCount(1, 'data')
++            ->assertJsonPath('data.0.id', $blocked['app']->id);
++    }
++
++    public function test_business_users_cannot_manage_access_controls(): void
++    {
++        $t = $this->createTenant('NO-ADMIN');
++
++        $this->actingAs($t['user'])->getJson('/api/v1/accesos')->assertForbidden();
++        $this->actingAs($t['user'])->putJson("/api/v1/aplicaciones/{$t['app']->id}/bloqueo", ['activo' => false])->assertForbidden();
++        $this->actingAs($t['user'])->putJson("/api/v1/aplicaciones/{$t['app']->id}/mantenimiento", ['activo' => false])->assertForbidden();
++        $this->actingAs($t['user'])->postJson("/api/v1/aplicaciones/{$t['app']->id}/dominios", ['dominio' => 'x.com'])->assertForbidden();
++    }
++
++    private function admin(): Usuario
++    {
++        return Usuario::create([
++            'nombre' => 'Admin Acceso', 'usuario' => 'admin_acceso_'.uniqid(), 'documento' => '9'.random_int(10000000, 99999999),
++            'telefono' => '7'.random_int(1000000, 9999999), 'password' => 'PruebaSegura123', 'rol' => 'administrador', 'estado' => 'activo',
++        ]);
++    }
++
++    private function tenantHeaders(array $tenant): array
++    {
++        return ['X-VITI-Empresa' => (string) $tenant['company']->id];
++    }
++
++    private function subscription(array $tenant, string $due, int $grace): Suscripcion
++    {
++        return Suscripcion::create([
++            'aplicacion_id' => $tenant['app']->id,
++            'empresa_id' => $tenant['company']->id,
++            'plan' => $tenant['plan']->nombre,
++            'monto' => 89,
++            'frecuencia' => 'mensual',
++            'moneda' => 'BOB',
++            'fecha_inicio' => '2026-07-01',
++            'prueba_hasta' => null,
++            'fecha_vencimiento' => $due,
++            'dias_gracia' => $grace,
++            'estado' => 'activa',
++        ]);
++    }
++}
+-- 
+2.39.5
+

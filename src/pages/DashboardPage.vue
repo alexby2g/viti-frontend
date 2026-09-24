@@ -48,7 +48,7 @@ onMounted(async () => {
       subtitle="Recibe solicitudes, aprueba proyectos, registra avances y entrega sistemas desde un solo lugar."
     >
       <q-btn class="viti-btn viti-btn--ghost" outline no-caps icon="language" label="Vista pública" to="/viti" />
-      <q-btn class="viti-btn viti-btn--primary" unelevated no-caps icon="open_in_new" label="Probar formulario" to="/solicitud" />
+      <q-btn class="viti-btn viti-btn--primary" unelevated no-caps icon="dns" label="Dominios y acceso" to="/accesos" />
     </PageHeader>
 
     <section class="metrics-grid">

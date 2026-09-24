@@ -118,6 +118,14 @@ api.interceptors.response.use(
     const method = String(config?.method || 'get').toLowerCase()
     const safeRead = method === 'get' || method === 'head'
     const status = Number(error?.response?.status || 0)
+    // Un sistema entregado bloqueado (pago 402, bloqueo manual 423, mantenimiento 503) no es una caída:
+    // no se reintenta y se avisa a la interfaz para mostrar el motivo.
+    const serviceBlock = error?.response?.data?.bloqueo
+    if (serviceBlock && [402, 403, 423, 503].includes(status)) {
+      error.vitiServiceBlock = serviceBlock
+      if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('viti:service-blocked', { detail:{ status, ...serviceBlock } }))
+      return Promise.reject(error)
+    }
     const retryableStatus = [502, 503, 504].includes(status)
     const retryableNetwork = !error?.response || ['ECONNABORTED', 'ETIMEDOUT'].includes(error?.code)
     const online = typeof navigator === 'undefined' || navigator.onLine
