@@ -1,7 +1,7 @@
 <script setup>
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { Dark, useQuasar } from 'quasar'
-import { useRoute, useRouter } from 'vue-router'
+import { useRouter } from 'vue-router'
 import { api } from '../boot/axios'
 import { useAuthStore } from '../stores/auth'
 import { useBrandingStore } from '../stores/branding'
@@ -19,7 +19,6 @@ const profileDialog = ref(false)
 const profilePhotoPreview = ref(false)
 const uploadingPhoto = ref(false)
 const router = useRouter()
-const route = useRoute()
 const $q = useQuasar()
 const drawer = ref(false)
 const quickSearch = ref(false)
@@ -204,8 +203,9 @@ onBeforeUnmount(() => {
 
         <q-scroll-area class="col">
           <q-list padding>
-            <template v-for="item in menu" :key="item.label">
-              <q-item v-if="!item.children" clickable v-ripple :to="item.action ? undefined : item.to" exact @click="handleItem(item)">
+            <template v-for="item in menu" :key="`${item.type || 'item'}-${item.label}`">
+              <div v-if="item.type === 'section'" class="drawer-section-label">{{ item.label }}</div>
+              <q-item v-else-if="!item.children" clickable v-ripple :to="item.action ? undefined : item.to" exact @click="handleItem(item)">
                 <q-item-section avatar><q-icon :name="item.icon" /></q-item-section>
                 <q-item-section>{{ item.label }}</q-item-section>
                 <q-item-section v-if="item.badge" side><q-badge rounded color="negative" :label="item.badge > 99 ? '99+' : item.badge" /></q-item-section>
@@ -362,6 +362,7 @@ onBeforeUnmount(() => {
 .viti-toolbar :deep(.q-btn){border-radius:11px;transition:background .18s ease,transform .18s ease}.viti-toolbar :deep(.q-btn:hover){background:rgba(255,255,255,.06);transform:translateY(-1px)}
 .drawer-primary-action{min-height:44px;border-radius:12px;background:linear-gradient(135deg,rgba(20,87,184,.92),rgba(26,105,207,.92))!important;border:1px solid rgba(116,170,244,.2);box-shadow:0 12px 28px rgba(4,17,33,.18)}
 .viti-drawer :deep(.q-list){padding-top:4px}.viti-drawer :deep(.q-item){position:relative}.viti-drawer :deep(.q-item.q-router-link--active:before){content:"";position:absolute;left:0;top:9px;bottom:9px;width:3px;border-radius:999px;background:#f28b30}.viti-drawer :deep(.q-item.q-router-link--active){background:linear-gradient(90deg,rgba(242,139,48,.09),rgba(255,255,255,.025))!important}.viti-drawer :deep(.q-item.q-router-link--active .q-icon){color:#ff9a3c!important}.viti-drawer :deep(.q-expansion-item__container>.q-item:hover),.viti-drawer :deep(.q-item:hover){background:rgba(255,255,255,.045)!important}
+.drawer-section-label{padding:18px 18px 7px;font-size:9px;font-weight:900;letter-spacing:.16em;text-transform:uppercase;color:rgba(210,226,242,.5)}
 .viti-toolbar{min-height:68px}
 .quick-search-card{width:620px;max-width:94vw;margin-top:9vh;border-radius:18px}
 .profile-footer{border-radius:14px;transition:background .18s ease}.profile-footer:hover{background:rgba(255,255,255,.07)}

@@ -5,106 +5,27 @@ import { api } from '../boot/axios'
 import { useAuthStore } from '../stores/auth'
 import PageHeader from '../components/PageHeader.vue'
 
-const route = useRoute()
-const router = useRouter()
-const auth = useAuthStore()
-const loading = ref(true)
-const frameLoaded = ref(false)
-const application = ref(null)
-const error = ref('')
-
-const isAdmin = computed(() => auth.user?.rol === 'superadmin')
-const backPath = computed(() => isAdmin.value ? '/aplicaciones' : '/mi-aplicaciones')
-const safeUrl = computed(() => {
-  const value = application.value?.url_externa || application.value?.url
-  if (!value) return ''
-  try {
-    const parsed = new URL(value)
-    return parsed.protocol === 'https:' ? parsed.toString() : ''
-  } catch {
-    return ''
-  }
-})
-
-async function load() {
-  loading.value = true
-  error.value = ''
-  try {
-    const id = Number(route.params.id)
-    if (!Number.isInteger(id) || id < 1) throw new Error('La aplicación solicitada no es válida.')
-
-    if (isAdmin.value) {
-      application.value = (await api.get(`/aplicaciones/${id}`)).data.data
-    } else {
-      const apps = (await api.get('/mi/aplicaciones')).data.data || []
-      application.value = apps.find(item => Number(item.id) === id) || null
-      if (!application.value?.url_externa || !application.value?.ruta) {
-        throw new Error('Esta aplicación no está disponible para el negocio seleccionado.')
-      }
-    }
-
-    if (!safeUrl.value) throw new Error('La aplicación no tiene un enlace HTTPS válido.')
-  } catch (requestError) {
-    application.value = null
-    error.value = requestError.response?.data?.message || requestError.message || 'No se pudo abrir la aplicación.'
-  } finally {
-    loading.value = false
-  }
-}
-
-function goBack() {
-  router.push(backPath.value)
-}
-
+const route=useRoute(), router=useRouter(), auth=useAuthStore()
+const loading=ref(true), application=ref(null), error=ref('')
+const isAdmin=computed(()=>['superadmin','administrador'].includes(auth.user?.rol))
+const backPath=computed(()=>isAdmin.value?'/sistemas':'/mi-aplicaciones')
+const safeUrl=computed(()=>{const value=application.value?.url_externa||application.value?.url;if(!value)return'';try{const parsed=new URL(value);return parsed.protocol==='https:'?parsed.toString():''}catch{return''}})
+async function load(){loading.value=true;error.value='';try{const id=Number(route.params.id);if(!Number.isInteger(id)||id<1)throw new Error('El sistema solicitado no es válido.');if(isAdmin.value)application.value=(await api.get(`/aplicaciones/${id}`)).data.data;else{const apps=(await api.get('/mi/aplicaciones')).data.data||[];application.value=apps.find(item=>Number(item.id)===id)||null}if(!safeUrl.value)throw new Error('Este sistema no tiene un enlace HTTPS disponible.')}catch(e){application.value=null;error.value=e.response?.data?.message||e.message||'No se pudo abrir el sistema.'}finally{loading.value=false}}
+function openExternal(){if(safeUrl.value)window.open(safeUrl.value,'_blank','noopener,noreferrer')}
 onMounted(load)
 </script>
 
 <template>
-  <q-page class="external-app-page">
-    <div class="external-app-toolbar">
-      <PageHeader
-        eyebrow="Aplicación integrada"
-        :title="application?.nombre || 'Sistema externo'"
-        :subtitle="application?.empresa?.nombre_comercial || 'Administrado desde VITI'"
-      >
-        <div class="row q-gutter-sm toolbar-actions">
-          <q-btn outline color="primary" icon="arrow_back" label="Volver a VITI" no-caps @click="goBack"/>
-          <q-btn v-if="safeUrl" flat color="primary" icon="open_in_new" label="Pantalla completa" no-caps :href="safeUrl" target="_blank" rel="noopener noreferrer"/>
-        </div>
-      </PageHeader>
-    </div>
-
-    <q-inner-loading :showing="loading" label="Preparando la aplicación..."/>
-
-    <q-banner v-if="error && !loading" rounded class="bg-red-1 text-negative q-ma-md">
-      <template #avatar><q-icon name="error_outline"/></template>
-      {{error}}
-      <template #action><q-btn flat color="negative" label="Volver" no-caps @click="goBack"/></template>
-    </q-banner>
-
-    <div v-if="safeUrl && !loading" class="external-frame-shell">
-      <div v-if="!frameLoaded" class="frame-loading">
-        <q-spinner color="primary" size="42px"/>
-        <div class="q-mt-md text-grey-7">Cargando {{application?.nombre}}…</div>
-      </div>
-      <iframe
-        :src="safeUrl"
-        :title="application?.nombre || 'Aplicación integrada'"
-        class="external-frame"
-        allow="clipboard-read; clipboard-write"
-        sandbox="allow-downloads allow-forms allow-modals allow-popups allow-popups-to-escape-sandbox allow-same-origin allow-scripts"
-        referrerpolicy="no-referrer"
-        @load="frameLoaded=true"
-      />
-    </div>
+  <q-page class="external-page viti-page">
+    <q-inner-loading :showing="loading"/>
+    <q-banner v-if="error&&!loading" rounded class="bg-red-10 text-white">{{error}}<template #action><q-btn flat label="Volver" @click="router.push(backPath)"/></template></q-banner>
+    <template v-if="safeUrl&&!loading">
+      <PageHeader eyebrow="Sistema externo" :title="application?.nombre||'Sistema'" :subtitle="application?.empresa?.nombre_comercial||'Administrado desde VITI'"/>
+      <section class="external-card"><q-icon name="open_in_new" size="48px"/><h2>Este sistema funciona fuera de VITI</h2><p>VITI conserva el acceso y la información técnica, pero la operación del sistema se realiza en su propio sitio.</p><div class="url-box">{{safeUrl}}</div><div class="actions"><q-btn outline no-caps icon="arrow_back" label="Volver a VITI" @click="router.push(backPath)"/><q-btn color="primary" unelevated no-caps icon="open_in_new" label="Abrir sistema" @click="openExternal"/></div></section>
+    </template>
   </q-page>
 </template>
 
 <style scoped>
-.external-app-page{padding:0;min-height:calc(100vh - 64px);min-height:calc(100dvh - 64px);display:flex;flex-direction:column;background:var(--viti-bg)}
-.external-app-toolbar{padding:18px 22px 4px}
-.external-frame-shell{position:relative;flex:1;min-height:640px;margin:0 22px 22px;border:1px solid var(--viti-border);border-radius:18px;overflow:hidden;background:#fff;box-shadow:0 16px 42px rgba(26,42,68,.12)}
-.external-frame{display:block;width:100%;height:100%;min-height:640px;border:0;background:#fff}
-.frame-loading{position:absolute;inset:0;z-index:1;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#fff}
-@media(max-width:600px){.external-app-page{min-height:calc(100dvh - 58px)}.external-app-toolbar{padding:12px 12px 2px}.toolbar-actions{width:100%}.toolbar-actions :deep(.q-btn){flex:1}.external-frame-shell{min-height:calc(100dvh - 208px);margin:0;border-left:0;border-right:0;border-bottom:0;border-radius:14px 14px 0 0}.external-frame{min-height:calc(100dvh - 208px)}}
+.external-page{max-width:900px;padding-top:32px}.external-card{min-height:430px;border:1px solid rgba(80,112,143,.22);background:linear-gradient(180deg,rgba(13,37,62,.84),rgba(8,27,47,.9));border-radius:22px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:36px}.external-card>.q-icon{color:#f28b30}.external-card h2{font-size:27px;margin:15px 0 7px}.external-card p{color:#91a8bb;max-width:600px;line-height:1.6}.url-box{max-width:100%;overflow-wrap:anywhere;margin:16px 0;padding:12px 16px;border-radius:12px;background:rgba(255,255,255,.03);border:1px solid rgba(86,117,146,.18);color:#cbd8e2;font-size:11px}.actions{display:flex;gap:8px;flex-wrap:wrap;justify-content:center}.actions .q-btn{min-height:42px;border-radius:11px}@media(max-width:600px){.external-page{padding-top:18px}.actions{width:100%;display:grid;grid-template-columns:1fr}.actions .q-btn{width:100%}}
 </style>

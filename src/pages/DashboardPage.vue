@@ -10,27 +10,21 @@ const loading = ref(true)
 const data = ref({ resumen: {}, solicitudes_recientes: [], proyectos_recientes: [], requieren_atencion: [] })
 
 const metrics = computed(() => [
-  { key: 'negocios_activos', label: 'Negocios registrados', icon: 'business', to: '/empresas' },
-  { key: 'solicitudes_activas', label: 'Solicitudes activas', icon: 'fact_check', to: '/solicitudes' },
-  { key: 'proyectos_activos', label: 'Proyectos activos', icon: 'account_tree', to: '/proyectos' },
-  { key: 'aplicaciones_activas', label: 'Sistemas activos', icon: 'grid_view', to: '/aplicaciones' },
-  { key: 'pagos_vencidos', label: 'Cobros con atención', icon: 'payments', to: '/pagos' },
+  { key: 'solicitudes_por_revisar', fallback: 'solicitudes_activas', label: 'Solicitudes por revisar', hint: 'Entrada comercial', icon: 'inbox', to: '/solicitudes' },
+  { key: 'proyectos_activos', label: 'Trabajos activos', hint: 'Producción en curso', icon: 'account_tree', to: '/trabajos' },
+  { key: 'sistemas_entregados', fallback: 'aplicaciones_activas', label: 'Sistemas entregados', hint: 'Operación externa', icon: 'language', to: '/sistemas' },
+  { key: 'clientes_registrados', fallback: 'negocios_activos', label: 'Clientes registrados', hint: 'Relación comercial', icon: 'groups', to: '/clientes' },
 ])
 
-const flow = computed(() => [
-  { number: '01', title: 'Solicitud', text: 'Recibe la necesidad del cliente y define el alcance.', icon: 'description', to: '/solicitudes', active: (data.value.resumen.solicitudes_activas || 0) > 0 },
-  { number: '02', title: 'Aprobación', text: 'Decide si la solicitud continúa y habilita el acceso del cliente.', icon: 'verified', to: '/solicitudes', active: (data.value.resumen.solicitudes_activas || 0) > 0 },
-  { number: '03', title: 'Proyecto', text: 'Registra avances, fechas y una beta cuando esté lista para revisar.', icon: 'account_tree', to: '/proyectos', active: (data.value.resumen.proyectos_activos || 0) > 0 },
-  { number: '04', title: 'Entrega', text: 'Publica el sistema, sus accesos y la APK cuando realmente esté listo.', icon: 'rocket_launch', to: '/aplicaciones', active: (data.value.resumen.aplicaciones_activas || 0) > 0 },
-])
+const workflow = [
+  { number: '01', title: 'Solicitud', text: 'El cliente explica qué necesita y deja sus datos.', icon: 'description', to: '/solicitudes' },
+  { number: '02', title: 'Decisión', text: 'VITI revisa, rechaza o acepta el trabajo.', icon: 'fact_check', to: '/solicitudes' },
+  { number: '03', title: 'Trabajo', text: 'El desarrollo se planifica, produce, prueba y entrega.', icon: 'account_tree', to: '/trabajos' },
+  { number: '04', title: 'Sistema', text: 'VITI conserva URLs, hosting, repositorios y soporte.', icon: 'open_in_new', to: '/sistemas' },
+]
 
-const workspaceEmpty = computed(() =>
-  !data.value.resumen.solicitudes_activas &&
-  !data.value.resumen.proyectos_activos &&
-  !data.value.resumen.aplicaciones_activas &&
-  !data.value.resumen.negocios_activos
-)
-
+const attentionCount = computed(() => data.value.requieren_atencion?.length || 0)
+const metricValue = item => data.value.resumen?.[item.key] ?? data.value.resumen?.[item.fallback] ?? 0
 function go(to) { router.push(to) }
 
 onMounted(async () => {
@@ -45,89 +39,82 @@ onMounted(async () => {
 
     <PageHeader
       eyebrow="Centro VITI"
-      title="Tu operación, en orden."
-      subtitle="Recibe solicitudes, aprueba proyectos, registra avances y entrega sistemas desde un solo lugar."
+      title="Controla el trabajo, no el negocio del cliente."
+      subtitle="VITI recibe solicitudes, organiza el desarrollo y mantiene centralizada la información de los sistemas que entregas."
     >
-      <q-btn class="viti-btn viti-btn--ghost" outline no-caps icon="language" label="Vista pública" to="/viti" />
-      <q-btn class="viti-btn viti-btn--primary" unelevated no-caps icon="open_in_new" label="Probar formulario" to="/solicitud" />
+      <q-btn class="viti-btn viti-btn--ghost" outline no-caps icon="open_in_new" label="Formulario público" to="/solicitud" />
+      <q-btn class="viti-btn viti-btn--primary" unelevated no-caps icon="inbox" label="Revisar solicitudes" to="/solicitudes" />
     </PageHeader>
 
     <section class="metrics-grid">
       <button v-for="item in metrics" :key="item.key" class="metric-card" type="button" @click="go(item.to)">
         <span class="metric-icon"><q-icon :name="item.icon" /></span>
-        <span class="metric-copy"><b>{{ data.resumen[item.key] || 0 }}</b><small>{{ item.label }}</small></span>
-        <q-icon name="north_east" class="metric-arrow" />
+        <span class="metric-copy"><small>{{ item.label }}</small><b>{{ metricValue(item) }}</b><em>{{ item.hint }}</em></span>
+        <q-icon name="arrow_forward" class="metric-arrow" />
       </button>
     </section>
 
-    <section v-if="workspaceEmpty && !loading" class="empty-workspace q-mt-lg">
-      <div class="empty-orbit"><q-icon name="hub" /></div>
-      <div class="empty-copy">
-        <div class="section-label">Espacio limpio</div>
-        <h2>VITI está listo para tu primer proyecto.</h2>
-        <p>No hay clientes, solicitudes, proyectos ni sistemas de demostración. Empieza una prueba real y VITI irá habilitando cada etapa cuando corresponda.</p>
-      </div>
-      <div class="empty-actions">
-        <q-btn class="viti-btn viti-btn--primary" unelevated no-caps icon="open_in_new" label="Probar como cliente" to="/solicitud" />
-        <q-btn class="viti-btn viti-btn--ghost" outline no-caps icon="fact_check" label="Ver solicitudes" to="/solicitudes" />
-      </div>
-    </section>
-
-    <section class="flow-section q-mt-lg">
-      <div class="section-top">
-        <div>
-          <div class="section-label">Flujo principal</div>
-          <h2>De la idea a la entrega</h2>
+    <section class="command-grid q-mt-lg">
+      <article class="workflow-panel">
+        <div class="panel-heading">
+          <div><div class="section-label">Modelo operativo</div><h2>Solicitud → Trabajo → Sistema</h2></div>
+          <span>VITI coordina el ciclo completo</span>
         </div>
-        <span class="flow-hint">Cada etapa abre la siguiente</span>
-      </div>
-      <div class="flow-grid">
-        <button v-for="step in flow" :key="step.number" class="flow-card" :class="{ 'is-active': step.active }" type="button" @click="go(step.to)">
-          <span class="flow-number">{{ step.number }}</span>
-          <span class="flow-icon"><q-icon :name="step.icon" /></span>
-          <strong>{{ step.title }}</strong>
-          <p>{{ step.text }}</p>
-          <span class="flow-link">Abrir <q-icon name="arrow_forward" /></span>
-        </button>
-      </div>
+        <div class="workflow-grid">
+          <button v-for="step in workflow" :key="step.number" type="button" class="workflow-step" @click="go(step.to)">
+            <span class="step-number">{{ step.number }}</span>
+            <span class="step-icon"><q-icon :name="step.icon" /></span>
+            <strong>{{ step.title }}</strong>
+            <p>{{ step.text }}</p>
+          </button>
+        </div>
+      </article>
+
+      <article class="attention-panel">
+        <div class="section-label">Atención</div>
+        <div class="attention-value">{{ attentionCount }}</div>
+        <h3>{{ attentionCount ? 'Elementos requieren revisión' : 'Todo bajo control' }}</h3>
+        <p>{{ attentionCount ? 'Hay sistemas, cobros o entregas que necesitan seguimiento.' : 'No hay alertas operativas pendientes en este momento.' }}</p>
+        <q-btn flat no-caps icon-right="arrow_forward" label="Abrir soporte" to="/soporte" />
+      </article>
     </section>
 
     <section class="dashboard-columns q-mt-lg">
       <article class="viti-panel">
         <div class="panel-head">
           <div><div class="section-label">Entrada</div><h3>Solicitudes recientes</h3></div>
-          <q-btn flat round icon="arrow_forward" class="panel-link" to="/solicitudes"><q-tooltip>Ver solicitudes</q-tooltip></q-btn>
+          <q-btn flat round icon="arrow_forward" to="/solicitudes"><q-tooltip>Ver solicitudes</q-tooltip></q-btn>
         </div>
         <div v-if="data.solicitudes_recientes?.length" class="activity-list">
           <button v-for="item in data.solicitudes_recientes" :key="item.id" type="button" class="activity-row" @click="go(`/solicitudes/${item.id}`)">
             <span class="activity-icon"><q-icon name="description" /></span>
-            <span class="activity-copy"><b>{{ item.titulo || item.codigo }}</b><small>{{ item.empresa?.nombre_comercial || item.cliente?.nombre || 'Sin empresa asignada' }}</small></span>
+            <span class="activity-copy"><b>{{ item.titulo || item.codigo }}</b><small>{{ item.empresa?.nombre_comercial || item.cliente?.nombre || 'Sin cliente' }}</small></span>
             <span class="activity-date">{{ formatDateTime(item.created_at) }}</span>
           </button>
         </div>
-        <div v-else class="panel-empty"><q-icon name="inbox" /><b>Sin solicitudes todavía</b><span>Las nuevas solicitudes aparecerán aquí.</span></div>
+        <div v-else class="panel-empty"><q-icon name="inbox" /><b>Sin solicitudes recientes</b><span>Las nuevas solicitudes aparecerán aquí.</span></div>
       </article>
 
       <article class="viti-panel">
         <div class="panel-head">
-          <div><div class="section-label">Producción</div><h3>Proyectos recientes</h3></div>
-          <q-btn flat round icon="arrow_forward" class="panel-link" to="/proyectos"><q-tooltip>Ver proyectos</q-tooltip></q-btn>
+          <div><div class="section-label">Producción</div><h3>Trabajos recientes</h3></div>
+          <q-btn flat round icon="arrow_forward" to="/trabajos"><q-tooltip>Ver trabajos</q-tooltip></q-btn>
         </div>
         <div v-if="data.proyectos_recientes?.length" class="activity-list">
-          <button v-for="item in data.proyectos_recientes" :key="item.id" type="button" class="activity-row" @click="go(`/proyectos/${item.id}`)">
+          <button v-for="item in data.proyectos_recientes" :key="item.id" type="button" class="activity-row" @click="go(`/trabajos/${item.id}`)">
             <span class="activity-icon"><q-icon name="account_tree" /></span>
-            <span class="activity-copy"><b>{{ item.nombre || item.codigo }}</b><small>{{ item.empresa?.nombre_comercial || item.cliente?.nombre || 'Sin empresa asignada' }}</small></span>
+            <span class="activity-copy"><b>{{ item.nombre || item.codigo }}</b><small>{{ item.empresa?.nombre_comercial || item.cliente?.nombre || 'Sin cliente' }}</small></span>
             <span class="progress-pill">{{ item.progreso || 0 }}%</span>
           </button>
         </div>
-        <div v-else class="panel-empty"><q-icon name="conversion_path" /><b>Sin proyectos activos</b><span>Convierte una solicitud aprobada para iniciar.</span></div>
+        <div v-else class="panel-empty"><q-icon name="conversion_path" /><b>Sin trabajos activos</b><span>Un trabajo nace cuando aceptas una solicitud.</span></div>
       </article>
     </section>
   </q-page>
 </template>
 
 <style scoped>
-.dashboard-page{padding-top:34px}.metrics-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px}.metric-card,.flow-card,.activity-row{font:inherit;color:inherit;text-align:left}.metric-card{border:1px solid var(--viti-border);background:rgba(15,40,70,.55);border-radius:18px;padding:18px;display:flex;align-items:center;gap:14px;cursor:pointer;transition:.2s ease;min-height:96px}.metric-card:hover{transform:translateY(-2px);border-color:rgba(242,139,48,.55);background:rgba(20,52,88,.76)}.metric-icon{width:44px;height:44px;border-radius:13px;background:rgba(242,139,48,.11);color:#ff9a3c;display:grid;place-items:center;font-size:23px}.metric-copy{display:grid;gap:2px}.metric-copy b{font-size:27px;line-height:1}.metric-copy small{color:var(--viti-muted);font-size:12px}.metric-arrow{margin-left:auto;color:#6f89a4}.empty-workspace{border:1px solid rgba(242,139,48,.24);background:linear-gradient(135deg,rgba(11,31,52,.88),rgba(18,47,78,.7));border-radius:22px;padding:28px;display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:22px}.empty-orbit{width:70px;height:70px;border:1px solid rgba(242,139,48,.38);border-radius:50%;display:grid;place-items:center;color:#ff9a3c;font-size:30px;box-shadow:inset 0 0 24px rgba(242,139,48,.08)}.empty-copy h2{margin:4px 0 6px;font-size:26px}.empty-copy p{margin:0;color:var(--viti-muted);max-width:680px;line-height:1.55}.empty-actions{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}.flow-section,.viti-panel{border:1px solid var(--viti-border);background:rgba(8,25,45,.62);border-radius:22px}.flow-section{padding:24px}.section-top,.panel-head{display:flex;align-items:center;justify-content:space-between;gap:20px}.section-top h2,.panel-head h3{margin:4px 0 0}.section-top h2{font-size:24px}.flow-hint{font-size:12px;color:var(--viti-muted)}.flow-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-top:20px}.flow-card{position:relative;border:1px solid rgba(99,129,160,.2);background:rgba(16,43,72,.52);border-radius:17px;padding:18px;cursor:pointer;transition:.2s ease;overflow:hidden}.flow-card:before{content:"";position:absolute;left:0;top:0;bottom:0;width:2px;background:transparent}.flow-card:hover,.flow-card.is-active{border-color:rgba(242,139,48,.42);background:rgba(20,53,88,.82)}.flow-card.is-active:before{background:#f28b30}.flow-number{font-size:10px;letter-spacing:.12em;color:#7d96af;font-weight:800}.flow-icon{display:grid;place-items:center;width:38px;height:38px;border-radius:12px;margin:14px 0;background:rgba(20,87,184,.18);color:#77adff;font-size:21px}.flow-card strong{font-size:17px}.flow-card p{color:var(--viti-muted);font-size:12px;line-height:1.55;min-height:58px}.flow-link{font-size:11px;color:#ff9a3c;display:inline-flex;align-items:center;gap:4px;font-weight:700}.dashboard-columns{display:grid;grid-template-columns:1fr 1fr;gap:14px}.viti-panel{overflow:hidden}.panel-head{padding:20px 22px;border-bottom:1px solid rgba(99,129,160,.18)}.panel-head h3{font-size:18px}.panel-link{color:#ff9a3c}.activity-list{display:grid}.activity-row{border:0;border-bottom:1px solid rgba(99,129,160,.13);background:transparent;padding:15px 20px;display:flex;align-items:center;gap:12px;cursor:pointer;transition:.18s ease}.activity-row:last-child{border-bottom:0}.activity-row:hover{background:rgba(20,87,184,.08)}.activity-icon{width:36px;height:36px;border-radius:10px;display:grid;place-items:center;background:rgba(255,255,255,.04);color:#8ba8c4}.activity-copy{display:grid;gap:2px;min-width:0}.activity-copy b{font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.activity-copy small,.activity-date{color:var(--viti-muted);font-size:11px}.activity-date{margin-left:auto;white-space:nowrap}.progress-pill{margin-left:auto;padding:5px 9px;border-radius:999px;background:rgba(242,139,48,.12);color:#ffad62;font-size:11px;font-weight:800}.panel-empty{min-height:180px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;color:var(--viti-muted);gap:5px;padding:22px}.panel-empty .q-icon{font-size:34px;color:#66819d}.panel-empty b{color:var(--viti-text);font-size:14px}.panel-empty span{font-size:12px}.viti-btn{border-radius:12px;min-height:42px}.viti-btn--ghost{background:rgba(255,255,255,.025)!important;border-color:rgba(158,180,201,.28)!important}.viti-btn--primary{background:linear-gradient(135deg,#1457b8,#1a69cf)!important;box-shadow:0 10px 28px rgba(20,87,184,.18)!important}
-@media(max-width:1100px){.metrics-grid,.flow-grid{grid-template-columns:repeat(2,1fr)}.dashboard-columns{grid-template-columns:1fr}.empty-workspace{grid-template-columns:auto 1fr}.empty-actions{grid-column:1/-1;justify-content:flex-start}}
-@media(max-width:600px){.dashboard-page{padding-top:18px}.metrics-grid,.flow-grid{grid-template-columns:1fr}.empty-workspace{grid-template-columns:1fr}.empty-orbit{width:58px;height:58px}.flow-section{padding:17px}.activity-date{display:none}}
+.dashboard-page{padding-top:34px}.metrics-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px}.metric-card,.workflow-step,.activity-row{font:inherit;color:inherit;text-align:left}.metric-card{border:1px solid var(--viti-border);background:linear-gradient(180deg,rgba(15,40,70,.72),rgba(8,27,48,.72));border-radius:19px;padding:18px;display:flex;align-items:center;gap:14px;cursor:pointer;transition:.2s ease;min-height:112px}.metric-card:hover{transform:translateY(-2px);border-color:rgba(242,139,48,.5)}.metric-icon{width:46px;height:46px;border-radius:14px;background:rgba(242,139,48,.1);color:#ff9a3c;display:grid;place-items:center;font-size:23px}.metric-copy{display:grid;min-width:0}.metric-copy small{color:#a9bbcb;font-size:11px}.metric-copy b{font-size:30px;line-height:1.05;margin:3px 0}.metric-copy em{font-style:normal;color:#718ba2;font-size:9px;text-transform:uppercase;letter-spacing:.08em}.metric-arrow{margin-left:auto;color:#6f89a4}.command-grid{display:grid;grid-template-columns:minmax(0,1fr) 290px;gap:14px}.workflow-panel,.attention-panel,.viti-panel{border:1px solid var(--viti-border);background:rgba(8,25,45,.62);border-radius:22px}.workflow-panel{padding:23px}.panel-heading,.panel-head{display:flex;align-items:center;justify-content:space-between;gap:20px}.panel-heading h2,.panel-head h3{margin:4px 0 0}.panel-heading h2{font-size:23px}.panel-heading>span{color:var(--viti-muted);font-size:11px}.workflow-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:18px}.workflow-step{border:1px solid rgba(99,129,160,.18);background:rgba(16,43,72,.48);border-radius:16px;padding:16px;cursor:pointer;transition:.18s}.workflow-step:hover{border-color:rgba(242,139,48,.4);background:rgba(20,53,88,.75)}.step-number{font-size:9px;font-weight:900;letter-spacing:.13em;color:#728ba3}.step-icon{display:grid;place-items:center;width:37px;height:37px;border-radius:11px;margin:12px 0;background:rgba(20,87,184,.17);color:#7db4ff;font-size:20px}.workflow-step strong{display:block;font-size:14px}.workflow-step p{margin:6px 0 0;color:#8ea5b9;font-size:10px;line-height:1.5}.attention-panel{padding:24px;background:linear-gradient(145deg,rgba(14,39,65,.82),rgba(17,52,84,.7))}.attention-value{font-size:46px;font-weight:900;line-height:1;margin:20px 0 6px;color:#f5f8fb}.attention-panel h3{font-size:17px;margin:0 0 7px}.attention-panel p{color:#93a9bb;font-size:11px;line-height:1.6;min-height:54px}.attention-panel .q-btn{color:#ff9b42;padding-left:0}.dashboard-columns{display:grid;grid-template-columns:1fr 1fr;gap:14px}.viti-panel{overflow:hidden}.panel-head{padding:20px 22px;border-bottom:1px solid rgba(88,118,148,.14)}.panel-head h3{font-size:18px}.activity-row{width:100%;border:0;border-bottom:1px solid rgba(88,118,148,.12);background:transparent;padding:14px 18px;display:flex;align-items:center;gap:12px;cursor:pointer}.activity-row:last-child{border-bottom:0}.activity-row:hover{background:rgba(255,255,255,.025)}.activity-icon{width:36px;height:36px;border-radius:10px;background:rgba(20,87,184,.15);color:#79b1ff;display:grid;place-items:center}.activity-copy{display:grid;min-width:0;flex:1}.activity-copy b{font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.activity-copy small{font-size:9px;color:#7f98ad;margin-top:3px}.activity-date{font-size:9px;color:#71899e}.progress-pill{font-size:10px;font-weight:800;color:#9fd0ff;border:1px solid rgba(80,145,216,.25);border-radius:999px;padding:4px 8px}.panel-empty{min-height:160px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;color:#768ea3}.panel-empty .q-icon{font-size:30px;color:#56738f}.panel-empty b{color:#cfdbe5;margin-top:9px}.panel-empty span{font-size:10px;margin-top:3px}.viti-btn{border-radius:12px;min-height:42px}.viti-btn--ghost{background:rgba(255,255,255,.025)!important}.viti-btn--primary{background:linear-gradient(135deg,#1457b8,#1a69cf)!important}
+@media(max-width:1120px){.metrics-grid{grid-template-columns:repeat(2,1fr)}.command-grid{grid-template-columns:1fr}.workflow-grid{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:760px){.dashboard-page{padding-top:18px}.metrics-grid,.dashboard-columns{grid-template-columns:1fr}.workflow-grid{grid-template-columns:1fr 1fr}.panel-heading{align-items:flex-start;flex-direction:column}.activity-date{display:none}}
 </style>

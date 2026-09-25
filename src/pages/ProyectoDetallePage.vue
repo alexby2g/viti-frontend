@@ -18,13 +18,6 @@ const blankMember=()=>({usuario_id:'',rol:'desarrollador',permisos:[],activo:tru
 const blankEnv=(tipo,nombre)=>({tipo,nombre,frontend_url:'',backend_url:'',proveedor_frontend:tipo==='produccion'?'Vercel':'',proveedor_backend:tipo==='produccion'?'Render':'',base_datos_referencia:'',estado:'pendiente',notas:''})
 const blankDomain=()=>({ambiente_tipo:'produccion',dominio:'',tipo:'web',estado:'pendiente',verificado_at:'',notas:''})
 
-function resetDevelopment(){
-  development.repositorios=[]
-  development.miembros=[]
-  development.ambientes=[blankEnv('desarrollo','Desarrollo local'),blankEnv('staging','Staging'),blankEnv('produccion','Producción')]
-  development.dominios=[]
-}
-
 function hydrateDevelopment(project){
   development.repositorios=(project.repositorios||[]).map(x=>({...blankRepo(),...x}))
   development.miembros=(project.miembros||[]).map(x=>({...blankMember(),usuario_id:x.usuario_id,rol:x.rol,permisos:x.permisos||[],activo:x.activo!==false}))
@@ -45,7 +38,7 @@ async function load(){
 async function save(){
   try{
     await api.put(`/proyectos/${item.value.id}`,form)
-    $q.notify({type:'positive',message:'Proyecto actualizado.'})
+    $q.notify({type:'positive',message:'Trabajo actualizado.'})
     editDialog.value=false
     load()
   }catch(e){$q.notify({type:'negative',message:e.response?.data?.message||'No se pudo actualizar.'})}
@@ -87,7 +80,7 @@ onMounted(load)
 <q-page class="viti-page">
   <q-inner-loading :showing="loading"/>
   <template v-if="item">
-    <PageHeader eyebrow="Proyecto" :title="`${item.codigo} · ${item.nombre}`" :subtitle="`${item.empresa?.nombre_comercial} · ${item.cliente?.nombre}`">
+    <PageHeader eyebrow="Trabajo" :title="`${item.codigo} · ${item.nombre}`" :subtitle="`${item.empresa?.nombre_comercial} · ${item.cliente?.nombre}`">
       <div class="row q-gutter-sm">
         <q-btn outline color="primary" icon="picture_as_pdf" label="PDF" no-caps @click="downloadFile(`/reportes/proyectos/${item.id}.pdf`,`${item.codigo}.pdf`)"/>
         <q-btn outline color="primary" icon="edit" label="Editar" no-caps @click="editDialog=true"/>
@@ -153,7 +146,7 @@ onMounted(load)
 
   <q-dialog v-model="editDialog">
     <q-card style="width:720px;max-width:94vw">
-      <q-card-section><div class="section-label">Proyecto</div><div class="text-h5 text-weight-bold">Editar configuración</div></q-card-section>
+      <q-card-section><div class="section-label">Trabajo</div><div class="text-h5 text-weight-bold">Editar configuración</div></q-card-section>
       <q-card-section><q-input v-model="form.nombre" outlined label="Nombre"/><q-input v-model="form.descripcion" outlined type="textarea" label="Descripción" class="q-mt-md"/><div class="row q-col-gutter-md q-mt-xs"><div class="col-6"><q-select v-model="form.fase" outlined :options="['levantamiento','analisis','diseno','desarrollo','beta','pruebas','ajustes','implementacion','finalizado','mantenimiento']" label="Fase"/></div><div class="col-6"><q-select v-model="form.estado" outlined :options="['activo','pausado','finalizado','cancelado','mantenimiento']" label="Estado"/></div><div class="col-4"><q-input v-model.number="form.progreso" outlined type="number" label="Progreso %"/></div><div class="col-4"><q-input v-model="form.fecha_beta" outlined type="date" stack-label label="Beta"/></div><div class="col-4"><q-input v-model="form.fecha_entrega" outlined type="date" stack-label label="Entrega"/></div><div class="col-12"><q-input v-model="form.repositorio_url" outlined label="Repositorio URL"/></div><div class="col-12"><q-input v-model="form.produccion_url" outlined label="Producción URL"/></div></div></q-card-section>
       <q-card-actions align="right"><q-btn flat label="Cancelar" v-close-popup/><q-btn color="primary" unelevated label="Guardar cambios" no-caps @click="save"/></q-card-actions>
     </q-card>
@@ -167,7 +160,7 @@ onMounted(load)
         <div class="row q-col-gutter-lg">
           <div class="col-12 col-xl-6">
             <q-card flat bordered>
-              <q-card-section class="row items-center"><div><div class="text-h6 text-weight-bold">Repositorios</div><div class="text-caption">Referencias de código cuando el proyecto las necesite.</div></div><q-space/><q-btn color="primary" icon="add" label="Repositorio" no-caps @click="addRepo"/></q-card-section>
+              <q-card-section class="row items-center"><div><div class="text-h6 text-weight-bold">Repositorios</div><div class="text-caption">Referencias de código cuando el trabajo las necesite.</div></div><q-space/><q-btn color="primary" icon="add" label="Repositorio" no-caps @click="addRepo"/></q-card-section>
               <q-separator/>
               <q-card-section>
                 <div v-for="(repo,index) in development.repositorios" :key="index" class="q-pa-md q-mb-md rounded-borders dev-block">
