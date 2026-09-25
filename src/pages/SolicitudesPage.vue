@@ -40,6 +40,7 @@ const statusSummary=computed(()=>[
 async function load(){loading.value=true;try{const {data}=await api.get('/solicitudes',{params:{per_page:100}});rows.value=data.data||[]}finally{loading.value=false}}
 function clearFilters(){search.value='';statusFilter.value=null}
 function openPublic(){window.open('/solicitud','_blank','noopener,noreferrer')}
+function openEdit(row){router.push({path:`/solicitudes/${row.id}`,query:{editar:'1'}})}
 function remove(row){$q.dialog({title:'Eliminar solicitud',message:`¿Eliminar ${row.codigo}?`,cancel:true,persistent:true}).onOk(async()=>{try{await api.delete(`/solicitudes/${row.id}`);await load()}catch(e){$q.notify({type:'negative',message:e.response?.data?.message||'No se puede eliminar esta solicitud.'})}})}
 function stateLabel(value){return statusOptions.find(x=>x.value===value)?.label||String(value||'').replaceAll('_',' ')}
 function stateColor(value){return {borrador:'blue-grey',en_revision:'orange',aprobada:'positive',rechazada:'negative',convertida:'purple',cerrada:'grey'}[value]||'grey'}
@@ -66,7 +67,7 @@ onMounted(load)
   </q-card>
 
   <q-table v-if="$q.screen.gt.sm" flat class="viti-table" :rows="filteredRows" :columns="columns" row-key="id" :loading="loading" :pagination="{rowsPerPage:20,sortBy:'id',descending:true}">
-    <template #body-cell-actions="p"><q-td :props="p"><RowActionsMenu @open="router.push(`/solicitudes/${p.row.id}`)" @delete="remove(p.row)"/></q-td></template>
+    <template #body-cell-actions="p"><q-td :props="p"><RowActionsMenu @open="router.push(`/solicitudes/${p.row.id}`)" @edit="openEdit(p.row)" @delete="remove(p.row)"/></q-td></template>
     <template #body-cell-titulo="p"><q-td :props="p"><button class="title-link" :title="p.row.titulo" @click="router.push(`/solicitudes/${p.row.id}`)"><b>{{p.row.titulo}}</b><small>{{p.row.resumen||'Abrir solicitud'}}</small></button></q-td></template>
     <template #body-cell-empresa="p"><q-td :props="p"><div class="business-cell">💼 {{p.row.empresa?.nombre_comercial||'Sin negocio'}}</div></q-td></template>
     <template #body-cell-cliente="p"><q-td :props="p"><div class="contact-cell text-weight-bold">👤 {{p.row.cliente?.nombre||'Sin contacto'}}</div><div class="text-caption text-grey-6">📱 {{p.row.cliente?.telefono||''}}</div></q-td></template>
