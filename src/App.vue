@@ -1,9 +1,16 @@
 <script setup>
-import { onMounted, onBeforeUnmount, ref } from 'vue'
+import { computed, onMounted, onBeforeUnmount, ref } from 'vue'
 import Agr006FloatingAssistant from './components/agr/Agr006FloatingAssistantV2.vue'
+import { useRoute } from 'vue-router'
 
 const STORAGE_KEY = 'viti006.enabled'
+const route = useRoute()
 const assistantEnabled = ref(localStorage.getItem(STORAGE_KEY) !== '0')
+const publicPresentation = computed(() => {
+  const path = String(route.path || '')
+  return path === '/viti' || path.startsWith('/viti/') || path === '/solicitud' || path.startsWith('/solicitud/') || path === '/registro' || path === '/login' || path === '/demo'
+})
+const showAssistant = computed(() => assistantEnabled.value && !publicPresentation.value)
 
 function setAssistantEnabled(value) {
   assistantEnabled.value = value
@@ -37,10 +44,10 @@ onBeforeUnmount(() => {
 <template>
   <router-view />
 
-  <Agr006FloatingAssistant v-if="assistantEnabled" />
+  <Agr006FloatingAssistant v-if="showAssistant" />
 
   <button
-    v-if="assistantEnabled"
+    v-if="showAssistant"
     class="viti006-power-off"
     type="button"
     title="Desactivar VITI 006"
@@ -51,7 +58,7 @@ onBeforeUnmount(() => {
   </button>
 
   <button
-    v-else
+    v-else-if="!publicPresentation"
     class="viti006-power-on"
     type="button"
     title="Activar VITI 006"
