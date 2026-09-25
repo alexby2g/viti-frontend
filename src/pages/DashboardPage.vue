@@ -10,6 +10,7 @@ const loading = ref(true)
 const data = ref({ resumen: {}, solicitudes_recientes: [], proyectos_recientes: [], requieren_atencion: [] })
 
 const metrics = computed(() => [
+  { key: 'negocios_activos', label: 'Negocios registrados', icon: 'business', to: '/empresas' },
   { key: 'solicitudes_activas', label: 'Solicitudes activas', icon: 'fact_check', to: '/solicitudes' },
   { key: 'proyectos_activos', label: 'Proyectos activos', icon: 'account_tree', to: '/proyectos' },
   { key: 'aplicaciones_activas', label: 'Sistemas activos', icon: 'grid_view', to: '/aplicaciones' },

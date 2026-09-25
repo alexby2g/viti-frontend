@@ -6,6 +6,7 @@ import PageHeader from '../components/PageHeader.vue'
 
 const $q = useQuasar()
 const loading = ref(true)
+const loadError = ref('')
 const data = ref({ resumen:{}, atencion:[], planes:[] })
 const businesses = ref([])
 const planDialog = ref(false)
@@ -32,13 +33,16 @@ function annualSaving(p){ return p?.precio_mensual&&p?.precio_anual ? Math.max(0
 
 async function load(){
   loading.value=true
+  loadError.value=''
   try {
     const [overview,b] = await Promise.all([api.get('/saas/resumen'),api.get('/empresas?per_page=100')])
     const raw = overview.data.data || {}
     data.value = { resumen:raw.resumen||{}, atencion:raw.atencion||[], planes:raw.planes||[] }
     businesses.value = b.data.data || []
-  } catch(e){ $q.notify({type:'negative',message:e.response?.data?.message||'No se pudo cargar planes y cobros.'}) }
-  finally { loading.value=false }
+  } catch(e){
+    loadError.value=e.response?.data?.message||'No se pudo cargar la información comercial.'
+    $q.notify({type:'negative',message:loadError.value})
+  } finally { loading.value=false }
 }
 function newPlan(){
   editingPlan.value=null
@@ -77,16 +81,18 @@ onMounted(load)
       <q-btn class="viti-btn viti-btn--ghost" outline no-caps icon="language" label="Ver planes públicos" to="/viti/planes" />
       <q-btn class="viti-btn viti-btn--primary" unelevated no-caps icon="add" label="Nuevo plan" @click="newPlan" />
     </PageHeader>
-    <q-inner-loading :showing="loading" />
+    <section v-if="loading" class="saas-loading" aria-live="polite"><q-spinner-dots color="orange" size="42px"/><div><b>Cargando planes y precios</b><span>Estamos preparando el resumen comercial de VITI.</span></div></section>
 
-    <section v-if="!loading" class="mini-metrics">
+    <section v-else-if="loadError" class="saas-error"><div class="state-icon state-icon--error"><q-icon name="cloud_off"/></div><div class="section-label">No se pudo cargar</div><h2>Revisa la conexión e inténtalo nuevamente.</h2><p>{{loadError}}</p><q-btn class="viti-btn viti-btn--primary q-mt-md" unelevated no-caps icon="refresh" label="Reintentar" @click="load"/></section>
+
+    <section v-if="!loading&&!loadError" class="mini-metrics">
       <div v-for="metric in metrics" :key="metric.label" class="mini-metric">
         <span><q-icon :name="metric.icon" /></span>
         <div><b>{{ metric.value }}</b><small>{{ metric.label }}</small></div>
       </div>
     </section>
 
-    <section v-if="!loading" class="saas-layout q-mt-lg">
+    <section v-if="!loading&&!loadError" class="saas-layout q-mt-lg">
       <article class="plans-panel">
         <div class="panel-head">
           <div><div class="section-label">Catálogo comercial</div><h2>Planes disponibles</h2><p>La implementación y el servicio recurrente se muestran por separado.</p></div>
@@ -109,13 +115,13 @@ onMounted(load)
             <span class="plan-price"><b>{{ p.precio_mensual ? money(p.precio_mensual) : '—' }}</b><small v-if="p.precio_mensual">/ mes</small><q-icon name="edit"/></span>
           </button>
         </div>
-        <div v-else class="panel-empty"><q-icon name="sell"/><b>No hay planes configurados</b><span>Crea el primero para usarlo en nuevas solicitudes.</span></div>
+        <div v-else class="panel-empty"><div class="state-icon"><q-icon name="sell"/></div><b>No hay planes configurados</b><span>Crea tu primer plan para definir implementación, mensualidad y alcance comercial.</span><q-btn flat no-caps color="orange" icon="add" label="Crear primer plan" @click="newPlan"/></div>
       </article>
 
       <aside class="assignment-panel">
         <div class="section-label">Asignación</div>
         <h2>Plan de empresa</h2>
-        <p>Asigna el plan acordado únicamente cuando la empresa ya fue aprobada.</p>
+        <p>Selecciona una empresa y registra el plan comercial que acordaste con el cliente.</p>
         <div v-if="businesses.length" class="assignment-form">
           <q-select v-model="assignment.empresa_id" outlined emit-value map-options :options="businessOptions" label="Empresa" />
           <q-select v-model="assignment.plan_viti_id" outlined emit-value map-options :options="planOptions" label="Plan" />
@@ -125,7 +131,7 @@ onMounted(load)
       </aside>
     </section>
 
-    <section v-if="!loading && data.atencion.length" class="attention-panel q-mt-lg">
+    <section v-if="!loading && !loadError && data.atencion.length" class="attention-panel q-mt-lg">
       <div class="panel-head compact"><div><div class="section-label">Atención</div><h2>Requieren revisión</h2></div></div>
       <div class="attention-list">
         <div v-for="row in data.atencion" :key="row.app.id" class="attention-row"><q-icon name="warning_amber"/><div><b>{{row.app.nombre}}</b><small>{{row.app.empresa?.nombre_comercial}} · {{row.ciclo.mensaje}}</small></div><q-space/><q-badge outline color="orange">{{row.ciclo.estado}}</q-badge></div>
@@ -156,7 +162,7 @@ onMounted(load)
 </template>
 
 <style scoped>
-.saas-page{padding-top:34px}.mini-metrics{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}.mini-metric{display:flex;align-items:center;gap:12px;padding:15px 17px;border:1px solid var(--viti-border);background:rgba(13,36,61,.6);border-radius:16px}.mini-metric>span{width:38px;height:38px;border-radius:11px;background:rgba(242,139,48,.1);color:#ff9a3c;display:grid;place-items:center;font-size:20px}.mini-metric div{display:grid}.mini-metric b{font-size:21px;line-height:1}.mini-metric small{color:var(--viti-muted);font-size:10px;margin-top:4px}.saas-layout{display:grid;grid-template-columns:minmax(0,1fr) 330px;gap:16px}.plans-panel,.assignment-panel,.attention-panel{border:1px solid var(--viti-border);background:rgba(8,25,45,.62);border-radius:22px;overflow:hidden}.panel-head{padding:22px 24px;display:flex;justify-content:space-between;gap:18px;align-items:center;border-bottom:1px solid rgba(102,132,163,.15)}.panel-head.compact{border-bottom:0}.panel-head h2,.assignment-panel h2{margin:4px 0 3px;font-size:21px}.panel-head p,.assignment-panel p{margin:0;color:var(--viti-muted);font-size:12px}.count-pill{padding:6px 10px;border:1px solid rgba(242,139,48,.28);border-radius:999px;color:#ffad62;font-size:10px}.plan-list{display:grid}.plan-row{font:inherit;color:inherit;text-align:left;border:0;border-bottom:1px solid rgba(102,132,163,.13);background:transparent;padding:18px 22px;display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:14px;align-items:center;cursor:pointer;transition:.18s ease}.plan-row:last-child{border-bottom:0}.plan-row:hover{background:rgba(20,87,184,.08)}.plan-mark{width:42px;height:42px;border-radius:12px;background:rgba(20,87,184,.16);color:#79b1ff;display:grid;place-items:center;font-size:22px}.plan-copy{display:grid;gap:5px;min-width:0}.plan-title{display:flex;align-items:center;gap:8px}.plan-copy>small{color:var(--viti-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.plan-tags{display:flex;gap:6px;flex-wrap:wrap}.plan-tags em{font-style:normal;font-size:9px;padding:4px 7px;border-radius:999px;background:rgba(255,255,255,.035);color:#9fb3c6;border:1px solid rgba(102,132,163,.12)}.plan-price{display:grid;grid-template-columns:auto auto;align-items:end;gap:3px;text-align:right;min-width:112px}.plan-price b{font-size:16px}.plan-price small{font-size:9px;color:var(--viti-muted)}.plan-price .q-icon{grid-column:1/-1;justify-self:end;color:#708aa4;margin-top:6px}.assignment-panel{padding:24px;height:max-content;position:sticky;top:88px}.assignment-form{display:grid;gap:12px;margin-top:22px}.assignment-empty{min-height:230px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;color:var(--viti-muted);gap:10px}.assignment-empty>.q-icon{font-size:34px}.attention-list{display:grid}.attention-row{display:flex;align-items:center;gap:12px;padding:14px 22px;border-top:1px solid rgba(102,132,163,.12)}.attention-row>.q-icon{color:#f28b30}.attention-row div{display:grid}.attention-row small{color:var(--viti-muted);font-size:11px}.panel-empty{min-height:260px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;color:var(--viti-muted);gap:6px}.panel-empty .q-icon{font-size:38px}.panel-empty b{color:var(--viti-text)}.viti-dialog{background:#0c2036;color:var(--viti-text);border:1px solid var(--viti-border);border-radius:22px}.plan-dialog{width:780px;max-width:94vw}.dialog-head{display:flex;align-items:flex-start;justify-content:space-between;gap:16px}.saving-note{color:#7fd49a;font-size:12px}.advanced-plan{border:1px solid rgba(102,132,163,.18);border-radius:14px;background:rgba(6,21,37,.32);overflow:hidden}.viti-btn{border-radius:12px;min-height:42px}.viti-btn--ghost{background:rgba(255,255,255,.025)!important;border-color:rgba(158,180,201,.28)!important}.viti-btn--primary{background:linear-gradient(135deg,#1457b8,#1a69cf)!important;box-shadow:0 10px 28px rgba(20,87,184,.18)!important}
+.saas-page{padding-top:34px}.saas-loading{min-height:260px;border:1px solid var(--viti-border);background:rgba(8,25,45,.56);border-radius:22px;display:flex;align-items:center;justify-content:center;gap:14px;color:var(--viti-muted)}.saas-loading>div{display:grid;gap:4px}.saas-loading b{color:var(--viti-text);font-size:15px}.saas-loading span{font-size:11px}.saas-error{min-height:340px;border:1px dashed rgba(226,91,91,.36);background:rgba(56,17,25,.18);border-radius:22px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:34px}.saas-error h2{font-size:25px;margin:6px 0}.saas-error p{color:var(--viti-muted);max-width:620px}.state-icon{width:52px;height:52px;border-radius:15px;background:rgba(242,139,48,.10);color:#ff9d43;display:grid;place-items:center;font-size:25px;margin-bottom:8px}.state-icon--error{background:rgba(224,83,83,.10);color:#ff7d7d}.mini-metrics{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}.mini-metric{display:flex;align-items:center;gap:12px;padding:15px 17px;border:1px solid var(--viti-border);background:rgba(13,36,61,.6);border-radius:16px}.mini-metric>span{width:38px;height:38px;border-radius:11px;background:rgba(242,139,48,.1);color:#ff9a3c;display:grid;place-items:center;font-size:20px}.mini-metric div{display:grid}.mini-metric b{font-size:21px;line-height:1}.mini-metric small{color:var(--viti-muted);font-size:10px;margin-top:4px}.saas-layout{display:grid;grid-template-columns:minmax(0,1fr) 330px;gap:16px}.plans-panel,.assignment-panel,.attention-panel{border:1px solid var(--viti-border);background:rgba(8,25,45,.62);border-radius:22px;overflow:hidden}.panel-head{padding:22px 24px;display:flex;justify-content:space-between;gap:18px;align-items:center;border-bottom:1px solid rgba(102,132,163,.15)}.panel-head.compact{border-bottom:0}.panel-head h2,.assignment-panel h2{margin:4px 0 3px;font-size:21px}.panel-head p,.assignment-panel p{margin:0;color:var(--viti-muted);font-size:12px}.count-pill{padding:6px 10px;border:1px solid rgba(242,139,48,.28);border-radius:999px;color:#ffad62;font-size:10px}.plan-list{display:grid}.plan-row{font:inherit;color:inherit;text-align:left;border:0;border-bottom:1px solid rgba(102,132,163,.13);background:transparent;padding:18px 22px;display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:14px;align-items:center;cursor:pointer;transition:.18s ease}.plan-row:last-child{border-bottom:0}.plan-row:hover{background:rgba(20,87,184,.08)}.plan-mark{width:42px;height:42px;border-radius:12px;background:rgba(20,87,184,.16);color:#79b1ff;display:grid;place-items:center;font-size:22px}.plan-copy{display:grid;gap:5px;min-width:0}.plan-title{display:flex;align-items:center;gap:8px}.plan-copy>small{color:var(--viti-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.plan-tags{display:flex;gap:6px;flex-wrap:wrap}.plan-tags em{font-style:normal;font-size:9px;padding:4px 7px;border-radius:999px;background:rgba(255,255,255,.035);color:#9fb3c6;border:1px solid rgba(102,132,163,.12)}.plan-price{display:grid;grid-template-columns:auto auto;align-items:end;gap:3px;text-align:right;min-width:112px}.plan-price b{font-size:16px}.plan-price small{font-size:9px;color:var(--viti-muted)}.plan-price .q-icon{grid-column:1/-1;justify-self:end;color:#708aa4;margin-top:6px}.assignment-panel{padding:24px;height:max-content;position:sticky;top:88px}.assignment-form{display:grid;gap:12px;margin-top:22px}.assignment-empty{min-height:230px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;color:var(--viti-muted);gap:10px}.assignment-empty>.q-icon{font-size:34px}.attention-list{display:grid}.attention-row{display:flex;align-items:center;gap:12px;padding:14px 22px;border-top:1px solid rgba(102,132,163,.12)}.attention-row>.q-icon{color:#f28b30}.attention-row div{display:grid}.attention-row small{color:var(--viti-muted);font-size:11px}.panel-empty{min-height:290px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;color:var(--viti-muted);gap:7px;padding:28px}.panel-empty>.q-icon{font-size:38px}.panel-empty b{color:var(--viti-text);font-size:15px}.panel-empty>span{max-width:420px;line-height:1.5}.panel-empty .q-btn{margin-top:5px}.viti-dialog{background:#0c2036;color:var(--viti-text);border:1px solid var(--viti-border);border-radius:22px}.plan-dialog{width:780px;max-width:94vw}.dialog-head{display:flex;align-items:flex-start;justify-content:space-between;gap:16px}.saving-note{color:#7fd49a;font-size:12px}.advanced-plan{border:1px solid rgba(102,132,163,.18);border-radius:14px;background:rgba(6,21,37,.32);overflow:hidden}.viti-btn{border-radius:12px;min-height:42px}.viti-btn--ghost{background:rgba(255,255,255,.025)!important;border-color:rgba(158,180,201,.28)!important}.viti-btn--primary{background:linear-gradient(135deg,#1457b8,#1a69cf)!important;box-shadow:0 10px 28px rgba(20,87,184,.18)!important}
 @media(max-width:1050px){.mini-metrics{grid-template-columns:repeat(2,1fr)}.saas-layout{grid-template-columns:1fr}.assignment-panel{position:static}}
 @media(max-width:600px){.saas-page{padding-top:18px}.mini-metrics{grid-template-columns:1fr 1fr}.plan-row{grid-template-columns:auto minmax(0,1fr)}.plan-price{display:none}.panel-head{padding:18px}.assignment-panel{padding:18px}}
 </style>
