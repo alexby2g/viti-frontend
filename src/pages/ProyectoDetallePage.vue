@@ -1,5 +1,5 @@
 <script setup>
-import { onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, onUnmounted, reactive, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import { useQuasar } from 'quasar'
 import { api } from '../boot/axios'
@@ -15,6 +15,57 @@ const uploadingAdvance=ref(false)
 const uploadStatus=reactive({total:0,uploaded:0})
 const form=reactive({})
 const development=reactive({repositorios:[],miembros:[],ambientes:[],dominios:[]})
+const galleryDialog=ref(false)
+const galleryFiles=ref([])
+const galleryIndex=ref(0)
+const galleryUrl=ref('')
+const galleryLoading=ref(false)
+const galleryError=ref(false)
+const activeGalleryFile=computed(()=>galleryFiles.value[galleryIndex.value]||null)
+
+function releaseGalleryUrl(){
+  if(galleryUrl.value){ URL.revokeObjectURL(galleryUrl.value); galleryUrl.value='' }
+}
+
+async function loadGalleryFile(){
+  releaseGalleryUrl()
+  galleryError.value=false
+  const file=activeGalleryFile.value
+  if(!file) return
+  galleryLoading.value=true
+  try{
+    const response=await api.get(`/archivos/${file.id}/descargar`,{responseType:'blob'})
+    galleryUrl.value=URL.createObjectURL(response.data)
+  }catch{ galleryError.value=true }
+  finally{ galleryLoading.value=false }
+}
+
+async function openGallery(files,index=0){
+  galleryFiles.value=Array.isArray(files)?files:[]
+  galleryIndex.value=Math.min(Math.max(index,0),Math.max(galleryFiles.value.length-1,0))
+  galleryDialog.value=true
+  await loadGalleryFile()
+}
+
+async function moveGallery(step){
+  const total=galleryFiles.value.length
+  if(total<2) return
+  galleryIndex.value=(galleryIndex.value+step+total)%total
+  await loadGalleryFile()
+}
+
+function closeGallery(){
+  releaseGalleryUrl()
+  galleryFiles.value=[]
+  galleryIndex.value=0
+  galleryError.value=false
+}
+
+function downloadGalleryFile(){
+  const file=activeGalleryFile.value
+  if(file) downloadFile(`/archivos/${file.id}/descargar`,file.nombre_original)
+}
+
 
 const blankRepo=()=>({tipo:'frontend',proveedor:'github',nombre:'',url:'',rama_principal:'main',privado:true,descripcion:''})
 const blankMember=()=>({usuario_id:'',rol:'desarrollador',permisos:[],activo:true})
@@ -152,6 +203,7 @@ async function addAdvance(){
 }
 
 onMounted(load)
+onUnmounted(()=>{ clearAdvanceFiles(); closeGallery() })
 </script>
 
 <template>
@@ -192,9 +244,18 @@ onMounted(load)
               <div style="white-space:pre-wrap">{{a.descripcion}}</div>
               <q-badge v-if="a.progreso!==null" outline color="primary" class="q-mt-sm">{{a.progreso}}%</q-badge>
               <div v-if="a.archivos?.length" class="q-mt-sm advance-attachments">
-  <div class="attachments-summary"><q-icon name="photo_library"/> {{a.archivos.length}} foto{{a.archivos.length===1?'':'s'}} subida{{a.archivos.length===1?'':'s'}}</div>
-  <div class="row q-gutter-xs q-mt-xs"><q-chip v-for="f in a.archivos" :key="f.id" clickable icon="image" @click="downloadFile(`/archivos/${f.id}/descargar`,f.nombre_original)">{{f.nombre_original}}</q-chip></div>
-</div>
+                <div class="attachments-summary">
+                  <div><q-icon name="photo_library"/> <b>{{a.archivos.length}} foto{{a.archivos.length===1?'':'s'}}</b> disponible{{a.archivos.length===1?'':'s'}} en este avance</div>
+                  <q-btn outline color="primary" dense no-caps icon="visibility" :label="a.archivos.length===1?'Ver foto':'Ver galería'" @click="openGallery(a.archivos)"/>
+                </div>
+                <div class="attachment-file-list">
+                  <button v-for="(f,index) in a.archivos" :key="f.id" type="button" class="attachment-file" @click="openGallery(a.archivos,index)">
+                    <q-icon name="image"/>
+                    <span>{{f.nombre_original}}</span>
+                    <q-icon name="open_in_full" class="attachment-open"/>
+                  </button>
+                </div>
+              </div>
             </q-timeline-entry>
             <div v-if="!item.avances?.length" class="empty-state">No hay avances adicionales.</div>
           </q-timeline>
@@ -262,6 +323,39 @@ onMounted(load)
 </div>
 <div class="col-12"><q-toggle v-model="advance.visible_cliente" label="Este avance puede mostrarse al cliente"/></div></div></q-card-section>
       <q-card-actions align="right"><q-btn flat label="Cancelar" :disable="uploadingAdvance" v-close-popup/><q-btn color="primary" unelevated label="Guardar avance" no-caps :loading="uploadingAdvance" @click="addAdvance"/></q-card-actions>
+    </q-card>
+  </q-dialog>
+
+  <q-dialog v-model="galleryDialog" @hide="closeGallery">
+    <q-card class="photo-viewer-card">
+      <q-card-section class="photo-viewer-head">
+        <div>
+          <div class="section-label">Evidencia del avance</div>
+          <div class="text-h6 text-weight-bold">Galería de fotos</div>
+        </div>
+        <q-space/>
+        <div class="photo-viewer-counter" v-if="galleryFiles.length">{{galleryIndex+1}} / {{galleryFiles.length}}</div>
+        <q-btn flat round icon="download" :disable="!activeGalleryFile" @click="downloadGalleryFile"><q-tooltip>Descargar foto</q-tooltip></q-btn>
+        <q-btn flat round icon="close" v-close-popup/>
+      </q-card-section>
+      <q-separator/>
+      <div class="photo-viewer-stage">
+        <q-inner-loading :showing="galleryLoading" dark/>
+        <q-img v-if="galleryUrl && !galleryError" :src="galleryUrl" fit="contain" class="photo-viewer-image"/>
+        <div v-else-if="galleryError" class="photo-viewer-error">
+          <q-icon name="broken_image" size="44px"/>
+          <b>No se pudo mostrar esta foto.</b>
+          <span>Puedes descargarla para revisarla.</span>
+        </div>
+        <q-btn v-if="galleryFiles.length>1" round unelevated class="photo-nav photo-nav-left" icon="chevron_left" @click="moveGallery(-1)"/>
+        <q-btn v-if="galleryFiles.length>1" round unelevated class="photo-nav photo-nav-right" icon="chevron_right" @click="moveGallery(1)"/>
+      </div>
+      <q-card-section class="photo-viewer-meta" v-if="activeGalleryFile">
+        <q-icon name="image"/>
+        <span class="ellipsis">{{activeGalleryFile.nombre_original}}</span>
+        <q-space/>
+        <span>{{galleryFiles.length===1?'Foto del avance':`Foto ${galleryIndex+1} de ${galleryFiles.length}`}}</span>
+      </q-card-section>
     </q-card>
   </q-dialog>
 
@@ -384,5 +478,12 @@ onMounted(load)
 .upload-progress{margin-top:12px;padding:11px 13px;border-radius:12px;background:rgba(39,104,184,.09);border:1px solid rgba(70,127,193,.18);font-size:12px;color:#9eb7ca}.upload-progress b{color:#eaf4fc}
 .attachments-summary{display:inline-flex;align-items:center;gap:6px;color:#82add5;font-size:11px;font-weight:700}
 @media(max-width:600px){.photo-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.upload-count{display:none}}
+
+
+.advance-attachments{padding:12px;border:1px solid rgba(89,122,152,.2);border-radius:14px;background:rgba(8,26,44,.45)}
+.attachments-summary{display:flex;align-items:center;justify-content:space-between;gap:12px;color:#a9bdcb;font-size:12px}.attachments-summary>div{display:flex;align-items:center;gap:7px}.attachments-summary .q-icon{color:#73aaf0;font-size:18px}
+.attachment-file-list{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:7px;margin-top:10px}.attachment-file{display:flex;align-items:center;gap:8px;min-width:0;padding:9px 10px;border:1px solid rgba(91,130,166,.18);border-radius:10px;background:rgba(255,255,255,.02);color:#9fb7cb;cursor:pointer;text-align:left;transition:.2s ease}.attachment-file:hover{border-color:rgba(83,147,225,.4);background:rgba(52,112,184,.08);color:#dce9f5}.attachment-file span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.attachment-file>.q-icon:first-child{color:#76aef0}.attachment-open{margin-left:auto;color:#607e99}
+.photo-viewer-card{width:min(980px,96vw);max-width:96vw;background:#081a2c!important;color:#edf4fb;border:1px solid rgba(95,134,170,.32);border-radius:20px;overflow:hidden}.photo-viewer-head{display:flex;align-items:center;gap:8px;padding:14px 16px}.photo-viewer-counter{padding:5px 9px;border-radius:999px;background:rgba(58,120,197,.12);border:1px solid rgba(86,143,213,.2);font-size:11px;color:#a9c6e4}.photo-viewer-stage{position:relative;display:grid;place-items:center;min-height:520px;max-height:72vh;background:radial-gradient(circle at 50% 45%,rgba(32,82,135,.16),transparent 45%),#04101c}.photo-viewer-image{width:100%;height:min(68vh,720px)}.photo-viewer-error{display:flex;flex-direction:column;align-items:center;gap:8px;color:#8199ad}.photo-viewer-error b{color:#dce7f0}.photo-nav{position:absolute;top:50%;transform:translateY(-50%);background:rgba(7,22,37,.86)!important;color:#f4f8fc!important;border:1px solid rgba(110,153,190,.24);backdrop-filter:blur(10px)}.photo-nav-left{left:14px}.photo-nav-right{right:14px}.photo-viewer-meta{display:flex;align-items:center;gap:9px;color:#9fb2c3;font-size:12px}.photo-viewer-meta>.q-icon{color:#72aaff;font-size:18px}
+@media(max-width:600px){.attachments-summary{align-items:flex-start;flex-direction:column}.attachment-file-list{grid-template-columns:1fr}.photo-viewer-card{width:100vw;max-width:100vw;border-radius:0}.photo-viewer-stage{min-height:62vh}.photo-nav-left{left:8px}.photo-nav-right{right:8px}}
 
 </style>

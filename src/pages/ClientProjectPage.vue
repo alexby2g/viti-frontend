@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { api } from '../boot/axios'
 import { formatDate, formatDateTime } from '../utils/date'
@@ -10,9 +10,59 @@ const router=useRouter()
 const item=ref(null)
 const loading=ref(true)
 const plan=computed(()=>item.value?.empresa?.plan_viti||item.value?.solicitud?.plan_viti||null)
+const galleryDialog=ref(false)
+const galleryFiles=ref([])
+const galleryIndex=ref(0)
+const galleryUrl=ref('')
+const galleryLoading=ref(false)
+const galleryError=ref(false)
+const activeGalleryFile=computed(()=>galleryFiles.value[galleryIndex.value]||null)
+
+function releaseGalleryUrl(){
+  if(galleryUrl.value){ URL.revokeObjectURL(galleryUrl.value); galleryUrl.value='' }
+}
+
+async function loadGalleryFile(){
+  releaseGalleryUrl()
+  galleryError.value=false
+  const file=activeGalleryFile.value
+  if(!file) return
+  galleryLoading.value=true
+  try{
+    const response=await api.get(`/mi/archivos/${file.id}/descargar`,{responseType:'blob'})
+    galleryUrl.value=URL.createObjectURL(response.data)
+  }catch{ galleryError.value=true }
+  finally{ galleryLoading.value=false }
+}
+
+async function openGallery(files,index=0){
+  galleryFiles.value=Array.isArray(files)?files:[]
+  galleryIndex.value=Math.min(Math.max(index,0),Math.max(galleryFiles.value.length-1,0))
+  galleryDialog.value=true
+  await loadGalleryFile()
+}
+
+async function moveGallery(step){
+  const total=galleryFiles.value.length
+  if(total<2) return
+  galleryIndex.value=(galleryIndex.value+step+total)%total
+  await loadGalleryFile()
+}
+
+function closeGallery(){
+  releaseGalleryUrl()
+  galleryFiles.value=[]
+  galleryIndex.value=0
+  galleryError.value=false
+}
+
+function downloadGalleryFile(){
+  const file=activeGalleryFile.value
+  if(file) downloadFile(`/mi/archivos/${file.id}/descargar`,file.nombre_original)
+}
+
 
 async function load(){ loading.value=true; try{ item.value=(await api.get('/mi/proyecto')).data.data } finally{ loading.value=false } }
-function openFile(f){ downloadFile(`/mi/archivos/${f.id}/descargar`,f.nombre_original) }
 function money(value){ return value===null||value===undefined ? 'Por definir' : `${Number(value).toFixed(0)} Bs` }
 function pretty(value){ return String(value||'').replaceAll('_',' ').replace(/\b\w/g,c=>c.toUpperCase()) }
 function openApplication(){
@@ -24,6 +74,7 @@ function openApplication(){
   else if(item.value.aplicacion.url)window.location.assign(item.value.aplicacion.url)
 }
 onMounted(load)
+onUnmounted(closeGallery)
 </script>
 
 <template>
@@ -65,7 +116,19 @@ onMounted(load)
             <div v-if="item.avances?.length" class="updates-list">
               <article v-for="a in item.avances" :key="a.id" class="update-row">
                 <span class="update-dot"></span>
-                <div class="update-body"><div class="update-top"><b>{{a.titulo}}</b><small>{{formatDateTime(a.created_at)}}</small></div><p>{{a.descripcion}}</p><div class="update-foot"><q-badge v-if="a.progreso!==null" outline color="orange">{{a.progreso}}%</q-badge><q-btn v-for="f in a.archivos" :key="f.id" flat dense no-caps icon="attach_file" :label="f.nombre_original" @click="openFile(f)"/></div></div>
+                <div class="update-body">
+                  <div class="update-top"><b>{{a.titulo}}</b><small>{{formatDateTime(a.created_at)}}</small></div>
+                  <p>{{a.descripcion}}</p>
+                  <div class="update-foot"><q-badge v-if="a.progreso!==null" outline color="orange">{{a.progreso}}%</q-badge></div>
+                  <button v-if="a.archivos?.length" type="button" class="client-gallery-trigger" @click="openGallery(a.archivos)">
+                    <span class="client-gallery-icon"><q-icon name="photo_library"/></span>
+                    <span class="client-gallery-copy">
+                      <b>{{a.archivos.length===1?'Ver foto del avance':`Ver ${a.archivos.length} fotos del avance`}}</b>
+                      <small>Se abrirá aquí mismo, sin salir de VITI</small>
+                    </span>
+                    <q-icon name="arrow_forward" class="client-gallery-arrow"/>
+                  </button>
+                </div>
               </article>
             </div>
             <div v-else class="empty-updates">Todavía no hay avances publicados. Aparecerán aquí cuando el proyecto comience a moverse.</div>
@@ -99,9 +162,47 @@ onMounted(load)
       <p>Cuando una solicitud sea aprobada y VITI inicie el proyecto, aparecerá aquí.</p>
       <q-btn outline color="orange" no-caps label="Volver a mi espacio" to="/mi-cuenta"/>
     </div>
+    <q-dialog v-model="galleryDialog" @hide="closeGallery">
+      <q-card class="client-photo-viewer">
+        <q-card-section class="client-viewer-head">
+          <div>
+            <div class="eyebrow">FOTOS DEL AVANCE</div>
+            <div class="text-h6 text-weight-bold">Evidencia compartida por VITI</div>
+          </div>
+          <q-space/>
+          <div v-if="galleryFiles.length" class="client-viewer-count">{{galleryIndex+1}} / {{galleryFiles.length}}</div>
+          <q-btn flat round icon="download" :disable="!activeGalleryFile" @click="downloadGalleryFile"><q-tooltip>Descargar</q-tooltip></q-btn>
+          <q-btn flat round icon="close" v-close-popup/>
+        </q-card-section>
+        <q-separator/>
+        <div class="client-viewer-stage">
+          <q-inner-loading :showing="galleryLoading" dark/>
+          <q-img v-if="galleryUrl && !galleryError" :src="galleryUrl" fit="contain" class="client-viewer-image"/>
+          <div v-else-if="galleryError" class="client-viewer-error">
+            <q-icon name="broken_image" size="44px"/>
+            <b>No pudimos mostrar esta foto.</b>
+            <span>Puedes descargarla para revisarla.</span>
+          </div>
+          <q-btn v-if="galleryFiles.length>1" round unelevated class="client-photo-nav client-photo-left" icon="chevron_left" @click="moveGallery(-1)"/>
+          <q-btn v-if="galleryFiles.length>1" round unelevated class="client-photo-nav client-photo-right" icon="chevron_right" @click="moveGallery(1)"/>
+        </div>
+        <q-card-section v-if="activeGalleryFile" class="client-viewer-meta">
+          <q-icon name="image"/>
+          <span class="ellipsis">{{activeGalleryFile.nombre_original}}</span>
+          <q-space/>
+          <span>{{galleryFiles.length===1?'1 foto':`${galleryIndex+1} de ${galleryFiles.length}`}}</span>
+        </q-card-section>
+      </q-card>
+    </q-dialog>
+
   </q-page>
 </template>
 
 <style scoped>
 .client-project-page{min-height:100%;color:#edf4fb}.project-hero{display:flex;justify-content:space-between;align-items:center;gap:28px;padding:28px 30px;background:linear-gradient(135deg,#0d2239,#123353);border:1px solid rgba(89,122,152,.28);border-radius:22px}.project-hero>div:first-child{flex:1}.eyebrow{font-size:10px;font-weight:900;letter-spacing:.14em;color:#f28b30}.project-hero h2,.client-card h3{margin:7px 0 6px;color:#f5f9fd}.project-hero h2{font-size:30px}.project-hero p,.client-card p.muted,.commercial-card>div>p{color:#9fb2c3;line-height:1.6}.progress-track{height:8px;background:#071729;border-radius:999px;overflow:hidden;margin-top:18px}.progress-track span{display:block;height:100%;background:linear-gradient(90deg,#246bc7,#f28b30);border-radius:999px}.progress-meta{display:flex;justify-content:space-between;gap:12px;margin-top:8px;font-size:11px;color:#a9bdcb}.progress-ring{width:112px;height:112px;flex:0 0 112px;border-radius:50%;border:7px solid #246bc7;box-shadow:inset 0 0 0 1px rgba(242,139,48,.26);display:flex;flex-direction:column;align-items:center;justify-content:center;background:#0a1d31}.progress-ring strong{font-size:25px}.progress-ring span{font-size:9px;color:#9fb2c3}.project-grid{display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:16px}.client-card{background:linear-gradient(180deg,rgba(12,34,57,.94),rgba(9,27,47,.96))!important;color:#edf4fb;border:1px solid rgba(89,122,152,.24);border-radius:19px;overflow:hidden}.client-card :deep(.q-separator){background:rgba(89,122,152,.17)}.commercial-card h3,.client-card h3{font-size:21px}.money-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:18px}.money-grid>div{padding:14px;border-radius:14px;background:rgba(6,21,37,.4);border:1px solid rgba(89,122,152,.18)}.money-grid small,.money-grid b,.money-grid span{display:block}.money-grid small{color:#f28b30;font-size:9px;text-transform:uppercase;letter-spacing:.08em}.money-grid b{font-size:19px;margin:4px 0}.money-grid span{font-size:10px;color:#859cad}.plain-note{display:flex;gap:8px;align-items:flex-start;margin-top:13px;padding:11px 12px;border:1px solid rgba(36,107,199,.22);background:rgba(36,107,199,.06);border-radius:12px;color:#9fb2c3;font-size:11px;line-height:1.5}.plain-note .q-icon{color:#72aaff;font-size:17px}.updates-list{display:grid}.update-row{display:grid;grid-template-columns:14px 1fr;gap:10px;padding:18px 20px;border-bottom:1px solid rgba(89,122,152,.13)}.update-row:last-child{border-bottom:0}.update-dot{width:9px;height:9px;border-radius:50%;background:#f28b30;margin-top:5px}.update-top{display:flex;justify-content:space-between;gap:16px}.update-top small{color:#768fa4;font-size:10px}.update-body p{color:#a9bdcb;line-height:1.55;white-space:pre-wrap;margin:7px 0 0}.update-foot{display:flex;flex-wrap:wrap;gap:5px;margin-top:10px}.update-foot :deep(.q-btn){color:#9fb6ca}.empty-updates{padding:34px 20px;text-align:center;color:#8299ad}.dates-card{padding-bottom:5px}.date-row{display:flex;justify-content:space-between;gap:10px;padding:14px 18px;border-top:1px solid rgba(89,122,152,.14);font-size:12px}.date-row span{color:#8199ad}.project-empty{min-height:460px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;color:#8fa6ba}.project-empty .q-icon{color:#f28b30}.project-empty h2{color:#edf4fb;margin-bottom:5px}.project-empty p{max-width:520px;line-height:1.6}@media(max-width:900px){.project-grid{grid-template-columns:1fr}.project-hero{align-items:flex-start}.progress-ring{width:90px;height:90px;flex-basis:90px}}@media(max-width:600px){.project-hero{padding:22px;flex-direction:column}.money-grid{grid-template-columns:1fr}.progress-ring{display:none}.update-top{flex-direction:column;gap:3px}}
+
+.client-gallery-trigger{width:100%;display:flex;align-items:center;gap:11px;margin-top:12px;padding:11px 12px;border:1px solid rgba(73,131,199,.22);border-radius:13px;background:linear-gradient(90deg,rgba(34,91,158,.08),rgba(255,255,255,.015));color:#dce8f3;cursor:pointer;text-align:left;transition:.2s ease}.client-gallery-trigger:hover{border-color:rgba(93,157,230,.4);background:linear-gradient(90deg,rgba(42,109,190,.13),rgba(255,255,255,.02));transform:translateY(-1px)}.client-gallery-icon{display:grid;place-items:center;width:38px;height:38px;flex:0 0 38px;border-radius:11px;background:rgba(43,108,191,.15);color:#72aaff;font-size:19px}.client-gallery-copy{display:flex;flex-direction:column;min-width:0}.client-gallery-copy b{font-size:12px;color:#e7f0f7}.client-gallery-copy small{font-size:10px;color:#7890a5;margin-top:2px}.client-gallery-arrow{margin-left:auto;color:#6689a8}
+.client-photo-viewer{width:min(980px,96vw);max-width:96vw;background:#07192a!important;color:#edf4fb;border:1px solid rgba(95,134,170,.32);border-radius:20px;overflow:hidden}.client-viewer-head{display:flex;align-items:center;gap:8px;padding:14px 16px}.client-viewer-count{padding:5px 9px;border-radius:999px;background:rgba(58,120,197,.12);border:1px solid rgba(86,143,213,.2);font-size:11px;color:#a9c6e4}.client-viewer-stage{position:relative;display:grid;place-items:center;min-height:520px;max-height:72vh;background:radial-gradient(circle at 50% 45%,rgba(32,82,135,.16),transparent 45%),#030e18}.client-viewer-image{width:100%;height:min(68vh,720px)}.client-viewer-error{display:flex;flex-direction:column;align-items:center;gap:8px;color:#8199ad}.client-viewer-error b{color:#dce7f0}.client-photo-nav{position:absolute;top:50%;transform:translateY(-50%);background:rgba(7,22,37,.86)!important;color:#f4f8fc!important;border:1px solid rgba(110,153,190,.24);backdrop-filter:blur(10px)}.client-photo-left{left:14px}.client-photo-right{right:14px}.client-viewer-meta{display:flex;align-items:center;gap:9px;color:#9fb2c3;font-size:12px}.client-viewer-meta>.q-icon{color:#72aaff;font-size:18px}
+@media(max-width:600px){.client-photo-viewer{width:100vw;max-width:100vw;border-radius:0}.client-viewer-stage{min-height:62vh}.client-photo-left{left:8px}.client-photo-right{right:8px}.client-gallery-copy small{display:none}}
+
 </style>
