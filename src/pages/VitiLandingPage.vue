@@ -3,17 +3,17 @@ import AppBrand from '../components/AppBrand.vue'
 import PublicPlansCatalog from '../components/public/PublicPlansCatalog.vue'
 
 const solutions = [
-  { icon:'web', title:'Sistemas web', text:'Paneles y sistemas para organizar ventas, clientes, pedidos, servicios, reservas, inventario o procesos internos.' },
-  { icon:'admin_panel_settings', title:'Panel administrativo', text:'Un espacio sencillo para que tu equipo gestione la operación diaria sin depender de hojas sueltas.' },
-  { icon:'android', title:'Aplicaciones y APK', text:'Cuando el proyecto lo requiere, preparamos una versión móvil o una APK conectada a tu sistema.' },
-  { icon:'sync_alt', title:'Integraciones', text:'Podemos conectar pagos, mapas, notificaciones, servicios externos u otras herramientas según el alcance.' },
+  { icon:'web', title:'Sistemas web', text:'Paneles y sistemas para organizar ventas, clientes, pedidos, servicios, reservas, inventario o procesos internos.', tag:'Hecho a medida' },
+  { icon:'admin_panel_settings', title:'Panel administrativo', text:'Un espacio sencillo para que tu equipo gestione la operación diaria sin depender de hojas sueltas.', tag:'Control central' },
+  { icon:'android', title:'Aplicaciones y APK', text:'Cuando el proyecto lo requiere, preparamos una versión móvil o una APK conectada a tu sistema.', tag:'Web + móvil' },
+  { icon:'sync_alt', title:'Integraciones', text:'Podemos conectar pagos, mapas, notificaciones, servicios externos u otras herramientas según el alcance.', tag:'Servicios conectados' },
 ]
 
 const workflow = [
-  { number:'01', title:'Nos cuentas qué necesitas', text:'Completa una solicitud breve. No necesitas conocer términos técnicos ni definir cómo debe programarse.' },
-  { number:'02', title:'VITI revisa y propone', text:'Ordenamos la necesidad, definimos el alcance y te presentamos una propuesta clara antes de iniciar.' },
-  { number:'03', title:'Desarrollamos y validamos', text:'Sigues el avance del trabajo y puedes revisar entregas parciales cuando el proyecto lo requiera.' },
-  { number:'04', title:'Recibes tu sistema', text:'Entregamos el acceso acordado y dejamos organizado el soporte o mantenimiento contratado.' },
+  { number:'01', icon:'chat_bubble_outline', title:'Nos cuentas qué necesitas', text:'Una solicitud corta basta para empezar. Explica el problema con tus propias palabras.' },
+  { number:'02', icon:'fact_check', title:'VITI ordena la idea', text:'Revisamos la necesidad, aclaramos lo importante y definimos contigo el alcance real.' },
+  { number:'03', icon:'developer_mode', title:'Construimos y validamos', text:'Desarrollamos por etapas y te mostramos avances útiles antes de llegar a la entrega.' },
+  { number:'04', icon:'rocket_launch', title:'Recibes tu sistema', text:'Entregamos accesos, dejamos todo organizado y continuamos con el soporte acordado.' },
 ]
 
 const subscription = [
@@ -182,6 +182,7 @@ const subscription = [
               <div class="card-index">VITI</div>
               <h3>{{item.title}}</h3>
               <p>{{item.text}}</p>
+              <div class="solution-footer"><span></span><b>{{ item.tag }}</b></div>
               <div class="card-glint" aria-hidden="true"></div>
             </article>
           </div>
@@ -190,22 +191,30 @@ const subscription = [
 
       <section id="como-funciona" class="landing-section workflow-section cinematic-section">
         <div class="section-watermark watermark-right" aria-hidden="true">VITI</div>
-        <div class="landing-container workflow-layout">
-          <div class="workflow-intro reveal-block">
-            <div class="section-kicker">Cómo funciona</div>
-            <h2>Un proceso claro de principio a entrega.</h2>
-            <p>Tú te concentras en explicar el problema. VITI organiza el resto del trabajo para que siempre sepas qué sigue.</p>
-            <q-btn flat no-caps class="text-action" icon-right="arrow_forward" label="Iniciar una solicitud" to="/solicitud" />
+        <div class="landing-container">
+          <div class="workflow-heading reveal-block">
+            <div>
+              <div class="section-kicker">Cómo funciona</div>
+              <h2>De una necesidad a un sistema, sin vueltas.</h2>
+            </div>
+            <div class="workflow-heading-copy">
+              <p>Empiezas contando el problema. VITI convierte esa necesidad en un trabajo ordenado y te acompaña hasta la entrega.</p>
+              <q-btn flat no-caps class="text-action" icon-right="arrow_forward" label="Iniciar una solicitud" to="/solicitud" />
+            </div>
           </div>
 
-          <div class="workflow-list">
-            <article v-for="(item, index) in workflow" :key="item.number" class="workflow-row reveal-block" :style="`animation-delay:${0.09 * (index + 1)}s`">
-              <span class="workflow-number">{{item.number}}</span>
-              <div>
-                <h3>{{item.title}}</h3>
-                <p>{{item.text}}</p>
+          <div class="workflow-cards">
+            <article v-for="(item, index) in workflow" :key="item.number" class="workflow-card interactive-card reveal-block" :style="`animation-delay:${0.08 * (index + 1)}s`">
+              <div class="workflow-card-top">
+                <span class="workflow-icon"><q-icon :name="item.icon" /></span>
+                <span class="workflow-number">{{ item.number }}</span>
               </div>
-              <q-icon name="arrow_forward" class="workflow-arrow" />
+              <h3>{{ item.title }}</h3>
+              <p>{{ item.text }}</p>
+              <div class="workflow-card-foot">
+                <span>{{ index === workflow.length - 1 ? 'Listo para usar' : 'Siguiente paso' }}</span>
+                <q-icon :name="index === workflow.length - 1 ? 'check_circle' : 'arrow_forward'" />
+              </div>
             </article>
           </div>
         </div>
@@ -369,11 +378,11 @@ const subscription = [
 
 /* Sections */
 .landing-section{padding:88px 0}.surface-section{background:linear-gradient(180deg,rgba(11,29,48,.62),rgba(9,25,42,.58));border-top:1px solid rgba(98,132,164,.07);border-bottom:1px solid rgba(98,132,164,.07)}
-.section-heading{max-width:860px}.split-heading{display:grid;grid-template-columns:1.05fr .95fr;gap:64px;align-items:end;max-width:none}.section-heading h2,.price-explain h2,.subscription-copy h2,.workflow-intro h2,.cta-section h2{font-size:clamp(31px,3.55vw,46px);line-height:1.08;letter-spacing:-.042em;margin:12px 0;color:#f3f7fb;font-weight:720}.section-heading p,.subscription-copy p,.workflow-intro p,.cta-section p,.price-explain>div>p{font-size:15px;line-height:1.72;color:#9eafbd;margin-bottom:0}
-.solution-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}.solution-card{position:relative;min-height:250px;border:1px solid rgba(93,126,157,.18);border-radius:19px;background:linear-gradient(180deg,rgba(15,38,63,.62),rgba(9,27,45,.78));padding:22px;overflow:hidden}.solution-card:after{content:'';position:absolute;left:0;right:0;bottom:0;height:2px;background:linear-gradient(90deg,transparent,rgba(243,149,63,.45),transparent);opacity:0;transition:.2s ease}.solution-card:hover:after{opacity:1}.solution-icon{width:50px;height:50px;border-radius:14px;display:grid;place-items:center;color:#f3a15a;background:rgba(242,139,48,.095);border:1px solid rgba(242,139,48,.12);font-size:24px;box-shadow:0 12px 24px rgba(242,139,48,.08)}.card-index{position:absolute;right:18px;top:20px;font-size:8px;letter-spacing:.2em;color:#45637d}.solution-card h3{font-size:17px;margin:42px 0 9px;color:#eaf0f5}.solution-card p{color:#93a7b7;line-height:1.66;font-size:12.5px;margin:0}.card-glint{position:absolute;inset:auto -10% 16px auto;width:120px;height:120px;border-radius:50%;background:radial-gradient(circle,rgba(83,146,228,.14),transparent 68%);opacity:.45;pointer-events:none}
+.section-heading{max-width:860px}.split-heading{display:grid;grid-template-columns:1.05fr .95fr;gap:64px;align-items:end;max-width:none}.section-heading h2,.price-explain h2,.subscription-copy h2,.workflow-heading h2,.cta-section h2{font-size:clamp(31px,3.55vw,46px);line-height:1.08;letter-spacing:-.042em;margin:12px 0;color:#f3f7fb;font-weight:720}.section-heading p,.subscription-copy p,.workflow-intro p,.cta-section p,.price-explain>div>p{font-size:15px;line-height:1.72;color:#9eafbd;margin-bottom:0}
+.solution-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}.solution-card{position:relative;min-height:238px;border:1px solid rgba(93,126,157,.18);border-radius:19px;background:linear-gradient(180deg,rgba(15,38,63,.62),rgba(9,27,45,.78));padding:23px;overflow:hidden;display:flex;flex-direction:column}.solution-card:after{content:'';position:absolute;left:0;right:0;bottom:0;height:2px;background:linear-gradient(90deg,transparent,rgba(243,149,63,.45),transparent);opacity:0;transition:.2s ease}.solution-card:hover:after{opacity:1}.solution-icon{width:60px;height:60px;border-radius:17px;display:grid;place-items:center;color:#f3a15a;background:linear-gradient(145deg,rgba(242,139,48,.14),rgba(40,95,158,.09));border:1px solid rgba(242,139,48,.16);font-size:29px;box-shadow:0 14px 30px rgba(242,139,48,.08)}.card-index{position:absolute;right:18px;top:20px;font-size:8px;letter-spacing:.2em;color:#45637d}.solution-card h3{font-size:18px;margin:24px 0 9px;color:#eaf0f5}.solution-card p{color:#93a7b7;line-height:1.62;font-size:12.5px;margin:0}.solution-footer{display:flex;align-items:center;gap:8px;margin-top:auto;padding-top:18px;font-size:9px;text-transform:uppercase;letter-spacing:.1em;color:#6f89a0}.solution-footer span{width:18px;height:2px;border-radius:999px;background:linear-gradient(90deg,#f28b30,#579be9)}.solution-footer b{font-weight:800}.card-glint{position:absolute;inset:auto -10% 16px auto;width:120px;height:120px;border-radius:50%;background:radial-gradient(circle,rgba(83,146,228,.14),transparent 68%);opacity:.45;pointer-events:none}
 
 /* Workflow */
-.workflow-section{background:linear-gradient(180deg,#071624,#081827)}.workflow-layout{display:grid;grid-template-columns:.76fr 1.24fr;gap:78px;align-items:start}.workflow-intro{position:sticky;top:110px}.workflow-intro p{max-width:430px}.text-action{color:#f2a45f!important;margin:15px 0 0 -12px}.workflow-list{border-top:1px solid rgba(105,141,174,.16)}.workflow-row{display:grid;grid-template-columns:52px 1fr 30px;gap:17px;align-items:center;min-height:125px;border-bottom:1px solid rgba(105,141,174,.16);transition:.2s ease}.workflow-row:hover{padding-left:8px;background:linear-gradient(90deg,rgba(243,149,63,.035),transparent 65%)}.workflow-number{font-size:11px;font-weight:900;letter-spacing:.12em;color:#f0a25d}.workflow-row h3{margin:0 0 6px;font-size:17px;color:#e8eef3}.workflow-row p{margin:0;max-width:600px;color:#8fa4b6;line-height:1.58;font-size:12.5px}.workflow-arrow{color:#466782;justify-self:end}
+.workflow-section{background:linear-gradient(180deg,#071624,#081827);padding-top:82px;padding-bottom:92px}.workflow-heading{display:grid;grid-template-columns:1.05fr .95fr;gap:70px;align-items:end;margin-bottom:30px}.workflow-heading h2{font-size:clamp(34px,4vw,50px);line-height:1.06;letter-spacing:-.045em;margin:12px 0 0;max-width:620px}.workflow-heading-copy{max-width:500px;justify-self:end}.workflow-heading-copy p{margin:0;color:#9aafbf;font-size:14px;line-height:1.7}.text-action{color:#f2a45f!important;margin:12px 0 0 -12px}.workflow-cards{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;position:relative}.workflow-cards:before{content:'';position:absolute;left:7%;right:7%;top:45px;height:1px;background:linear-gradient(90deg,transparent,rgba(93,145,201,.24),rgba(242,139,48,.18),rgba(93,145,201,.24),transparent);z-index:0}.workflow-card{position:relative;z-index:1;min-height:250px;padding:20px;border:1px solid rgba(95,130,162,.18);border-radius:18px;background:linear-gradient(180deg,rgba(14,38,64,.82),rgba(8,27,46,.9));display:flex;flex-direction:column;overflow:hidden}.workflow-card-top{display:flex;align-items:center;justify-content:space-between}.workflow-icon{display:grid;place-items:center;width:52px;height:52px;border-radius:15px;background:linear-gradient(145deg,rgba(47,111,187,.18),rgba(242,139,48,.06));border:1px solid rgba(92,146,205,.18);color:#7db4f8;font-size:24px;box-shadow:0 12px 26px rgba(23,72,126,.12)}.workflow-number{font-size:11px;font-weight:900;letter-spacing:.15em;color:#f0a25d}.workflow-card h3{margin:28px 0 8px;font-size:17px;color:#e8eef3}.workflow-card p{margin:0;color:#8fa4b6;line-height:1.62;font-size:11.5px}.workflow-card-foot{display:flex;align-items:center;justify-content:space-between;margin-top:auto;padding-top:18px;color:#6888a4;font-size:9px;text-transform:uppercase;letter-spacing:.1em}.workflow-card-foot .q-icon{font-size:16px;color:#f0a25d}
 
 /* Pricing */
 .plans-section{background:linear-gradient(180deg,#091a2b,#0a1d31)}.price-explain{display:grid;grid-template-columns:.9fr 1.1fr;gap:50px;align-items:end}.price-explain>div:first-child>p{max-width:520px}.price-columns{display:grid;grid-template-columns:1fr 1fr;gap:11px}.price-columns>div{padding:18px;border:1px solid rgba(94,128,160,.18);border-radius:16px;background:rgba(255,255,255,.018)}.price-icon{display:grid;place-items:center;width:44px;height:44px;border-radius:13px;background:rgba(243,149,63,.09);color:#f1a15b;font-size:23px;box-shadow:0 10px 24px rgba(242,139,48,.08)}.price-columns b,.price-columns span{display:block}.price-columns b{margin:12px 0 6px;font-size:14px;color:#e4ebf1}.price-columns>div>span:last-child{font-size:11.5px;line-height:1.55;color:#91a6b7}
@@ -391,12 +400,12 @@ const subscription = [
 @keyframes scanSweep{0%{transform:translateX(-20%) rotate(12deg)}100%{transform:translateX(240%) rotate(12deg)}}
 
 @media(max-width:1050px){
-  .nav-links{display:none}.hero-grid{grid-template-columns:1fr;gap:42px;min-height:auto}.hero-copy{max-width:760px}.hero-copy h1{max-width:720px}.visual-stage{max-width:720px;margin:0 auto;width:100%}.hero-trust{grid-template-columns:1fr 1fr;gap:14px}.trust-line{display:none}.split-heading,.price-explain,.subscription-grid,.workflow-layout{grid-template-columns:1fr}.split-heading,.workflow-layout{gap:30px}.solution-grid{grid-template-columns:repeat(2,1fr)}.workflow-intro{position:static}.price-explain{gap:24px}.subscription-grid{gap:34px}.watermark-hero{right:-10vw}
+  .nav-links{display:none}.hero-grid{grid-template-columns:1fr;gap:42px;min-height:auto}.hero-copy{max-width:760px}.hero-copy h1{max-width:720px}.visual-stage{max-width:720px;margin:0 auto;width:100%}.hero-trust{grid-template-columns:1fr 1fr;gap:14px}.trust-line{display:none}.split-heading,.price-explain,.subscription-grid,.workflow-heading{grid-template-columns:1fr}.split-heading,.workflow-heading{gap:30px}.solution-grid,.workflow-cards{grid-template-columns:repeat(2,1fr)}.workflow-heading-copy{justify-self:start}.workflow-cards:before{display:none}.price-explain{gap:24px}.subscription-grid{gap:34px}.watermark-hero{right:-10vw}
 }
 @media(max-width:700px){
-  .landing-container{width:min(100% - 24px,1180px)}.nav-inner{min-height:64px}.nav-actions .nav-login{display:none}.brand-link :deep(.brand-meaning){display:none}.hero-section{padding:58px 0 26px}.hero-grid{gap:30px}.hero-copy h1{font-size:clamp(39px,11.5vw,55px);margin-top:17px}.hero-copy h1 span{margin-top:5px}.hero-lead{font-size:15.5px}.hero-actions{margin-top:24px}.visual-stage{padding:34px 0 30px}.float-card{min-width:178px;padding:9px 10px}.float-card-top{right:-5px}.float-card-bottom{left:-5px}.float-card b{font-size:9px}.signal-chip{display:none}.hero-trust{margin-top:12px;padding:15px 4px;grid-template-columns:1fr 1fr}.hero-trust>div{white-space:normal;font-size:9.5px}.landing-section{padding:68px 0}.solution-grid,.subscription-cards,.price-columns{grid-template-columns:1fr}.solution-card{min-height:210px}.solution-card h3{margin-top:30px}.section-heading h2,.price-explain h2,.subscription-copy h2,.workflow-intro h2,.cta-section h2{font-size:clamp(29px,9vw,40px)}.preview-body{padding:20px}.preview-status strong{font-size:23px}.preview-steps{grid-template-columns:repeat(3,1fr)}.cta-section{padding:54px 0}.cta-shell{padding:27px 22px;flex-direction:column;align-items:flex-start}.cta-actions{justify-content:flex-start;max-width:none;width:100%}.footer-inner{flex-direction:column;align-items:flex-start}.section-watermark{font-size:clamp(90px,20vw,120px)}
+  .landing-container{width:min(100% - 24px,1180px)}.nav-inner{min-height:64px}.nav-actions .nav-login{display:none}.brand-link :deep(.brand-meaning){display:none}.hero-section{padding:58px 0 26px}.hero-grid{gap:30px}.hero-copy h1{font-size:clamp(39px,11.5vw,55px);margin-top:17px}.hero-copy h1 span{margin-top:5px}.hero-lead{font-size:15.5px}.hero-actions{margin-top:24px}.visual-stage{padding:34px 0 30px}.float-card{min-width:178px;padding:9px 10px}.float-card-top{right:-5px}.float-card-bottom{left:-5px}.float-card b{font-size:9px}.signal-chip{display:none}.hero-trust{margin-top:12px;padding:15px 4px;grid-template-columns:1fr 1fr}.hero-trust>div{white-space:normal;font-size:9.5px}.landing-section{padding:68px 0}.solution-grid,.subscription-cards,.price-columns,.workflow-cards{grid-template-columns:1fr}.solution-card{min-height:220px}.solution-card h3{margin-top:22px}.workflow-card{min-height:215px}.section-heading h2,.price-explain h2,.subscription-copy h2,.workflow-heading h2,.cta-section h2{font-size:clamp(29px,9vw,40px)}.preview-body{padding:20px}.preview-status strong{font-size:23px}.preview-steps{grid-template-columns:repeat(3,1fr)}.cta-section{padding:54px 0}.cta-shell{padding:27px 22px;flex-direction:column;align-items:flex-start}.cta-actions{justify-content:flex-start;max-width:none;width:100%}.footer-inner{flex-direction:column;align-items:flex-start}.section-watermark{font-size:clamp(90px,20vw,120px)}
 }
 @media(max-width:480px){
-  .hero-actions .q-btn,.cta-actions .q-btn{width:100%;flex:auto}.hero-points{display:grid;grid-template-columns:1fr 1fr}.hero-points span:last-child{grid-column:1/-1}.preview-body{padding:17px}.preview-steps{grid-template-columns:1fr 1fr}.float-card{display:none}.hero-trust{grid-template-columns:1fr}.workflow-row{grid-template-columns:42px 1fr}.workflow-arrow{display:none}.footer-links{align-items:flex-start}.customer-preview{border-radius:20px}.section-watermark{opacity:.7}
+  .hero-actions .q-btn,.cta-actions .q-btn{width:100%;flex:auto}.hero-points{display:grid;grid-template-columns:1fr 1fr}.hero-points span:last-child{grid-column:1/-1}.preview-body{padding:17px}.preview-steps{grid-template-columns:1fr 1fr}.float-card{display:none}.hero-trust{grid-template-columns:1fr}.footer-links{align-items:flex-start}.customer-preview{border-radius:20px}.section-watermark{opacity:.7}
 }
 </style>

@@ -42,7 +42,7 @@ onMounted(async () => {
       title="Controla el trabajo, no el negocio del cliente."
       subtitle="VITI recibe solicitudes, organiza el desarrollo y mantiene centralizada la información de los sistemas que entregas."
     >
-      <q-btn class="viti-btn viti-btn--ghost" outline no-caps icon="open_in_new" label="Formulario público" to="/solicitud" />
+      <q-btn class="viti-btn viti-btn--ghost" outline no-caps icon="open_in_new" label="Solicitud pública" to="/solicitud" />
       <q-btn class="viti-btn viti-btn--primary" unelevated no-caps icon="inbox" label="Revisar solicitudes" to="/solicitudes" />
     </PageHeader>
 

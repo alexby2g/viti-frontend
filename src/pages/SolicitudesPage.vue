@@ -60,7 +60,7 @@ onMounted(load)
       title="Decide qué trabajos acepta VITI"
       subtitle="Cada solicitud es una oportunidad. Revisa la necesidad, acepta o rechaza y convierte únicamente lo aprobado en trabajo."
     >
-      <q-btn class="viti-btn viti-btn--ghost" outline color="orange" icon="open_in_new" label="Formulario público" no-caps @click="openPublic"/>
+      <q-btn class="viti-btn viti-btn--ghost" outline color="orange" icon="open_in_new" label="Solicitud pública" no-caps @click="openPublic"/>
     </PageHeader>
 
     <section class="status-tabs q-mb-lg">
