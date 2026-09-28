@@ -9,7 +9,10 @@ import { formatDate, formatDateTime } from '../utils/date'
 
 const route=useRoute(),$q=useQuasar(),item=ref(null),loading=ref(true),advanceDialog=ref(false),editDialog=ref(false),developmentDialog=ref(false)
 const advance=reactive({fase:'desarrollo',area:'general',titulo:'',descripcion:'',progreso:0,visible_cliente:true})
-const advanceFile=ref(null)
+const advanceFiles=ref([])
+const advanceInput=ref(null)
+const uploadingAdvance=ref(false)
+const uploadStatus=reactive({total:0,uploaded:0})
 const form=reactive({})
 const development=reactive({repositorios:[],miembros:[],ambientes:[],dominios:[]})
 
@@ -64,13 +67,88 @@ function removeEnvironment(index){development.ambientes.splice(index,1)}
 function addDomain(){development.dominios.push(blankDomain())}
 function removeDomain(index){development.dominios.splice(index,1)}
 
-function openAdvance(){Object.assign(advance,{fase:item.value.fase,area:'general',titulo:'',descripcion:'',progreso:item.value.progreso,visible_cliente:true});advanceFile.value=null;advanceDialog.value=true}
+function clearAdvanceFiles(){
+  advanceFiles.value.forEach(entry=>{if(entry.preview) URL.revokeObjectURL(entry.preview)})
+  advanceFiles.value=[]
+  if(advanceInput.value) advanceInput.value.value=''
+}
+
+function openAdvance(){
+  Object.assign(advance,{fase:item.value.fase,area:'general',titulo:'',descripcion:'',progreso:item.value.progreso,visible_cliente:true})
+  clearAdvanceFiles()
+  Object.assign(uploadStatus,{total:0,uploaded:0})
+  advanceDialog.value=true
+}
+
+function openAdvancePicker(){
+  advanceInput.value?.click()
+}
+
+function onAdvanceFilesSelected(event){
+  const selected=Array.from(event.target.files||[]).filter(file=>file.type.startsWith('image/'))
+  const oversized=selected.filter(file=>file.size>10*1024*1024)
+  const incoming=selected.filter(file=>file.size<=10*1024*1024)
+  if(oversized.length) $q.notify({type:'warning',message:`${oversized.length} foto${oversized.length===1?'':'s'} supera${oversized.length===1?'':'n'} el máximo de 10 MB y no se agregó.`})
+  const known=new Set(advanceFiles.value.map(entry=>`${entry.file.name}:${entry.file.size}:${entry.file.lastModified}`))
+  incoming.forEach(file=>{
+    const key=`${file.name}:${file.size}:${file.lastModified}`
+    if(!known.has(key)){
+      advanceFiles.value.push({file,preview:URL.createObjectURL(file)})
+      known.add(key)
+    }
+  })
+  event.target.value=''
+}
+
+function removeAdvanceFile(index){
+  const [removed]=advanceFiles.value.splice(index,1)
+  if(removed?.preview) URL.revokeObjectURL(removed.preview)
+}
+
+function formatFileSize(bytes){
+  if(!bytes) return '0 KB'
+  if(bytes<1024*1024) return `${Math.max(1,Math.round(bytes/1024))} KB`
+  return `${(bytes/(1024*1024)).toFixed(1)} MB`
+}
+
 async function addAdvance(){
+  if(uploadingAdvance.value) return
+  uploadingAdvance.value=true
   try{
     const {data}=await api.post(`/proyectos/${item.value.id}/avances`,advance)
-    if(advanceFile.value){const fd=new FormData();fd.append('tipo','avance');fd.append('id',data.data.id);fd.append('categoria','avance');fd.append('archivo',advanceFile.value);fd.append('descripcion',advance.titulo);await api.post('/archivos',fd)}
-    $q.notify({type:'positive',message:'Avance registrado.'});advanceDialog.value=false;load()
-  }catch(e){$q.notify({type:'negative',message:e.response?.data?.message||'No se pudo registrar.'})}
+    const files=advanceFiles.value.map(entry=>entry.file)
+    Object.assign(uploadStatus,{total:files.length,uploaded:0})
+    const failed=[]
+
+    for(const file of files){
+      try{
+        const fd=new FormData()
+        fd.append('tipo','avance')
+        fd.append('id',data.data.id)
+        fd.append('categoria','avance')
+        fd.append('archivo',file)
+        fd.append('descripcion',advance.titulo)
+        await api.post('/archivos',fd)
+        uploadStatus.uploaded+=1
+      }catch{
+        failed.push(file.name)
+      }
+    }
+
+    if(failed.length){
+      $q.notify({type:'warning',message:`Avance registrado. ${uploadStatus.uploaded} de ${uploadStatus.total} fotos se subieron correctamente.`})
+    }else{
+      const suffix=files.length?` · ${files.length} foto${files.length===1?'':'s'} subida${files.length===1?'':'s'}`:''
+      $q.notify({type:'positive',message:`Avance registrado${suffix}.`})
+    }
+    advanceDialog.value=false
+    clearAdvanceFiles()
+    await load()
+  }catch(e){
+    $q.notify({type:'negative',message:e.response?.data?.message||'No se pudo registrar.'})
+  }finally{
+    uploadingAdvance.value=false
+  }
 }
 
 onMounted(load)
@@ -113,7 +191,10 @@ onMounted(load)
             <q-timeline-entry v-for="a in item.avances" :key="a.id" :title="a.titulo" :subtitle="`${a.fase} · ${a.area||'general'} · ${formatDateTime(a.created_at)}`" :icon="a.visible_cliente?'visibility':'visibility_off'">
               <div style="white-space:pre-wrap">{{a.descripcion}}</div>
               <q-badge v-if="a.progreso!==null" outline color="primary" class="q-mt-sm">{{a.progreso}}%</q-badge>
-              <div v-if="a.archivos?.length" class="q-mt-sm"><q-chip v-for="f in a.archivos" :key="f.id" clickable icon="attach_file" @click="downloadFile(`/archivos/${f.id}/descargar`,f.nombre_original)">{{f.nombre_original}}</q-chip></div>
+              <div v-if="a.archivos?.length" class="q-mt-sm advance-attachments">
+  <div class="attachments-summary"><q-icon name="photo_library"/> {{a.archivos.length}} foto{{a.archivos.length===1?'':'s'}} subida{{a.archivos.length===1?'':'s'}}</div>
+  <div class="row q-gutter-xs q-mt-xs"><q-chip v-for="f in a.archivos" :key="f.id" clickable icon="image" @click="downloadFile(`/archivos/${f.id}/descargar`,f.nombre_original)">{{f.nombre_original}}</q-chip></div>
+</div>
             </q-timeline-entry>
             <div v-if="!item.avances?.length" class="empty-state">No hay avances adicionales.</div>
           </q-timeline>
@@ -139,8 +220,48 @@ onMounted(load)
   <q-dialog v-model="advanceDialog">
     <q-card style="width:680px;max-width:94vw">
       <q-card-section><div class="section-label">Seguimiento</div><div class="text-h5 text-weight-bold">Registrar avance</div></q-card-section>
-      <q-card-section><div class="row q-col-gutter-md"><div class="col-12 col-sm-4"><q-select v-model="advance.fase" outlined :options="['levantamiento','analisis','diseno','desarrollo','beta','pruebas','ajustes','implementacion','finalizado','mantenimiento']" label="Fase"/></div><div class="col-12 col-sm-4"><q-select v-model="advance.area" outlined :options="['general','analisis','diseno','frontend','backend','movil','infraestructura','qa']" label="Área"/></div><div class="col-12 col-sm-4"><q-input v-model.number="advance.progreso" outlined type="number" min="0" max="100" label="Progreso %"/></div><div class="col-12"><q-input v-model="advance.titulo" outlined label="Título del avance *"/></div><div class="col-12"><q-input v-model="advance.descripcion" outlined type="textarea" label="Descripción"/></div><div class="col-12"><q-file v-model="advanceFile" outlined accept="image/*,.pdf,.doc,.docx,.zip" label="Anexo del avance (opcional)"><template #prepend><q-icon name="attach_file"/></template></q-file></div><div class="col-12"><q-toggle v-model="advance.visible_cliente" label="Este avance puede mostrarse al cliente"/></div></div></q-card-section>
-      <q-card-actions align="right"><q-btn flat label="Cancelar" v-close-popup/><q-btn color="primary" unelevated label="Guardar avance" no-caps @click="addAdvance"/></q-card-actions>
+      <q-card-section><div class="row q-col-gutter-md"><div class="col-12 col-sm-4"><q-select v-model="advance.fase" outlined :options="['levantamiento','analisis','diseno','desarrollo','beta','pruebas','ajustes','implementacion','finalizado','mantenimiento']" label="Fase"/></div><div class="col-12 col-sm-4"><q-select v-model="advance.area" outlined :options="['general','analisis','diseno','frontend','backend','movil','infraestructura','qa']" label="Área"/></div><div class="col-12 col-sm-4"><q-input v-model.number="advance.progreso" outlined type="number" min="0" max="100" label="Progreso %"/></div><div class="col-12"><q-input v-model="advance.titulo" outlined label="Título del avance *"/></div><div class="col-12"><q-input v-model="advance.descripcion" outlined type="textarea" label="Descripción"/></div><div class="col-12">
+  <input ref="advanceInput" class="native-file-input" type="file" accept="image/*" multiple @change="onAdvanceFilesSelected">
+  <div class="advance-upload-box" :class="{'has-files':advanceFiles.length}" @click="openAdvancePicker">
+    <div class="upload-box-icon"><q-icon name="add_photo_alternate"/></div>
+    <div class="upload-box-copy">
+      <div class="upload-title">{{advanceFiles.length ? 'Agregar más fotos' : 'Agregar fotos del avance'}}</div>
+      <div class="upload-subtitle">Una o varias fotos · JPG, PNG o WEBP · máximo 10 MB cada una.</div>
+    </div>
+    <q-badge v-if="advanceFiles.length" class="upload-count">{{advanceFiles.length}} seleccionada{{advanceFiles.length===1?'':'s'}}</q-badge>
+    <q-icon name="chevron_right" class="upload-arrow"/>
+  </div>
+
+  <div v-if="advanceFiles.length" class="selected-files">
+    <div class="selected-files-head">
+      <div>
+        <b>Fotos listas para subir</b>
+        <span>{{advanceFiles.length}} archivo{{advanceFiles.length===1?'':'s'}} seleccionado{{advanceFiles.length===1?'':'s'}}</span>
+      </div>
+      <q-btn flat dense no-caps color="grey-5" label="Quitar todas" @click.stop="clearAdvanceFiles"/>
+    </div>
+    <div class="photo-grid">
+      <div v-for="(entry,index) in advanceFiles" :key="`${entry.file.name}-${entry.file.lastModified}`" class="photo-item">
+        <img :src="entry.preview" :alt="entry.file.name">
+        <div class="photo-meta">
+          <span class="photo-name">{{entry.file.name}}</span>
+          <small>{{formatFileSize(entry.file.size)}}</small>
+        </div>
+        <q-btn round dense flat icon="close" class="photo-remove" @click.stop="removeAdvanceFile(index)"/>
+      </div>
+    </div>
+  </div>
+
+  <div v-if="uploadingAdvance && uploadStatus.total" class="upload-progress">
+    <div class="row items-center justify-between q-mb-xs">
+      <span>Subiendo fotos</span>
+      <b>{{uploadStatus.uploaded}} / {{uploadStatus.total}}</b>
+    </div>
+    <q-linear-progress rounded size="7px" :value="uploadStatus.total ? uploadStatus.uploaded/uploadStatus.total : 0" color="primary" track-color="blue-grey-9"/>
+  </div>
+</div>
+<div class="col-12"><q-toggle v-model="advance.visible_cliente" label="Este avance puede mostrarse al cliente"/></div></div></q-card-section>
+      <q-card-actions align="right"><q-btn flat label="Cancelar" :disable="uploadingAdvance" v-close-popup/><q-btn color="primary" unelevated label="Guardar avance" no-caps :loading="uploadingAdvance" @click="addAdvance"/></q-card-actions>
     </q-card>
   </q-dialog>
 
@@ -251,4 +372,17 @@ onMounted(load)
 <style scoped>
 .dev-block{background:#081a2c;border:1px solid rgba(68,103,137,.28)}
 .q-dialog :deep(.q-card){background:#0a1d31;color:#edf4fb}.q-dialog :deep(.q-card.q-pa-md),.q-dialog :deep(.q-card[bordered]){border-color:rgba(68,103,137,.28)}
+
+.native-file-input{position:absolute;width:1px;height:1px;opacity:0;pointer-events:none}
+.advance-upload-box{display:flex;align-items:center;gap:14px;padding:15px 16px;border:1px dashed rgba(112,159,204,.34);border-radius:14px;background:linear-gradient(135deg,rgba(21,57,94,.58),rgba(10,34,59,.72));cursor:pointer;transition:.2s ease}
+.advance-upload-box:hover,.advance-upload-box.has-files{border-color:rgba(244,149,63,.58);background:linear-gradient(135deg,rgba(27,67,108,.7),rgba(11,39,67,.82))}
+.upload-box-icon{width:46px;height:46px;flex:0 0 46px;display:grid;place-items:center;border-radius:13px;background:rgba(56,127,214,.14);border:1px solid rgba(83,150,226,.18);color:#80b8f4;font-size:24px}
+.upload-box-copy{min-width:0;flex:1}.upload-title{font-weight:800;color:#edf5fc}.upload-subtitle{font-size:12px;color:#8fa8be;margin-top:3px}.upload-count{background:#f49a45!important;color:#081522!important;font-weight:800;padding:6px 9px;border-radius:999px}.upload-arrow{color:#6e8da8;font-size:22px}
+.selected-files{margin-top:12px;padding:13px;border:1px solid rgba(78,119,157,.24);border-radius:14px;background:rgba(6,24,42,.52)}
+.selected-files-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:10px}.selected-files-head b{display:block;font-size:13px}.selected-files-head span{display:block;color:#829ab0;font-size:11px;margin-top:2px}
+.photo-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:9px}.photo-item{position:relative;min-width:0;padding:7px;border:1px solid rgba(78,119,157,.22);border-radius:12px;background:#0a2139}.photo-item img{display:block;width:100%;height:92px;object-fit:cover;border-radius:8px;background:#071524}.photo-meta{padding:7px 2px 1px}.photo-name{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px;color:#dce9f3}.photo-meta small{display:block;margin-top:2px;color:#748da4}.photo-remove{position:absolute;right:10px;top:10px;background:rgba(5,16,29,.82)!important;color:#fff!important;backdrop-filter:blur(8px)}
+.upload-progress{margin-top:12px;padding:11px 13px;border-radius:12px;background:rgba(39,104,184,.09);border:1px solid rgba(70,127,193,.18);font-size:12px;color:#9eb7ca}.upload-progress b{color:#eaf4fc}
+.attachments-summary{display:inline-flex;align-items:center;gap:6px;color:#82add5;font-size:11px;font-weight:700}
+@media(max-width:600px){.photo-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.upload-count{display:none}}
+
 </style>
