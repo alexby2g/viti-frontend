@@ -83,7 +83,7 @@ function validateContact() {
   if (!/^\d{7,15}$/.test(form.celular)) return warn('El celular debe tener entre 7 y 15 dígitos.'), false
   if (!form.whatsapp_same && !/^\d{7,15}$/.test(form.whatsapp)) return warn('Escribe un WhatsApp válido o marca que es el mismo celular.'), false
   if (form.business_whatsapp_different && !/^\d{7,15}$/.test(form.whatsapp_business)) return warn('Escribe un WhatsApp del negocio válido.'), false
-  if (!/.+@.+\..+/.test(form.correo.trim())) return warn('Escribe un correo electrónico válido.'), false
+  if (form.correo.trim() && !/.+@.+\..+/.test(form.correo.trim())) return warn('El correo opcional no tiene un formato válido.'), false
   return true
 }
 function next() {
@@ -206,7 +206,6 @@ onMounted(load)
             <div class="form-grid">
               <q-input v-model="form.nombre" outlined class="span-2" label="Nombre completo *" autocomplete="name" />
               <q-input :model-value="form.celular" outlined label="Celular *" inputmode="numeric" maxlength="15" autocomplete="tel" @update:model-value="v=>form.celular=normalizePhone(v)" />
-              <q-input v-model="form.correo" outlined type="email" label="Correo electrónico *" autocomplete="email" />
               <div class="span-2 toggle-card">
                 <q-toggle v-model="form.whatsapp_same" color="orange" label="Mi celular también tiene WhatsApp" />
                 <q-input v-if="!form.whatsapp_same" :model-value="form.whatsapp" outlined label="Número de WhatsApp *" inputmode="numeric" maxlength="15" @update:model-value="v=>form.whatsapp=normalizePhone(v)" />
@@ -237,10 +236,10 @@ onMounted(load)
             </div>
             <div class="summary-grid q-mt-lg">
               <article><small>NECESIDAD</small><b>{{ form.titulo_sistema }}</b><span>{{ form.empresa_nombre }}</span></article>
-              <article><small>CONTACTO</small><b>{{ form.nombre }}</b><span>{{ form.celular }} · {{ form.correo }}</span></article>
+              <article><small>CONTACTO</small><b>{{ form.nombre }}</b><span>{{ form.celular }}{{ form.correo ? ` · ${form.correo}` : '' }}</span></article>
             </div>
             <q-checkbox v-model="form.terminos_aceptados" color="orange" class="confirm-check"><span>Confirmo que estos datos son correctos y autorizo a VITI a contactarme para evaluar esta solicitud.</span></q-checkbox>
-            <div class="privacy-note"><q-icon name="lock" /> Enviar una solicitud no genera cobros. También puedes crear tu cuenta antes o después; VITI vinculará todo con el mismo correo.</div>
+            <div class="privacy-note"><q-icon name="lock" /> Enviar una solicitud no genera cobros. También puedes crear tu cuenta antes o después; VITI vinculará tus solicitudes usando tu celular.</div>
           </q-card-section>
 
           <q-separator />
@@ -258,7 +257,7 @@ onMounted(load)
         <div class="eyebrow">SOLICITUD RECIBIDA</div>
         <h1>Listo. VITI ya tiene tu solicitud.</h1>
         <p v-if="result?.cuenta_existente">Ya tienes una cuenta VITI. Inicia sesión para consultar tus solicitudes y seguir el proceso desde tu espacio.</p>
-        <p v-else>Puedes crear tu cuenta ahora o esperar la revisión. Si usas el mismo correo, VITI vinculará esta solicitud automáticamente.</p>
+        <p v-else>Puedes crear tu cuenta ahora o esperar la revisión. Regístrate con el mismo celular y VITI vinculará tu solicitud automáticamente.</p>
         <div class="request-code"><small>CÓDIGO DE SOLICITUD</small><strong>{{ result?.codigo }}</strong></div>
         <div class="success-flow"><span class="done">Solicitud recibida</span><q-icon name="east"/><span>Revisión</span><q-icon name="east"/><span>Propuesta</span></div>
         <div class="success-actions">

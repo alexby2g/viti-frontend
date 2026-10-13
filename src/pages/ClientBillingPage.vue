@@ -116,7 +116,7 @@ onMounted(load)
               <q-card v-if="project.siguiente_pago?.monto>0" flat bordered class="next-payment q-mt-lg">
                 <q-card-section class="row items-center q-col-gutter-md">
                   <div class="col"><div class="text-caption text-grey-6">Siguiente pago</div><div class="text-h6 text-weight-bold">{{project.siguiente_pago.tipo==='anticipo'?'Anticipo':'Saldo final'}} · {{money(project.siguiente_pago.monto)}}</div><div class="text-caption">Realiza el pago por QR/transferencia y luego adjunta el comprobante aquí.</div></div>
-                  <div class="col-12 col-sm-auto"><q-btn v-if="project.siguiente_pago.puede_enviar" color="primary" unelevated no-caps icon="upload_file" :label="project.siguiente_pago.tipo==='anticipo'?'Enviar comprobante de anticipo':'Enviar comprobante de saldo'" @click="openPayment(project,'project')"/><q-badge v-else-if="project.siguiente_pago.comprobante_pendiente_id" color="orange" label="Comprobante en revisión"/></div>
+                  <div class="col-12 col-sm-auto"><q-btn v-if="project.siguiente_pago.puede_enviar" color="primary" unelevated no-caps icon="upload_file" :label="project.siguiente_pago.tipo==='anticipo'?'Enviar comprobante de anticipo':'Enviar comprobante de saldo'" @click="openPayment(project,'project')"/><q-badge v-else-if="project.siguiente_pago.comprobante_pendiente_id" color="orange" label="Comprobante en revisión"/><div v-else-if="project.siguiente_pago.motivo_bloqueo" class="text-caption text-blue-grey-3 q-mt-sm"><q-icon name="lock_clock" class="q-mr-xs"/>{{ project.siguiente_pago.motivo_bloqueo }}</div></div>
                 </q-card-section>
               </q-card>
             </q-card-section>

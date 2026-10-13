@@ -36,7 +36,7 @@ async function submit(){
   fieldErrors.clear()
   const valid=await formRef.value?.validate()
   if(valid===false){
-    if(!form.acceso)fieldErrors.set('acceso','Ingresa tu usuario, celular o correo.')
+    if(!form.acceso)fieldErrors.set('acceso','Ingresa tu celular o usuario.')
     if(!form.password)fieldErrors.set('password','Ingresa tu contraseña.')
     fieldErrors.scrollToFirst()
     return
@@ -59,7 +59,8 @@ async function submit(){
 }
 
 onMounted(async()=>{
-  if (typeof route.query.correo === 'string' && route.query.correo.trim()) form.acceso = route.query.correo.trim()
+  if (typeof route.query.celular === 'string' && route.query.celular.trim()) form.acceso = route.query.celular.trim()
+  else if (typeof route.query.correo === 'string' && route.query.correo.trim()) form.acceso = route.query.correo.trim()
   await warmBackend().catch(()=>{})
   const google=String(route.query.google||'')
   if(google==='success'){
@@ -111,7 +112,7 @@ onMounted(async()=>{
 
         <q-form ref="formRef" class="login-form" @submit="submit">
           <div data-error-field="acceso" class="field-block">
-            <q-input v-model="form.acceso" outlined label="Usuario, celular o correo" hint="Usa el dato que recuerdes de tu cuenta." autocomplete="username" :error="fieldErrors.has('acceso')" :error-message="fieldErrors.message('acceso')" :rules="[v=>!!v||'Ingresa tu usuario, celular o correo.']" @update:model-value="credentialsChanged('acceso')">
+            <q-input v-model="form.acceso" outlined label="Celular o usuario" hint="Ingresa tu celular. Las cuentas antiguas también pueden usar su usuario o correo." autocomplete="username" :error="fieldErrors.has('acceso')" :error-message="fieldErrors.message('acceso')" :rules="[v=>!!v||'Ingresa tu celular o usuario.']" @update:model-value="credentialsChanged('acceso')">
               <template #prepend><q-icon name="person_outline"/></template>
             </q-input>
           </div>

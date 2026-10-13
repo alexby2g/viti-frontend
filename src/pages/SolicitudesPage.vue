@@ -22,6 +22,10 @@ const states = [
   { label:'En trabajo', value:'convertida', icon:'account_tree' },
 ]
 
+const pendingCount = computed(() => rows.value.filter(r => r.estado === 'en_revision').length)
+const activeCount = computed(() => rows.value.filter(r => r.estado === 'convertida').length)
+const approvedCount = computed(() => rows.value.filter(r => r.estado === 'aprobada').length)
+
 const filteredRows = computed(() => {
   const term = search.value.trim().toLocaleLowerCase('es')
   return rows.value.filter(row => {
@@ -57,12 +61,17 @@ onMounted(load)
   <q-page class="viti-page requests-page">
     <PageHeader
       eyebrow="Solicitudes"
-      title="Decide qué trabajos acepta VITI"
-      subtitle="Cada solicitud es una oportunidad. Revisa la necesidad, acepta o rechaza y convierte únicamente lo aprobado en trabajo."
+      title="Centro de solicitudes"
+      subtitle="Primero recibimos la necesidad; después analizamos, acordamos el alcance y habilitamos el anticipo para iniciar."
     >
       <q-btn class="viti-btn viti-btn--ghost" outline color="orange" icon="open_in_new" label="Solicitud pública" no-caps @click="openPublic"/>
     </PageHeader>
 
+    <div class="flow-guide q-mb-lg">
+      <div class="flow-heading"><q-icon name="route" color="orange" size="24px"/><div><strong>Flujo comercial VITI</strong><small>Una sola ruta desde la idea hasta la entrega del proyecto</small></div></div>
+      <div class="flow-steps"><span><b>1</b> Solicitud</span><span><b>2</b> Análisis</span><span><b>3</b> Propuesta y acuerdo</span><span><b>4</b> Anticipo</span><span><b>5</b> Desarrollo</span><span><b>6</b> Entrega y saldo</span></div>
+      <div class="flow-kpis"><div><strong>{{ pendingCount }}</strong><small>Por revisar</small></div><div><strong>{{ approvedCount }}</strong><small>Aprobadas</small></div><div><strong>{{ activeCount }}</strong><small>En trabajo</small></div></div>
+    </div>
     <section class="status-tabs q-mb-lg">
       <button v-for="state in states" :key="state.value" type="button" :class="['status-tab',{active:statusFilter===state.value}]" @click="statusFilter=state.value">
         <q-icon :name="state.icon"/><span>{{state.label}}</span><b>{{countState(state.value)}}</b>
@@ -118,6 +127,8 @@ onMounted(load)
 </template>
 
 <style scoped>
+.flow-guide{border:1px solid rgba(73,126,185,.35);background:linear-gradient(115deg,rgba(14,47,80,.95),rgba(7,27,49,.88));border-radius:20px;padding:20px;display:grid;gap:17px}.flow-heading{display:flex;gap:10px;align-items:center}.flow-heading div{display:flex;flex-direction:column;gap:3px}.flow-heading strong{font-size:16px;color:#f1f7fe}.flow-heading small,.flow-kpis small{font-size:11px;color:#a6bacd}.flow-steps{display:flex;gap:10px;flex-wrap:wrap}.flow-steps span{display:flex;align-items:center;gap:7px;font-size:11px;color:#d4e4f3}.flow-steps b{width:23px;height:23px;display:grid;place-items:center;border-radius:8px;background:rgba(44,125,223,.18);color:#82bbff}.flow-kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:9px}.flow-kpis>div{border:1px solid rgba(103,145,189,.21);background:rgba(3,17,34,.38);border-radius:12px;padding:11px 14px;display:flex;flex-direction:column}.flow-kpis strong{font-size:23px;color:#fff}@media(max-width:560px){.flow-kpis{grid-template-columns:repeat(3,1fr)}.flow-steps span{min-width:42%}}
+
 .requests-page{max-width:1280px;padding-top:34px}.status-tabs{display:grid;grid-template-columns:repeat(6,1fr);gap:8px}.status-tab{font:inherit;color:#9fb3c6;border:1px solid rgba(82,115,145,.22);background:rgba(8,25,45,.48);border-radius:14px;min-height:48px;padding:9px 11px;display:flex;align-items:center;gap:8px;cursor:pointer;transition:.16s}.status-tab:hover,.status-tab.active{border-color:rgba(242,139,48,.42);background:rgba(242,139,48,.07);color:#eaf1f7}.status-tab .q-icon{font-size:18px}.status-tab b{margin-left:auto;font-size:12px;color:#fff}.status-tab.active .q-icon,.status-tab.active b{color:#ff9b42}.request-toolbar{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;align-items:center;padding:12px 14px;border:1px solid var(--viti-border);border-radius:16px;background:rgba(8,25,45,.55)}.requests-list{display:grid;gap:10px}.request-card{display:grid;grid-template-columns:155px minmax(0,1fr) 190px;gap:18px;align-items:center;border:1px solid rgba(78,110,141,.24);background:linear-gradient(180deg,rgba(13,36,61,.78),rgba(8,26,45,.82));border-radius:18px;padding:18px;cursor:pointer;transition:.18s}.request-card:hover{transform:translateY(-1px);border-color:rgba(242,139,48,.4);background:linear-gradient(180deg,rgba(17,46,77,.9),rgba(10,31,53,.92))}.request-code{align-self:stretch;display:flex;flex-direction:column;justify-content:space-between;gap:14px;border-right:1px solid rgba(83,114,143,.18);padding-right:16px}.request-code>span{font-size:11px;font-weight:900;letter-spacing:.08em;color:#89a0b5}.request-code .q-chip{align-self:flex-start;font-size:9px;font-weight:800}.request-main{min-width:0}.request-main h3{font-size:17px;margin:0;color:#f2f6fa;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.request-main p{font-size:11px;color:#92a8bb;line-height:1.55;margin:7px 0 12px;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}.request-meta{display:flex;gap:14px;flex-wrap:wrap}.request-meta span{display:inline-flex;align-items:center;gap:5px;font-size:10px;color:#b7c6d3}.request-meta .q-icon{color:#f28b30}.request-side{align-self:stretch;border-left:1px solid rgba(83,114,143,.18);padding-left:16px;display:flex;flex-direction:column;align-items:flex-end;justify-content:center;text-align:right}.request-side small{font-size:8px;letter-spacing:.11em;color:#718ba1}.request-side>b{font-size:10px;color:#cbd7e1;margin-top:4px}.request-actions{display:flex;gap:2px;margin-top:10px}.requests-empty{min-height:380px;border:1px dashed rgba(121,151,181,.28);border-radius:22px;background:rgba(8,25,45,.42);display:flex;flex-direction:column;align-items:center;justify-content:center}.requests-empty h2{color:#edf4fb;font-size:24px;margin:13px 0 5px}.requests-empty p{max-width:620px;line-height:1.6}.viti-btn{border-radius:12px;min-height:42px}.viti-btn--ghost{background:rgba(255,255,255,.025)!important}
 @media(max-width:1100px){.status-tabs{grid-template-columns:repeat(3,1fr)}.request-card{grid-template-columns:130px minmax(0,1fr) 165px}}
 @media(max-width:760px){.requests-page{padding-top:18px}.status-tabs{display:flex;overflow:auto;padding-bottom:4px}.status-tab{min-width:138px}.request-toolbar{grid-template-columns:1fr}.request-toolbar .q-btn{justify-self:start}.request-card{grid-template-columns:1fr;gap:12px}.request-code{border-right:0;border-bottom:1px solid rgba(83,114,143,.18);padding:0 0 10px;flex-direction:row;align-items:center}.request-side{border-left:0;border-top:1px solid rgba(83,114,143,.18);padding:10px 0 0;align-items:flex-start;text-align:left}.request-actions{align-self:flex-end;margin-top:-28px}.request-main h3{white-space:normal}}

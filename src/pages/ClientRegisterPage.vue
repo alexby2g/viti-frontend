@@ -55,7 +55,7 @@ async function submit() {
         title:'Ya tienes una cuenta VITI',
         message:'No necesitas registrarte otra vez. Inicia sesión y VITI mantendrá tus solicitudes vinculadas.',
         ok:{label:'Iniciar sesión',color:'primary',unelevated:true}, cancel:{label:'Quedarme aquí',flat:true},
-      }).onOk(()=>router.push({path:'/login',query:{correo:form.correo}}))
+      }).onOk(()=>router.push({path:'/login',query:{celular:form.celular}}))
       return
     }
     $q.notify({type:'negative',message})
@@ -88,9 +88,9 @@ onMounted(async()=>{
       <section class="register-copy">
         <div class="eyebrow">CREAR CUENTA VITI</div>
         <h1>{{ fromRequest ? 'Tu solicitud ya está guardada.' : 'Empieza sin elegir un plan.' }}</h1>
-        <p v-if="fromRequest">Crea tu acceso con el mismo correo y VITI vinculará automáticamente la solicitud que acabas de enviar.</p>
+        <p v-if="fromRequest">Crea tu acceso con el mismo celular y VITI vinculará automáticamente tu solicitud.</p>
         <p v-else>Tu cuenta sirve para guardar solicitudes, revisar avances y recibir tus sistemas. Puedes elegir un plan después.</p>
-        <div class="benefits"><div><q-icon name="check_circle"/> Sin plan obligatorio</div><div><q-icon name="check_circle"/> Sin datos técnicos</div><div><q-icon name="check_circle"/> Solicitudes vinculadas por correo</div></div>
+        <div class="benefits"><div><q-icon name="check_circle"/> Sin plan obligatorio</div><div><q-icon name="check_circle"/> Sin datos técnicos</div><div><q-icon name="check_circle"/> Solicitudes vinculadas por celular</div></div>
       </section>
 
       <q-card flat class="register-card"><q-card-section class="q-pa-lg">
@@ -99,8 +99,7 @@ onMounted(async()=>{
         <p>Crear una cuenta no activa un plan ni genera cobros.</p>
         <q-form ref="formRef" @submit="submit">
           <q-input v-model="form.nombre" outlined label="Nombre completo *" autocomplete="name" class="q-mt-lg" :rules="[v=>String(v||'').trim().length>=3||'Escribe tu nombre completo.']"/>
-          <q-input v-if="!googleMode" v-model="form.correo" outlined type="email" label="Correo electrónico *" autocomplete="email" class="q-mt-sm" :rules="[v=>/.+@.+\..+/.test(String(v||''))||'Escribe un correo válido.']"/>
-          <q-input v-else v-model="form.correo" outlined label="Correo electrónico" readonly class="q-mt-sm"/>
+          <q-input v-if="googleMode" v-model="form.correo" outlined label="Correo de Google" readonly class="q-mt-sm"/>
           <q-input :model-value="form.celular" outlined label="Celular *" inputmode="numeric" autocomplete="tel" class="q-mt-sm" :rules="[v=>validPhone(v)]" @update:model-value="v=>normalize('celular',v)"/>
 
           <div class="contact-option q-mt-sm">
@@ -118,7 +117,7 @@ onMounted(async()=>{
           </template>
           <q-btn type="submit" color="primary" unelevated no-caps size="lg" class="full-width register-btn q-mt-lg" :loading="auth.loading" label="Crear mi cuenta VITI" icon-right="arrow_forward"/>
         </q-form>
-        <div class="account-note"><q-icon name="info"/> Si ya enviaste una solicitud con este correo, VITI la vinculará; no tienes que repetirla.</div>
+        <div class="account-note"><q-icon name="info"/> Si enviaste una solicitud con este celular, VITI la vinculará; no tienes que repetirla.</div>
       </q-card-section></q-card>
     </main>
     <footer class="register-footer">VITI · Plataforma de sistemas y proyectos <span>· Tecnología desarrollada por AGR Studio</span></footer>

@@ -200,17 +200,18 @@ onMounted(load)
         </q-card-section>
 
         <q-card-section v-else-if="step===3" class="step-section">
-          <div class="step-chip">03 · PROPUESTA VITI</div>
+          <div class="step-chip">03 · PREFERENCIAS INICIALES</div>
           <h2>Ahora VITI te muestra opciones.</h2>
           <div class="proposal-card q-mt-lg">
-            <div class="proposal-label">Lo que entendimos</div>
+            <div class="proposal-label">Resumen de tu necesidad</div>
             <div class="proposal-title">{{ form.titulo_sistema || 'Tu sistema' }}</div>
             <p>{{ form.resumen || 'Tu idea todavía no tiene una descripción.' }}</p>
             <div class="proposal-modules">
               <q-chip v-for="item in ['Catálogo','Clientes','Operación','Pedidos','Seguimiento']" :key="item" color="blue-1" text-color="primary" icon="check">{{ item }}</q-chip>
             </div>
-            <div class="proposal-note"><q-icon name="auto_awesome" color="primary"/> VITI utiliza esta información para preparar la propuesta. Los módulos finales se ajustan después de la evaluación.</div>
+            <div class="proposal-note"><q-icon name="auto_awesome" color="primary"/> Esta es una orientación inicial, no un presupuesto definitivo. VITI analizará tu solicitud y confirmará el alcance, precio y pagos antes de comenzar.</div>
           </div>
+          <q-banner rounded class="bg-blue-1 text-primary q-mt-md"><q-icon name="verified_user" class="q-mr-sm"/>No pagarás nada por enviar la solicitud. El anticipo se habilita solo después de la revisión y del acuerdo.</q-banner>
           <div class="row q-col-gutter-lg q-mt-lg">
             <div v-for="plan in plans" :key="plan.id" class="col-12 col-md-6 col-lg-4">
               <q-card flat bordered class="plan-card" :class="{selected:Number(form.plan_viti_id)===Number(plan.id)}" @click="form.plan_viti_id=plan.id">
@@ -233,7 +234,7 @@ onMounted(load)
           </div>
           <q-checkbox v-model="form.declaracion_aceptada" label="Confirmo que la información de esta solicitud es correcta." class="q-mt-lg" />
           <q-input v-model="form.declaracion_nombre" outlined label="Nombre de quien confirma" class="q-mt-sm" />
-          <q-checkbox v-model="form.acuerdo_comercial_aceptado" label="Acepto el acuerdo comercial inicial para que AGR Studio evalúe y prepare la propuesta." class="q-mt-md" />
+          <q-checkbox v-model="form.acuerdo_comercial_aceptado" label="Acepto las condiciones iniciales para la evaluación de mi solicitud. Entiendo que el presupuesto final y cualquier pago se acordarán posteriormente." class="q-mt-md" />
           <q-input v-model="form.acuerdo_comercial_nombre" outlined label="Nombre para el acuerdo" class="q-mt-sm" />
         </q-card-section>
 
