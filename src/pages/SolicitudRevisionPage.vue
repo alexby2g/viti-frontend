@@ -114,7 +114,7 @@ function approveRequest(){
   if(!canApprove.value) return
   $q.dialog({title:'Aceptar trabajo',message:'La solicitud quedará aprobada y VITI preparará el acceso del cliente para continuar con el trabajo. ¿Aceptar?',cancel:true,persistent:true}).onOk(async()=>{
     actionLoading.value=true
-    try{const response=await api.post(`/solicitudes/${item.value.id}/aprobar`);$q.notify({type:response?.data?.data?.acceso?.email_enviado||response?.data?.data?.acceso?.tiene_cuenta?'positive':'warning',message:response?.data?.message||'Trabajo aceptado.',timeout:5000});await load();await loadHistory()}
+    try{const response=await api.post(`/solicitudes/${item.value.id}/aprobar`);$q.notify({type:response?.data?.data?.acceso?.url||response?.data?.data?.acceso?.email_enviado||response?.data?.data?.acceso?.tiene_cuenta?'positive':'warning',message:response?.data?.message||'Trabajo aceptado.',timeout:5000});await load();await loadHistory()}
     catch(error){$q.notify({type:'negative',message:error?.response?.data?.message||'No se pudo aprobar la solicitud.'})}
     finally{actionLoading.value=false}
   })
@@ -127,7 +127,7 @@ async function rejectRequest(){
   catch(error){$q.notify({type:'negative',message:error?.response?.data?.message||'No se pudo rechazar la solicitud.'})}
   finally{actionLoading.value=false}
 }
-async function createInvitation(){inviteLoading.value=true;try{const response=await api.post(`/solicitudes/${item.value.id}/invitacion`,{dias_vigencia:7});$q.notify({type:response?.data?.data?.email_enviado?'positive':'warning',message:response?.data?.message||'Acceso preparado.'});await load()}catch(error){$q.notify({type:'negative',message:error?.response?.data?.message||'No se pudo crear el acceso.'})}finally{inviteLoading.value=false}}
+async function createInvitation(){inviteLoading.value=true;try{const response=await api.post(`/solicitudes/${item.value.id}/invitacion`,{dias_vigencia:7});$q.notify({type:response?.data?.data?.url||response?.data?.data?.email_enviado?'positive':'warning',message:response?.data?.message||'Acceso preparado.'});await load()}catch(error){$q.notify({type:'negative',message:error?.response?.data?.message||'No se pudo crear el acceso.'})}finally{inviteLoading.value=false}}
 async function resendInvitation(){inviteLoading.value=true;try{const response=await api.post(`/solicitudes/${item.value.id}/invitacion/reenviar`);$q.notify({type:response?.data?.data?.email_enviado?'positive':'warning',message:response?.data?.message||'Invitación procesada.'});await load()}catch(error){$q.notify({type:'negative',message:error?.response?.data?.message||'No se pudo reenviar.'})}finally{inviteLoading.value=false}}
 function sendWhatsappInvitation(){
   const raw = String(item.value?.cliente?.whatsapp || item.value?.cliente?.telefono || '').replace(/\D/g, '')
@@ -256,7 +256,7 @@ onMounted(async()=>{await load();await loadHistory();if(route.query.editar==='1'
             <template v-if="waitingForAccount">
               <q-btn v-if="access.url" outline color="orange" no-caps icon="content_copy" label="Copiar acceso" @click="copyInvitation"/>
               <q-btn v-if="access.url && (item.cliente?.whatsapp || item.cliente?.telefono)" flat no-caps color="positive" icon="chat" label="Enviar por WhatsApp" @click="sendWhatsappInvitation" />
-              <q-btn v-if="access.url" flat no-caps icon="forward_to_inbox" label="Reintentar correo" :loading="inviteLoading" @click="resendInvitation"/>
+              <q-btn v-if="access.url && item.cliente?.correo" flat no-caps icon="forward_to_inbox" label="Reintentar correo" :loading="inviteLoading" @click="resendInvitation"/>
               <q-btn v-else color="primary" unelevated no-caps icon="person_add" label="Crear acceso" :loading="inviteLoading" @click="createInvitation"/>
             </template>
             <q-btn v-if="canCreateProject" color="primary" unelevated no-caps icon="rocket_launch" label="Iniciar trabajo" :loading="actionLoading" @click="createProject"/>
