@@ -46,14 +46,14 @@ async function submit() {
         password:form.password, password_confirmation:form.password_confirmation,
       })
     }
-    $q.notify({type:'positive',message:fromRequest.value?'Tu cuenta está lista y tu solicitud quedó vinculada.':'Tu cuenta VITI está lista.'})
+    $q.notify({type:'positive',message:'Tu cuenta VITI está lista.'})
     await router.replace('/mi-cuenta?bienvenida=1')
   } catch(error) {
     const message=errorMessage(error)
     if (/ya (?:existe|tienes) una cuenta|inicia sesi[oó]n/i.test(message)) {
       $q.dialog({
         title:'Ya tienes una cuenta VITI',
-        message:'No necesitas registrarte otra vez. Inicia sesión y VITI mantendrá tus solicitudes vinculadas.',
+        message:'No necesitas registrarte otra vez. Inicia sesión para consultar tus solicitudes y negocios.',
         ok:{label:'Iniciar sesión',color:'primary',unelevated:true}, cancel:{label:'Quedarme aquí',flat:true},
       }).onOk(()=>router.push({path:'/login',query:{celular:form.celular}}))
       return
@@ -88,9 +88,9 @@ onMounted(async()=>{
       <section class="register-copy">
         <div class="eyebrow">CREAR CUENTA VITI</div>
         <h1>{{ fromRequest ? 'Tu solicitud ya está guardada.' : 'Empieza sin elegir un plan.' }}</h1>
-        <p v-if="fromRequest">Crea tu acceso con el mismo celular y VITI vinculará automáticamente tu solicitud.</p>
+        <p v-if="fromRequest">Para proteger tus datos, VITI enviará una invitación de acceso cuando apruebe tu solicitud. Conocer el celular no basta para vincularla.</p>
         <p v-else>Tu cuenta sirve para guardar solicitudes, revisar avances y recibir tus sistemas. Puedes elegir un plan después.</p>
-        <div class="benefits"><div><q-icon name="check_circle"/> Sin plan obligatorio</div><div><q-icon name="check_circle"/> Sin datos técnicos</div><div><q-icon name="check_circle"/> Solicitudes vinculadas por celular</div></div>
+        <div class="benefits"><div><q-icon name="check_circle"/> Sin plan obligatorio</div><div><q-icon name="check_circle"/> Sin datos técnicos</div><div><q-icon name="check_circle"/> Vinculación mediante acceso verificado</div></div>
       </section>
 
       <q-card flat class="register-card"><q-card-section class="q-pa-lg">
@@ -117,7 +117,7 @@ onMounted(async()=>{
           </template>
           <q-btn type="submit" color="primary" unelevated no-caps size="lg" class="full-width register-btn q-mt-lg" :loading="auth.loading" label="Crear mi cuenta VITI" icon-right="arrow_forward"/>
         </q-form>
-        <div class="account-note"><q-icon name="info"/> Si enviaste una solicitud con este celular, VITI la vinculará; no tienes que repetirla.</div>
+        <div class="account-note"><q-icon name="info"/> Si ya enviaste una solicitud, espera la invitación de VITI para acceder de forma segura. No reclamamos solicitudes solo por coincidir el celular.</div>
       </q-card-section></q-card>
     </main>
     <footer class="register-footer">VITI · Plataforma de sistemas y proyectos <span>· Tecnología desarrollada por AGR Studio</span></footer>
