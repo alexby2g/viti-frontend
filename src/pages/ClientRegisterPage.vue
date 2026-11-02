@@ -40,7 +40,7 @@ async function submit() {
       })
     } else {
       await auth.createClientAccount({
-        nombre:form.nombre.trim(), correo:form.correo.trim().toLowerCase(), celular:form.celular,
+        nombre:form.nombre.trim(), celular:form.celular,
         whatsapp:effectiveWhatsapp.value||null,
         whatsapp_business:form.business_whatsapp_different?form.whatsapp_business:null,
         password:form.password, password_confirmation:form.password_confirmation,
