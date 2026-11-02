@@ -4,7 +4,8 @@ const login=read('src/pages/LoginPage.vue'),register=read('src/pages/ClientRegis
 // Acceso sin selector de rol y con registro/demo independientes.
 has(login,'VITI reconocerá automáticamente los permisos','Login automático');not(login,'q-select v-model="form.rol"','Login sin rol');has(login,'to="/registro"','Login registro');has(login,'to="/demo"','Login demo');
 // Registro breve y moderno.
-for(const term of ['Nombre completo *','Correo electrónico *','Celular *','Mi celular también tiene WhatsApp','Mi negocio atiende desde otro WhatsApp','Contraseña *','Confirmar contraseña *']) has(register,term,'Registro');
+has(register,'Correo de Google','El correo solo se muestra tras la verificación con Google');
+for(const term of ['Nombre completo *','Celular *','Mi celular también tiene WhatsApp','Mi negocio atiende desde otro WhatsApp','Contraseña *','Confirmar contraseña *']) has(register,term,'Registro');
 for(const term of ['CI / documento','Expedido','Dirección / zona','Rol *','Plan *']) not(register,term,'Registro breve');
 // Solicitud inicial solo comercial.
 for(const term of ['Celular *','Mi celular también tiene WhatsApp','Mi negocio atiende desde otro WhatsApp','Negocio, institución o proyecto *','¿Qué sistema necesitas? *','¿Qué quieres mejorar o resolver? *']) has(request,term,'Solicitud');
