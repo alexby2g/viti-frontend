@@ -26,7 +26,6 @@ const form = reactive({
   whatsapp: '',
   business_whatsapp_different: false,
   whatsapp_business: '',
-  correo: '',
   ciudad: '',
   plan_codigo: '',
   frecuencia_suscripcion_preferida: 'mensual',
@@ -72,8 +71,6 @@ function validateContact() {
   if (!/^\d{7,15}$/.test(form.celular)) return warn('El celular debe tener entre 7 y 15 dígitos.'), false
   if (!form.whatsapp_same && !/^\d{7,15}$/.test(form.whatsapp)) return warn('Escribe un WhatsApp válido o marca que es el mismo celular.'), false
   if (form.business_whatsapp_different && !/^\d{7,15}$/.test(form.whatsapp_business)) return warn('Escribe un WhatsApp del negocio válido.'), false
-  if (!form.correo.trim()) return warn('Escribe tu correo electrónico para recibir el seguimiento de la solicitud.'), false
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.correo.trim())) return warn('Escribe un correo electrónico válido.'), false
   return true
 }
 function next() {
@@ -86,7 +83,7 @@ function buildPayload() {
   const today = new Date().toISOString().slice(0, 10)
   return {
     nombre: form.nombre.trim(),
-    correo: form.correo.trim().toLowerCase(),
+    correo: null,
     telefono: form.celular,
     whatsapp: effectiveWhatsapp.value || form.celular,
     whatsapp_business: form.business_whatsapp_different ? form.whatsapp_business : null,
@@ -196,7 +193,6 @@ onMounted(load)
             <div class="form-grid">
               <q-input v-model="form.nombre" outlined class="span-2" label="Nombre completo *" autocomplete="name" />
               <q-input :model-value="form.celular" outlined label="Celular *" inputmode="numeric" maxlength="15" autocomplete="tel" @update:model-value="v=>form.celular=normalizePhone(v)" />
-              <q-input v-model="form.correo" outlined class="span-2" label="Correo electrónico *" type="email" autocomplete="email" maxlength="160" />
               <div class="span-2 toggle-card">
                 <q-toggle v-model="form.whatsapp_same" color="orange" label="Mi celular también tiene WhatsApp" />
                 <q-input v-if="!form.whatsapp_same" :model-value="form.whatsapp" outlined label="Número de WhatsApp *" inputmode="numeric" maxlength="15" @update:model-value="v=>form.whatsapp=normalizePhone(v)" />
@@ -227,10 +223,10 @@ onMounted(load)
             </div>
             <div class="summary-grid q-mt-lg">
               <article><small>NECESIDAD</small><b>{{ form.titulo_sistema }}</b><span>{{ form.empresa_nombre }}</span></article>
-              <article><small>CONTACTO</small><b>{{ form.nombre }}</b><span>{{ form.celular }}{{ form.correo ? ` · ${form.correo}` : '' }}</span></article>
+              <article><small>CONTACTO</small><b>{{ form.nombre }}</b><span>{{ form.celular }}</span></article>
             </div>
             <q-checkbox v-model="form.terminos_aceptados" color="orange" class="confirm-check"><span>Confirmo que estos datos son correctos y autorizo a VITI a contactarme para evaluar esta solicitud.</span></q-checkbox>
-            <div class="privacy-note"><q-icon name="lock" /> Enviar una solicitud no genera cobros. Si ya tienes cuenta, inicia sesión; si todavía no, VITI te dará acceso mediante una invitación segura cuando apruebe la solicitud.</div>
+            <div class="privacy-note"><q-icon name="lock" /> Enviar una solicitud no genera cobros. Si ya tienes cuenta, inicia sesión. Si todavía no, el administrador te enviará una invitación segura por WhatsApp cuando apruebe tu solicitud.</div>
           </q-card-section>
 
           <q-separator />
@@ -248,7 +244,7 @@ onMounted(load)
         <div class="eyebrow">SOLICITUD RECIBIDA</div>
         <h1>Listo. VITI ya tiene tu solicitud.</h1>
         <p v-if="result?.cuenta_existente">Ya tienes una cuenta VITI. Inicia sesión para consultar tus solicitudes y seguir el proceso desde tu espacio.</p>
-        <p v-else>Tu solicitud está en revisión. Por seguridad, VITI te enviará una invitación de acceso al correo registrado cuando la apruebe. Guarda tu código de solicitud.</p>
+        <p v-else>Tu solicitud está en revisión. Guarda tu código: VITI te compartirá por WhatsApp un enlace de acceso seguro cuando apruebe tu solicitud.</p>
         <div class="request-code"><small>CÓDIGO DE SOLICITUD</small><strong>{{ result?.codigo }}</strong></div>
         <div class="success-flow"><span class="done">Solicitud recibida</span><q-icon name="east"/><span>Revisión</span><q-icon name="east"/><span>Propuesta</span></div>
         <div class="success-actions">
