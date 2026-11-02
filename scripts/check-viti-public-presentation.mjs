@@ -7,7 +7,7 @@ for(const term of ['GitHub','Vercel','Render','repositorio','backend','frontend'
 has(plans,'IMPLEMENTACIÓN','planes');has(plans,'SUSCRIPCIÓN','planes');has(catalog,'Solicitar este plan','catálogo');has(catalog,'accessTo(plan)','catálogo');
 has(request,"PASO 1 DE 3",'solicitud');has(request,"PASO 2 DE 3",'solicitud');has(request,"PASO 3 DE 3",'solicitud');has(request,'VITI organiza el resto','solicitud');
 for(const term of ['CI / documento','Expedido','Dirección / zona','Dirección del negocio','Teléfono del negocio']) not(request,term,'solicitud breve');
-has(request,'Celular *','solicitud');has(request,'Correo electrónico *','solicitud');has(request,"if (!form.correo.trim())",'validación correo');has(request,'Mi celular también tiene WhatsApp','solicitud');has(request,'Mi negocio atiende desde otro WhatsApp','solicitud');
+has(request,'Celular *','solicitud');not(request,'Correo electrónico *','solicitud sin correo obligatorio');has(request,'correo: null','solicitud sin correo');has(request,'Mi celular también tiene WhatsApp','solicitud');has(request,'Mi negocio atiende desde otro WhatsApp','solicitud');
 has(routes,"path: '/registro'",'registro');has(routes,"ClientRegisterPage.vue",'registro');has(routes,"{ path: '/acceso', redirect: '/solicitud' }",'acceso');
 has(register,'Crea tu cuenta en pocos pasos.','registro');has(register,'Celular *','registro');has(register,'Mi celular también tiene WhatsApp','registro');has(register,'Mi negocio atiende desde otro WhatsApp','registro');
 has(login,'Crear cuenta gratis','login');has(login,'Explorar VITI como invitado','login');not(login,'CI o documento','login');not(login,'Selecciona tu rol','login');
