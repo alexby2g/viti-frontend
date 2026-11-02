@@ -7,6 +7,10 @@
       "destination": "https://viti-core-api-alexby2g.onrender.com/api/:path*"
     },
     {
+      "source": "/auth/google/:path*",
+      "destination": "https://viti-core-api-alexby2g.onrender.com/auth/google/:path*"
+    },
+    {
       "source": "/sanctum/:path*",
       "destination": "https://viti-core-api-alexby2g.onrender.com/sanctum/:path*"
     },
