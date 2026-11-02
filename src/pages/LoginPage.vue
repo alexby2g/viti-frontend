@@ -17,12 +17,8 @@ function credentialsChanged(field){clearField(field);needsAdminSecret.value=fals
 function errorMessage(e){return fieldErrors.fromResponse(e,'No se pudo iniciar sesión. Revisa los datos marcados.')}
 
 function continueWithGoogle(){
+  // OAuth comparte el mismo dominio que la API y Sanctum.
   const base=String(api.defaults.baseURL||'').replace(/\/api\/v1\/?$/,'')
-  if(!base){
-    googleNotice.value=true
-    $q.notify({type:'negative',message:'No se encontró la dirección del backend de VITI.'})
-    return
-  }
   window.location.assign(`${base}/auth/google/redirect`)
 }
 
