@@ -37,17 +37,6 @@ const selectedPlan = computed(() => plans.value.find(plan => plan.codigo === for
 const isCustom = computed(() => String(selectedPlan.value?.codigo || '').toLowerCase().includes('personalizado'))
 const progress = computed(() => sent.value ? 100 : ((step.value - 1) / 2) * 100)
 const effectiveWhatsapp = computed(() => form.whatsapp_same ? form.celular : form.whatsapp)
-const registerLink = computed(() => ({
-  path: '/registro',
-  query: {
-    correo: result.value?.correo || form.correo,
-    nombre: form.nombre,
-    celular: form.celular,
-    whatsapp: effectiveWhatsapp.value || '',
-    origen: 'solicitud',
-  },
-}))
-
 watch(() => form.celular, value => {
   if (form.whatsapp_same) form.whatsapp = normalizePhone(value)
 })
@@ -239,7 +228,7 @@ onMounted(load)
               <article><small>CONTACTO</small><b>{{ form.nombre }}</b><span>{{ form.celular }}{{ form.correo ? ` · ${form.correo}` : '' }}</span></article>
             </div>
             <q-checkbox v-model="form.terminos_aceptados" color="orange" class="confirm-check"><span>Confirmo que estos datos son correctos y autorizo a VITI a contactarme para evaluar esta solicitud.</span></q-checkbox>
-            <div class="privacy-note"><q-icon name="lock" /> Enviar una solicitud no genera cobros. También puedes crear tu cuenta antes o después; VITI vinculará tus solicitudes usando tu celular.</div>
+            <div class="privacy-note"><q-icon name="lock" /> Enviar una solicitud no genera cobros. Si ya tienes cuenta, inicia sesión; si todavía no, VITI te dará acceso mediante una invitación segura cuando apruebe la solicitud.</div>
           </q-card-section>
 
           <q-separator />
@@ -257,12 +246,11 @@ onMounted(load)
         <div class="eyebrow">SOLICITUD RECIBIDA</div>
         <h1>Listo. VITI ya tiene tu solicitud.</h1>
         <p v-if="result?.cuenta_existente">Ya tienes una cuenta VITI. Inicia sesión para consultar tus solicitudes y seguir el proceso desde tu espacio.</p>
-        <p v-else>Puedes crear tu cuenta ahora o esperar la revisión. Regístrate con el mismo celular y VITI vinculará tu solicitud automáticamente.</p>
+        <p v-else>Tu solicitud está en revisión. Por seguridad, VITI te enviará una invitación de acceso al correo registrado cuando la apruebe. Guarda tu código de solicitud.</p>
         <div class="request-code"><small>CÓDIGO DE SOLICITUD</small><strong>{{ result?.codigo }}</strong></div>
         <div class="success-flow"><span class="done">Solicitud recibida</span><q-icon name="east"/><span>Revisión</span><q-icon name="east"/><span>Propuesta</span></div>
         <div class="success-actions">
           <q-btn v-if="result?.cuenta_existente" color="primary" unelevated no-caps label="Iniciar sesión" to="/login" />
-          <q-btn v-else color="primary" unelevated no-caps label="Crear mi cuenta" :to="registerLink" />
           <q-btn outline no-caps color="orange" label="Volver a VITI" to="/viti" />
         </div>
       </section>

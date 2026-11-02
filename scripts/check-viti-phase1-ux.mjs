@@ -17,6 +17,6 @@ has(demo,'MODO INVITADO','Demo');not(demo,'api.','Demo frontend-only');has(app,'
 
 const router=read('src/router/index.js');
 has(router,"path:'/demo', component:() => import('../layouts/AuthLayout.vue')",'Demo dentro de QLayout');
-has(request,'VITI vinculará esta solicitud automáticamente','Solicitud -> cuenta');
-has(register,'VITI la vinculará','Registro vinculado');
+has(request,'invitación de acceso al correo registrado','Solicitud -> acceso verificado');
+has(register,'No reclamamos solicitudes solo por coincidir el celular','Registro seguro');
 console.log('VITI phase 1 UX smoke: PASS');
