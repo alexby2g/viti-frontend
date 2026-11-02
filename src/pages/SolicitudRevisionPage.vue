@@ -33,7 +33,7 @@ const editSelectedClient = computed(() => clients.value.find(row => row.id === e
 const editCompanyOptions = computed(() => editSelectedClient.value?.empresas?.map(row => ({ label:row.nombre_comercial, value:row.id })) || [])
 const canEdit = computed(() => Boolean(item.value?.id && !item.value?.proyecto && ['borrador','en_revision','rechazada'].includes(item.value?.estado)))
 const canSubmit = computed(() => ['borrador','rechazada'].includes(item.value?.estado) && !item.value?.proyecto)
-const approvalReady = computed(() => Boolean(item.value?.cliente_id && item.value?.cliente?.correo && item.value?.empresa_id && item.value?.plan_viti_id && plan.value && item.value?.declaracion_aceptada && item.value?.acuerdo_comercial_aceptado))
+const approvalReady = computed(() => Boolean(item.value?.cliente_id && (item.value?.cliente?.telefono || item.value?.cliente?.whatsapp || item.value?.cliente?.correo) && item.value?.empresa_id && item.value?.plan_viti_id && plan.value && item.value?.declaracion_aceptada && item.value?.acuerdo_comercial_aceptado))
 const canApprove = computed(() => item.value?.estado === 'en_revision' && !item.value?.proyecto && approvalReady.value)
 const canCreateProject = computed(() => item.value?.estado === 'aprobada' && !item.value?.proyecto && hasAccount.value)
 const waitingForAccount = computed(() => item.value?.estado === 'aprobada' && !item.value?.proyecto && !hasAccount.value)
@@ -129,7 +129,14 @@ async function rejectRequest(){
 }
 async function createInvitation(){inviteLoading.value=true;try{const response=await api.post(`/solicitudes/${item.value.id}/invitacion`,{dias_vigencia:7});$q.notify({type:response?.data?.data?.email_enviado?'positive':'warning',message:response?.data?.message||'Acceso preparado.'});await load()}catch(error){$q.notify({type:'negative',message:error?.response?.data?.message||'No se pudo crear el acceso.'})}finally{inviteLoading.value=false}}
 async function resendInvitation(){inviteLoading.value=true;try{const response=await api.post(`/solicitudes/${item.value.id}/invitacion/reenviar`);$q.notify({type:response?.data?.data?.email_enviado?'positive':'warning',message:response?.data?.message||'Invitación procesada.'});await load()}catch(error){$q.notify({type:'negative',message:error?.response?.data?.message||'No se pudo reenviar.'})}finally{inviteLoading.value=false}}
-async function copyInvitation(){if(!access.value?.url)return;try{await navigator.clipboard.writeText(access.value.url);$q.notify({type:'positive',message:'Enlace copiado.'})}catch{$q.dialog({title:'Enlace de acceso',message:access.value.url,ok:'Cerrar'})}}
+function sendWhatsappInvitation(){
+  const raw = String(item.value?.cliente?.whatsapp || item.value?.cliente?.telefono || '').replace(/\D/g, '')
+  const phone = raw.length === 8 ? `591${raw}` : raw
+  if (!/^[0-9]{8,15}$/.test(phone) || !access.value?.url) return
+  const message = `Hola, VITI aprobó tu solicitud ${item.value?.codigo || ''}. Tu enlace privado para crear el acceso es: ${access.value.url}. No compartas este enlace con otras personas.`
+  window.open(`https://wa.me/${phone}?text=${encodeURIComponent(message)}`, '_blank', 'noopener,noreferrer')
+}
+async function copyInvitation(){if(!access.value?.url)return;try{await navigator.clipboard.writeText(access.value.url);$q.notify({type:'positive',message:'Enlace copiado. Compártelo solo con el titular después de verificar su número.'})}catch{$q.dialog({title:'Enlace de acceso',message:access.value.url,ok:'Cerrar'})}}
 async function createProject(){
   if(!canCreateProject.value) return
   actionLoading.value=true
@@ -190,7 +197,7 @@ onMounted(async()=>{await load();await loadHistory();if(route.query.editar==='1'
               <q-tab-panel name="resumen">
                 <div class="summary-grid">
                   <article class="info-card large"><small>NECESIDAD</small><h2>{{item.titulo}}</h2><p>{{item.resumen || 'Sin descripción adicional.'}}</p></article>
-                  <article class="info-card"><small>CLIENTE</small><h3>{{item.cliente?.nombre || 'Sin contacto'}}</h3><p>{{item.cliente?.telefono || 'Sin teléfono'}}<br>{{item.cliente?.correo || 'Sin correo'}}</p></article>
+                  <article class="info-card"><small>CLIENTE</small><h3>{{item.cliente?.nombre || 'Sin contacto'}}</h3><p>{{item.cliente?.telefono || 'Sin teléfono'}}<br>{{item.cliente?.correo || 'Contacto por WhatsApp'}}</p></article>
                   <article class="info-card"><small>NEGOCIO</small><h3>{{item.empresa?.nombre_comercial || 'Sin negocio'}}</h3><p>{{item.empresa?.actividad || 'Actividad no especificada.'}}</p></article>
                   <article class="info-card"><small>PRESUPUESTO</small><h3>{{money(item.presupuesto_estimado)}}</h3><p>{{item.fecha_limite_deseada ? `Fecha deseada: ${item.fecha_limite_deseada}` : 'Sin fecha de entrega definida.'}}</p></article>
                   <article class="info-card"><small>PRIORIDAD</small><h3>{{pretty(item.prioridad || 'normal')}}</h3><p>Definida para la evaluación administrativa.</p></article>
@@ -214,7 +221,7 @@ onMounted(async()=>{await load();await loadHistory();if(route.query.editar==='1'
                   <article class="info-card"><small>DECLARACIÓN</small><h3>{{item.declaracion_aceptada?'Confirmada':'Pendiente'}}</h3><p>{{item.declaracion_nombre || 'El cliente todavía no confirmó sus datos.'}}</p></article>
                   <article class="info-card"><small>ACUERDO COMERCIAL</small><h3>{{item.acuerdo_comercial_aceptado?'Aceptado':'Pendiente'}}</h3><p>{{item.acuerdo_comercial_nombre || 'Sin aceptación registrada.'}}</p></article>
                 </div>
-                <q-banner v-if="item.estado==='en_revision' && !approvalReady" rounded class="approval-warning"><template #avatar><q-icon name="warning_amber"/></template>Antes de aceptar el trabajo completa cliente con correo, negocio, plan, declaración y acuerdo comercial.</q-banner>
+                <q-banner v-if="item.estado==='en_revision' && !approvalReady" rounded class="approval-warning"><template #avatar><q-icon name="warning_amber"/></template>Antes de aceptar el trabajo completa cliente con celular o correo, negocio, plan, declaración y acuerdo comercial.</q-banner>
               </q-tab-panel>
 
               <q-tab-panel name="historial">
@@ -248,7 +255,8 @@ onMounted(async()=>{await load();await loadHistory();if(route.query.editar==='1'
             </template>
             <template v-if="waitingForAccount">
               <q-btn v-if="access.url" outline color="orange" no-caps icon="content_copy" label="Copiar acceso" @click="copyInvitation"/>
-              <q-btn v-if="access.url" flat no-caps icon="forward_to_inbox" label="Reenviar acceso" :loading="inviteLoading" @click="resendInvitation"/>
+              <q-btn v-if="access.url && (item.cliente?.whatsapp || item.cliente?.telefono)" flat no-caps color="positive" icon="chat" label="Enviar por WhatsApp" @click="sendWhatsappInvitation" />
+              <q-btn v-if="access.url" flat no-caps icon="forward_to_inbox" label="Reintentar correo" :loading="inviteLoading" @click="resendInvitation"/>
               <q-btn v-else color="primary" unelevated no-caps icon="person_add" label="Crear acceso" :loading="inviteLoading" @click="createInvitation"/>
             </template>
             <q-btn v-if="canCreateProject" color="primary" unelevated no-caps icon="rocket_launch" label="Iniciar trabajo" :loading="actionLoading" @click="createProject"/>
