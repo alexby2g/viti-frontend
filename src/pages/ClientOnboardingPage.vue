@@ -82,7 +82,7 @@ onMounted(load)
           <p>Ya tenemos tus datos, tu negocio y lo que solicitaste. No vamos a pedirte todo otra vez. Solo crea tu usuario y contraseña.</p>
 
           <div class="request-summary">
-            <div><small>RESPONSABLE</small><b>{{ prefill.nombre }}</b><span>{{ email }}</span></div>
+            <div><small>RESPONSABLE</small><b>{{ prefill.nombre }}</b><span>{{ email || prefill.telefono || 'Acceso por invitación segura' }}</span></div>
             <div><small>NEGOCIO</small><b>{{ prefill.empresa_nombre }}</b><span>{{ prefill.empresa_actividad || 'Información recibida' }}</span></div>
             <div><small>SOLICITUD</small><b>{{ prefill.titulo_sistema }}</b><span>{{ prefill.resumen }}</span></div>
           </div>
