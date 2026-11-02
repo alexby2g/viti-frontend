@@ -7,7 +7,8 @@ has(login,'VITI reconocerá automáticamente los permisos','Login automático');
 for(const term of ['Nombre completo *','Correo electrónico *','Celular *','Mi celular también tiene WhatsApp','Mi negocio atiende desde otro WhatsApp','Contraseña *','Confirmar contraseña *']) has(register,term,'Registro');
 for(const term of ['CI / documento','Expedido','Dirección / zona','Rol *','Plan *']) not(register,term,'Registro breve');
 // Solicitud inicial solo comercial.
-for(const term of ['Celular *','Mi celular también tiene WhatsApp','Mi negocio atiende desde otro WhatsApp','Negocio, institución o proyecto *','¿Qué sistema necesitas? *','¿Qué quieres mejorar o resolver? *']) has(request,term,'Solicitud');
+for(const term of ['Celular *','Correo electrónico *','Mi celular también tiene WhatsApp','Mi negocio atiende desde otro WhatsApp','Negocio, institución o proyecto *','¿Qué sistema necesitas? *','¿Qué quieres mejorar o resolver? *']) has(request,term,'Solicitud');
+has(request,"if (!form.correo.trim())",'Solicitud exige correo antes de avanzar');
 for(const term of ['CI / documento','Expedido','Dirección / zona','Repositorio','Hosting','Base de datos']) not(request,term,'Solicitud comercial');
 // Marca producto primero; AGR queda solo como atribución.
 has(brand,'branding.product_name','Marca dinámica');has(brand,'Tecnología desarrollada por','Atribución');has(branding,"product_name: 'VITI'",'Marca VITI');has(branding,"studio_name: 'AGR Studio'",'Atribución AGR');has(branding,"document.title = `${this.product_name} · Plataforma de sistemas`",'Título navegador');

@@ -72,7 +72,8 @@ function validateContact() {
   if (!/^\d{7,15}$/.test(form.celular)) return warn('El celular debe tener entre 7 y 15 dígitos.'), false
   if (!form.whatsapp_same && !/^\d{7,15}$/.test(form.whatsapp)) return warn('Escribe un WhatsApp válido o marca que es el mismo celular.'), false
   if (form.business_whatsapp_different && !/^\d{7,15}$/.test(form.whatsapp_business)) return warn('Escribe un WhatsApp del negocio válido.'), false
-  if (form.correo.trim() && !/.+@.+\..+/.test(form.correo.trim())) return warn('El correo opcional no tiene un formato válido.'), false
+  if (!form.correo.trim()) return warn('Escribe tu correo electrónico para recibir el seguimiento de la solicitud.'), false
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.correo.trim())) return warn('Escribe un correo electrónico válido.'), false
   return true
 }
 function next() {
@@ -195,6 +196,7 @@ onMounted(load)
             <div class="form-grid">
               <q-input v-model="form.nombre" outlined class="span-2" label="Nombre completo *" autocomplete="name" />
               <q-input :model-value="form.celular" outlined label="Celular *" inputmode="numeric" maxlength="15" autocomplete="tel" @update:model-value="v=>form.celular=normalizePhone(v)" />
+              <q-input v-model="form.correo" outlined class="span-2" label="Correo electrónico *" type="email" autocomplete="email" maxlength="160" />
               <div class="span-2 toggle-card">
                 <q-toggle v-model="form.whatsapp_same" color="orange" label="Mi celular también tiene WhatsApp" />
                 <q-input v-if="!form.whatsapp_same" :model-value="form.whatsapp" outlined label="Número de WhatsApp *" inputmode="numeric" maxlength="15" @update:model-value="v=>form.whatsapp=normalizePhone(v)" />
