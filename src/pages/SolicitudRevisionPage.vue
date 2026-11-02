@@ -255,7 +255,7 @@ onMounted(async()=>{await load();await loadHistory();if(route.query.editar==='1'
             </template>
             <template v-if="waitingForAccount">
               <q-btn v-if="access.url" outline color="orange" no-caps icon="content_copy" label="Copiar acceso" @click="copyInvitation"/>
-              <q-btn v-if="access.url && (item.cliente?.whatsapp || item.cliente?.telefono)" flat no-caps color="positive" icon="chat" label="Enviar por WhatsApp" @click="sendWhatsappInvitation" />
+              <q-btn v-if="access.url && (item.cliente?.whatsapp || item.cliente?.telefono)" flat no-caps color="positive" icon="chat" label="Compartir por WhatsApp" @click="sendWhatsappInvitation" />
               <q-btn v-if="access.url && item.cliente?.correo" flat no-caps icon="forward_to_inbox" label="Reintentar correo" :loading="inviteLoading" @click="resendInvitation"/>
               <q-btn v-else color="primary" unelevated no-caps icon="person_add" label="Crear acceso" :loading="inviteLoading" @click="createInvitation"/>
             </template>
