@@ -8,7 +8,7 @@ import { useFormErrors } from '../composables/useFormErrors'
 import AppBrand from '../components/AppBrand.vue'
 
 const auth=useAuthStore(),router=useRouter(),route=useRoute(),$q=useQuasar()
-const show=ref(false),showSecret=ref(false),formRef=ref(null),googleNotice=ref(false),needsAdminSecret=ref(false)
+const show=ref(false),showSecret=ref(false),formRef=ref(null),needsAdminSecret=ref(false)
 const form=reactive({acceso:'',password:'',codigo_secreto:''})
 const fieldErrors=useFormErrors()
 
@@ -102,7 +102,6 @@ onMounted(async()=>{
           <span class="google-mark" aria-hidden="true">G</span>
           <span>Continuar con Google</span>
         </button>
-        <div v-if="googleNotice" class="google-note">No se pudo iniciar el flujo de Google. Revisa la configuración del backend.</div>
 
         <div class="divider"><span>o continúa con tu cuenta VITI</span></div>
 
