@@ -168,7 +168,7 @@ async function ask(message: string) {
   state.value = 'thinking'
   pushMessage('user', value)
   try {
-    const response = await api.get('/dashboard', { params: { agr: value }, timeout: 30000 })
+    const response = await api.post('/assistant/messages', { message: value }, { timeout: 30000 })
     const payload = response?.data || {}
     const answer = String(payload?.data?.message ?? payload?.message ?? payload?.data?.data?.message ?? 'No tengo una respuesta disponible todavía.')
     const action: Action | null = payload?.data?.action ?? payload?.action ?? payload?.data?.data?.action ?? null
