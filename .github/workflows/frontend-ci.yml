@@ -32,6 +32,9 @@ jobs:
       - name: VITI stability smoke
         run: npm run test:viti-stability
 
+      - name: AGR assistant POST transport smoke
+        run: npm run test:viti-assistant-transport
+
       - name: VITI public presentation smoke
         run: npm run test:viti-public
 
