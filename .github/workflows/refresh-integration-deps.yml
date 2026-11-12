@@ -1,0 +1,53 @@
+name: Refresh integration branch dependency lockfile
+
+on:
+  push:
+    branches:
+      - feature/irenet-assistant-api-20261112
+    paths:
+      - .github/workflows/refresh-integration-deps.yml
+
+permissions:
+  contents: write
+
+jobs:
+  refresh:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 12
+    steps:
+      - name: Checkout feature branch
+        uses: actions/checkout@v4
+        with:
+          ref: feature/irenet-assistant-api-20261112
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22.22.0'
+          cache: npm
+
+      - name: Update lockfile within existing dependency ranges
+        run: |
+          npm audit fix --package-lock-only || true
+          npm ci
+          npm audit --omit=dev --audit-level=high
+
+      - name: Verify assistant transport
+        run: npm run test:viti-assistant-transport
+
+      - name: Lint and production build
+        run: |
+          npm run lint -- --max-warnings=50
+          npm run build
+
+      - name: Commit lockfile update only to integration branch
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add package-lock.json package.json
+          if ! git diff --cached --quiet; then
+            git commit -m "fix(deps): refresh compatible frontend versions after security audit"
+            git push origin HEAD:feature/irenet-assistant-api-20261112
+          else
+            echo "Dependency lockfile already meets the audit gate"
+          fi
