@@ -33,12 +33,15 @@ curl --fail --silent --show-error "$BASE_URL/" >/dev/null
   --virtual-time-budget=7000 \
   --dump-dom "$BASE_URL/" >"$DOM_FILE"
 
+# Verificar textos visibles del formulario actual. El código de seguridad solo
+# aparece después de comprobar las credenciales y no debe exigirse al cargar.
 grep -Fq "Acceso a la plataforma" "$DOM_FILE"
-grep -Fq "Ingresar a VITI" "$DOM_FILE"
-grep -Fq "VITI · producto de AGR Studio" "$DOM_FILE"
-grep -Fq "Código secreto (solo superadministrador)" "$DOM_FILE"
-grep -Fq "Conocer VITI" "$DOM_FILE"
-grep -Fq "Desarrollado y administrado por" "$DOM_FILE"
+grep -Fq "Bienvenido a VITI" "$DOM_FILE"
+grep -Fq "Continuar con Google" "$DOM_FILE"
+grep -Fq "Celular o usuario" "$DOM_FILE"
+grep -Fq "Entrar a VITI" "$DOM_FILE"
+grep -Fq "Crear cuenta gratis" "$DOM_FILE"
+grep -Fq "Plataforma de sistemas y proyectos" "$DOM_FILE"
 
 if grep -Fq '<div id="q-app"></div>' "$DOM_FILE"; then
   echo "La aplicación no llegó a renderizar contenido dentro de #q-app."
