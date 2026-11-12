@@ -47,6 +47,23 @@ class Handler(BaseHTTPRequestHandler):
             file=ROOT/path.lstrip("/")
             if file.is_file(): return self.send_file(file,"text/javascript" if file.suffix==".js" else "text/css")
         if path=="/sw.js" and (ROOT/"sw.js").is_file(): return self.send_file(ROOT/"sw.js","text/javascript")
+        if path=="/mi-aplicaciones":
+            # Esta prueba simula que el cliente ya seleccionó explícitamente su
+            # empresa 301; la aplicación real NUNCA selecciona automáticamente
+            # entre varios negocios ni comparte sus datos sin ese contexto.
+            html=(ROOT/"index.html").read_bytes()
+            marker=b"</head>"
+            if marker not in html:
+                self.send_error(500,"index.html sin </head>")
+                return
+            selected=b"<script>localStorage.setItem('viti-empresa-id','301')</script></head>"
+            body=html.replace(marker,selected,1)
+            self.send_response(200)
+            self.send_header("Content-Type","text/html; charset=utf-8")
+            self.send_header("Content-Length",str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+            return
         return self.send_file(ROOT/"index.html","text/html; charset=utf-8")
 
 ThreadingHTTPServer(("127.0.0.1",PORT),Handler).serve_forever()

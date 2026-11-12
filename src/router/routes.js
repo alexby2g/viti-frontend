@@ -140,6 +140,7 @@ export default [
       { path: 'buzon', name: 'buzon', component: () => import('../pages/BuzonPage.vue'), meta:{adminOnly:true,superAdminOnly:true} },
       { path: 'auditoria', name: 'auditoria', component: () => import('../pages/AuditoriaPage.vue'), meta:{adminOnly:true,superAdminOnly:true} },
       { path: 'usuarios', name: 'usuarios', component: () => import('../pages/UsuariosPage.vue'), meta:{adminOnly:true,superAdminOnly:true} },
+      { path: 'irenet/dispositivos', name: 'irenet-devices', component: () => import('../pages/IrenetDevicesPage.vue'), meta:{adminOnly:true,superAdminOnly:true} },
       { path: 'formularios-viti', name: 'formularios-viti', component: () => import('../pages/FormulariosVitiPage.vue'), meta:{adminOnly:true,superAdminOnly:true} },
       { path: 'almacenamiento', name: 'almacenamiento', component: () => import('../pages/StoragePage.vue'), meta:{adminOnly:true,superAdminOnly:true} },
       { path: 'guia-viti', name: 'viti-guide', component: () => import('../pages/VitiGuidePage.vue') },

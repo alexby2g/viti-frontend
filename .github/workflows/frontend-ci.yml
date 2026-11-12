@@ -23,6 +23,12 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: AGR assistant POST transport smoke
+        run: npm run test:viti-assistant-transport
+
+      - name: IRENET pairing management smoke
+        run: npm run test:viti-irenet-pairing
+
       - name: Production dependency audit
         run: npm audit --omit=dev --audit-level=high
 

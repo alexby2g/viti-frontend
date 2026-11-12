@@ -22,13 +22,21 @@ check_page(){
   slug="$(echo "$path" | tr '/?' '__')"
   local file="${RUNNER_TEMP:-/tmp}/viti-auth-${slug}.html"
   "$CHROME_BIN" --headless=new --no-sandbox --disable-gpu --disable-dev-shm-usage --virtual-time-budget=11000 --dump-dom "$BASE$path" >"$file"
-  for text in "$@"; do grep -Fq "$text" "$file"; done
+  echo "Comprobando pantalla autenticada: $path"
+  for text in "$@"; do
+    if ! grep -Fq "$text" "$file"; then
+      echo "::error title=Auth Browser Smoke::Falta texto esperado en $path: $text" >&2
+      echo "Fragmento del DOM para diagnóstico:" >&2
+      grep -o -m 1 -E 'Mis sistemas|Electrofrío E2E|Clientes y atención|Taller E2E|Próximos sistemas' "$file" >&2 || true
+      exit 1
+    fi
+  done
   if grep -Fq '<div id="q-app"></div>' "$file"; then echo "Vue no renderizó $path"; exit 1; fi
   if grep -Fq 'Acceso a la plataforma' "$file"; then echo "La ruta autenticada $path terminó indebidamente en Login."; exit 1; fi
 }
 
 check_page "/mi-negocio" "Mi negocio" "Taller E2E" "VITI Inicial" "2 de 3 usados" "1 de 1 usados" "Equipo del negocio"
-check_page "/mi-aplicaciones" "Mis aplicaciones" "Electrofrío" "Taller E2E" "Aplicación activa"
+check_page "/mi-aplicaciones" "Mis sistemas" "Electrofrío E2E" "Próximos sistemas" "100% del trabajo"
 check_page "/mi-apps/electrofrio/clientes" "Clientes y atención" "Flujo rápido:" "Cliente E2E Aires"
 
 echo "Auth E2E OK: sesión, empresa activa, Feature Gate, aplicaciones y Clientes del sistema de aires renderizan en Chrome headless."
