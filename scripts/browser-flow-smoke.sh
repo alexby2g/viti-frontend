@@ -79,33 +79,30 @@ check_page(){
 }
 
 check_page viti-landing "$BASE/viti" \
-  "Organiza tu negocio." \
-  "¿Qué es VITI?" \
+  "VITI · SOLUCIONES DIGITALES" \
   "Cómo funciona" \
-  "Ver planes" \
-  "Ingresar"
+  "Solicitar evaluación" \
+  "Ver precios" \
+  "Iniciar sesión"
 
-check_page public-request "$BASE/solicitar/e2e-token-viti" \
-  "Solicitud VITI" \
-  "Cuéntanos qué necesitas. Nosotros evaluamos cómo hacerlo." \
-  "Antes de pedir tu sistema, conoce cómo trabajamos." \
-  "Conocer los planes" \
-  "Importante:"
+check_page public-request "$BASE/solicitud" \
+  "Cuéntanos lo esencial." \
+  "VITI organiza el resto." \
+  "PASO 1 DE 3" \
+  "¿Qué necesitas resolver?" \
+  "Negocio, institución o proyecto"
 
 check_page admin-request "$BASE/solicitudes/501" \
   "Solicitud autenticada E2E" \
   "SOL-AUTH-E2E" \
   "Empresa Auth E2E" \
-  "Cliente Admin E2E" \
-  "Revisar solicitud de acceso" \
-  "Empresas" \
-  "Salud del sistema"
+  "Necesidad" \
+  "Aceptar trabajo"
 
 check_page client-apps "$BASE/mi-aplicaciones" \
-  "Mis aplicaciones" \
+  "Mis sistemas" \
   "Negocio Auth A" \
-  "Electrofrío" \
-  "Mi negocio" \
-  "Nueva solicitud"
+  "Electrofrío E2E" \
+  "Próximos sistemas"
 
 echo "Flow E2E OK: presentación VITI, solicitud pública inicial, panel administrativo y cliente multiempresa renderizan con contexto explícito en Chrome headless."
