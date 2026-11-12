@@ -70,6 +70,12 @@
       </header>
       <div class="agr006-body">
         <p class="agr006-presence">{{ presence }}</p>
+        <div class="agr006-ai-mode">
+          <button type="button" :aria-pressed="aiEnabled" @click="toggleAi">
+            {{ aiEnabled ? 'IA Ollama: activada' : 'IA Ollama: desactivada' }}
+          </button>
+          <small v-if="aiEnabled">Las preguntas abiertas se enviarán a Ollama Cloud. Evita datos privados. Los comandos de VITI siguen protegidos.</small>
+        </div>
         <div class="agr006-messages" aria-live="polite">
           <div v-for="(item, index) in messages" :key="index" :class="['agr006-message', item.role]">{{ item.text }}</div>
         </div>
@@ -97,6 +103,7 @@ import { api } from '../../boot/axios'
 import { resolveAgr006LocalAction, type Agr006LocalAction } from '../../utils/agr006CommandRouter'
 
 interface Message { role: 'user' | 'assistant'; text: string }
+type AiTurn = { role: 'user' | 'assistant'; content: string }
 type Action = { type?: string; to?: string }
 
 const route = useRoute()
@@ -104,6 +111,13 @@ const router = useRouter()
 const visible = computed(() => route.meta?.requiresAuth === true)
 const open = ref(false)
 const draft = ref('')
+const aiEnabled = ref(false)
+const aiHistory = ref<AiTurn[]>([])
+
+function toggleAi() {
+  aiEnabled.value = !aiEnabled.value
+  aiHistory.value = []
+}
 const messages = ref<Message[]>([{ role: 'assistant', text: '006 en línea. VITI está operativo. ¿Qué necesitas?' }])
 const state = ref<'online' | 'thinking' | 'attention'>('online')
 const voiceArmed = ref(false)
@@ -170,8 +184,33 @@ async function ask(message: string) {
   try {
     const response = await api.post('/assistant/messages', { message: value }, { timeout: 30000 })
     const payload = response?.data || {}
-    const answer = String(payload?.data?.message ?? payload?.message ?? payload?.data?.data?.message ?? 'No tengo una respuesta disponible todavía.')
+    let answer = String(payload?.data?.message ?? payload?.message ?? payload?.data?.data?.message ?? 'No tengo una respuesta disponible todavía.')
     const action: Action | null = payload?.data?.action ?? payload?.action ?? payload?.data?.data?.action ?? null
+
+    // Los comandos deterministas mantienen prioridad. Ollama solo responde
+    // a consultas no reconocidas cuando el usuario habilitó explícitamente IA.
+    if (aiEnabled.value && payload?.intent === 'unknown') {
+      try {
+        const cloud = await api.post('/assistant/ollama', {
+          message: value,
+          history: aiHistory.value.slice(-6),
+        }, { timeout: 28000 })
+        const result = cloud?.data || {}
+        if (result?.intent === 'ollama_answer' && typeof result?.message === 'string') {
+          answer = result.message.trim() || answer
+          aiHistory.value = [
+            ...aiHistory.value,
+            { role: 'user', content: value },
+            { role: 'assistant', content: answer.slice(0, 500) },
+          ].slice(-6)
+        }
+      } catch (cloudError: any) {
+        const status = Number(cloudError?.response?.status)
+        answer = status === 503
+          ? 'Ollama Cloud todavía no está configurado en Render. Los comandos locales de 006 siguen funcionando.'
+          : 'No se pudo consultar Ollama. Puedes continuar con los comandos de VITI.'
+      }
+    }
     pushMessage('assistant', answer)
     state.value = 'online'
     await executeAction(action)
@@ -328,6 +367,7 @@ onBeforeUnmount(() => {
 .agr006-panel{position:absolute;right:0;bottom:92px;width:min(420px,calc(100vw - 32px));max-height:560px;overflow:hidden;border:1px solid rgba(130,220,255,.2);border-radius:20px;background:linear-gradient(180deg,rgba(8,23,37,.96),rgba(3,12,22,.97));backdrop-filter:blur(18px);box-shadow:0 20px 70px rgba(0,0,0,.45),0 0 50px rgba(53,200,255,.12)}
 .agr006-header{display:flex;justify-content:space-between;align-items:center;padding:16px 18px;border-bottom:1px solid rgba(255,255,255,.07)}.agr006-header strong{display:block;font-size:18px;letter-spacing:.18em}.agr006-header small{display:block;margin-top:2px;color:#86a8b8;font-size:11px}.agr006-close{background:transparent;border:0;color:#92aebd;font-size:24px;cursor:pointer}
 .agr006-body{padding:16px}.agr006-presence{margin:0 0 12px;color:#a9cedd;font-size:13px}.agr006-messages{display:flex;flex-direction:column;gap:9px;max-height:330px;overflow:auto;margin-bottom:12px}.agr006-message{max-width:88%;padding:10px 12px;border-radius:14px;font-size:13px;line-height:1.4}.agr006-message.user{align-self:flex-end;background:rgba(58,157,214,.17);border:1px solid rgba(98,197,244,.15)}.agr006-message.assistant{align-self:flex-start;background:rgba(255,255,255,.045);border:1px solid rgba(255,255,255,.07)}
+.agr006-ai-mode{display:flex;flex-direction:column;align-items:flex-start;gap:5px;margin:0 0 10px}.agr006-ai-mode button{border:1px solid rgba(133,220,255,.25);border-radius:8px;background:rgba(77,180,239,.12);color:#dff7ff;padding:6px 10px;font-size:11px;cursor:pointer}.agr006-ai-mode button[aria-pressed="true"]{border-color:#7dffb2;color:#b9ffd5}.agr006-ai-mode small{color:#91b2bd;line-height:1.4;font-size:10px}
 .agr006-actions{display:flex;gap:8px;flex-wrap:wrap;margin:0 0 12px}.agr006-actions button{border:1px solid rgba(133,220,255,.18);border-radius:10px;background:rgba(77,180,239,.1);color:#dff7ff;padding:7px 10px;cursor:pointer;font-size:12px}.agr006-input{display:flex;gap:8px}.agr006-input input{min-width:0;flex:1;border:1px solid rgba(133,220,255,.18);border-radius:12px;background:rgba(255,255,255,.035);color:#fff;padding:11px 12px;outline:none}.agr006-input button{width:40px;border:1px solid rgba(133,220,255,.18);border-radius:12px;background:rgba(77,180,239,.14);color:#dff7ff;cursor:pointer}.agr006-input button:disabled{opacity:.35;cursor:not-allowed}.voice-btn.active{background:rgba(56,201,255,.2);box-shadow:0 0 14px rgba(56,201,255,.22)}.voice-btn.armed{background:rgba(126,231,255,.12)}.agr006-hint{display:block;margin-top:9px;color:#7694a2;font-size:10px}
 .agr006-live-transcript{display:flex;align-items:center;gap:8px;margin:0 0 12px;padding:8px 10px;border-radius:10px;background:rgba(47,170,222,.08);border:1px solid rgba(120,220,255,.15);color:#cdefff;font-size:12px}.agr006-live-transcript span{width:8px;height:8px;border-radius:50%;background:#69eaff;box-shadow:0 0 12px #69eaff;animation:pulse .9s infinite}
 .hologram-layer{position:fixed;inset:0;display:grid;place-items:center;pointer-events:none;background:radial-gradient(circle at center,rgba(20,120,255,.10),rgba(0,0,0,0) 52%)}.holo-aura{position:absolute;width:520px;height:620px;border-radius:50%;background:radial-gradient(circle,rgba(65,211,255,.16),rgba(30,100,255,.06) 45%,rgba(0,0,0,0) 72%);filter:blur(15px);animation:breathe 3s ease-in-out infinite}.holo-grid{position:absolute;width:450px;height:650px;border:1px solid rgba(80,211,255,.09);background:repeating-linear-gradient(90deg,transparent 0 40px,rgba(90,220,255,.05) 41px 42px),repeating-linear-gradient(0deg,transparent 0 40px,rgba(90,220,255,.04) 41px 42px);transform:perspective(800px) rotateX(55deg) translateY(180px);opacity:.7}.holo-scanlines{position:absolute;inset:0;background:repeating-linear-gradient(0deg,rgba(128,230,255,.015) 0 2px,transparent 3px 6px);mix-blend-mode:screen}.hologram{position:relative;width:min(520px,78vw);height:min(80vh,760px);overflow:visible;filter:drop-shadow(0 0 14px rgba(72,214,255,.7));animation:materialize .9s ease-out, float 4s ease-in-out infinite}
