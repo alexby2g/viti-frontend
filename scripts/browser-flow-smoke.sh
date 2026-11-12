@@ -101,8 +101,8 @@ check_page admin-request "$BASE/solicitudes/501" \
 
 check_page client-apps "$BASE/mi-aplicaciones" \
   "Mis sistemas" \
-  "Negocio Auth A" \
   "Electrofrío E2E" \
+  "Aplicación lista para trabajar" \
   "Próximos sistemas"
 
 echo "Flow E2E OK: presentación VITI, solicitud pública inicial, panel administrativo y cliente multiempresa renderizan con contexto explícito en Chrome headless."
