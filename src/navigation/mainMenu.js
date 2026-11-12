@@ -41,6 +41,7 @@ export function buildMainMenu({
           { label: 'Planes y precios', icon: 'sell', to: '/saas' },
           { label: `Cobros ${productName}`, icon: 'receipt_long', to: '/pagos' },
           { label: 'Usuarios', icon: 'manage_accounts', to: '/usuarios' },
+          { label: 'Dispositivos IRENET', icon: 'devices', to: '/irenet/dispositivos' },
           { label: 'Formulario de apoyo', icon: 'dynamic_form', to: '/formularios-viti' },
           { label: 'Archivos', icon: 'folder_shared', to: '/archivos' },
           { label: 'Reportes', icon: 'analytics', to: '/reportes' },
