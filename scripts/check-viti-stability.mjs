@@ -5,7 +5,7 @@ has(routes,"path:'/viti'",'Rutas');has(routes,"path:'/viti/planes'",'Rutas');has
 has(planCatalog,'Implementación','Planes');has(planCatalog,'accessTo(plan)','Planes');has(planLogic,"path:'/solicitud'",'Planes');not(planLogic,"path:'/acceso'",'Planes');
 has(login,'Crear cuenta gratis','Login');has(login,'Explorar VITI como invitado','Login');not(login,'q-select v-model="form.rol"','Login');has(register,'createClientAccount','Registro');
 has(demo,'MODO INVITADO','Demo');has(demo,'Continúa con tu propia cuenta','Demo');not(demo,"api.post",'Demo sin escritura');not(demo,"api.put",'Demo sin escritura');not(demo,"api.delete",'Demo sin escritura');
-has(detail,'/solicitudes/${item.value.id}/invitacion','Invitación administrativa');has(detail,'Aprobar y habilitar acceso','Invitación administrativa');has(detail,'Crear proyecto ahora','Proyecto');
+has(detail,'/solicitudes/${item.value.id}/invitacion','Invitación administrativa');has(detail,'Crear acceso','Invitación administrativa');has(detail,'Iniciar trabajo','Proyecto');
 has(clientHub,"api.get('/mi/solicitud')",'Portal cliente');not(clientHub,"api.get('/mi/solicitudes')",'Portal cliente');has(idea,'¿Qué necesitas ahora?','Nueva solicitud cliente');not(idea,'visibleQuestions','Nueva solicitud cliente');
-has(menu,'Centro VITI','Menú');has(menu,'Planes y precios','Menú');has(layout,'useNotificationsStore','Layout');has(notifications,'/notificaciones/centro','Notificaciones');not(notifications,'/notificaciones/buzon','Notificaciones');
+has(menu,'Operación','Menú');has(menu,'Planes y precios','Menú');has(layout,'useNotificationsStore','Layout');has(notifications,'/notificaciones/centro','Notificaciones');not(notifications,'/notificaciones/buzon','Notificaciones');
 console.log('VITI stability smoke: PASS');
