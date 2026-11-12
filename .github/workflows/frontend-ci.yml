@@ -26,6 +26,9 @@ jobs:
       - name: AGR assistant POST transport smoke
         run: npm run test:viti-assistant-transport
 
+      - name: AGR Ollama opt-in smoke
+        run: npm run test:viti-ollama-optin
+
       - name: Production dependency audit
         run: npm audit --omit=dev --audit-level=high
 
