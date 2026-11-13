@@ -29,6 +29,9 @@ jobs:
       - name: AGR Ollama opt-in smoke
         run: npm run test:viti-ollama-optin
 
+      - name: IRENET local mode smoke
+        run: npm run test:viti-irenet-local
+
       - name: Production dependency audit
         run: npm audit --omit=dev --audit-level=high
 
