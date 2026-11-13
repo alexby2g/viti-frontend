@@ -139,25 +139,67 @@ function toggleLocal() {
   aiHistory.value = []
 }
 
-async function queryIrenetLocal(message: string): Promise<string> {
-  const job = await api.post('/assistant/local/jobs', { message }, { timeout: 40000 })
-  const id = String(job?.data?.id || '')
-  if (!/^[0-9a-f-]{36}$/i.test(id)) return 'VITI no devolvió un identificador válido para la consulta local.'
-
-  // The PC polls Render via HTTPS and runs the model at 127.0.0.1.
-  // Browser requests never connect directly to Ollama or the private PC.
+async function waitForIrenetJob(id: string): Promise<string> {
+  if (!/^[0-9a-f-]{36}$/i.test(id)) return 'VITI no devolvió un identificador válido.'
   for (let attempt = 0; attempt < 65; attempt++) {
     await new Promise<void>((resolve) => setTimeout(resolve, 3000))
     const response = await api.get('/assistant/local/jobs/' + id, { timeout: 40000 })
-    const state = String(response?.data?.status || '')
-    if (state === 'completed') {
-      return String(response?.data?.message || 'IRENET devolvió una respuesta vacía.')
-    }
-    if (state === 'failed') return 'IRENET no pudo procesar la consulta. Verifica que Ollama local siga funcionando.'
-    if (state === 'expired') return 'La consulta expiró. Comprueba que tu computadora y el conector IRENET estén encendidos.'
+    const status = String(response?.data?.status || '')
+    if (status === 'completed') return String(response?.data?.message || 'IRENET devolvió una respuesta vacía.')
+    if (status === 'failed') return 'IRENET no pudo procesar la consulta. Verifica que Ollama local esté funcionando.'
+    if (status === 'expired') return 'La consulta expiró. Comprueba que tu PC y el conector estén encendidos.'
   }
-  return 'IRENET no respondió dentro del plazo de espera. Comprueba el conector en tu computadora.'
+  return 'IRENET no respondió dentro del plazo. Comprueba el conector en Windows.'
 }
+
+async function queryIrenetLocal(message: string): Promise<string> {
+  const job = await api.post('/assistant/local/jobs', { message }, { timeout: 40000 })
+  return waitForIrenetJob(String(job?.data?.id || ''))
+}
+
+async function analyzeIrenetRequest(code: string): Promise<void> {
+  const normalizedCode = code.toUpperCase()
+  open.value = true
+  if (!localEnabled.value) {
+    pushMessage('assistant', 'Para analizar ' + normalizedCode + ', activa primero «IRENET local». Esta función utiliza tu modelo de Windows y no Ollama Cloud.')
+    return
+  }
+  if (state.value === 'thinking') {
+    pushMessage('assistant', 'Hay una consulta en curso. Termina esa consulta antes de analizar otra solicitud.')
+    return
+  }
+  state.value = 'thinking'
+  pushMessage('user', 'Analiza solicitud ' + normalizedCode)
+  try {
+    // Only the backend constructs an authorized, minimal, read-only context.
+    const response = await api.post('/assistant/local/analyze-request', { codigo: normalizedCode }, { timeout: 40000 })
+    const result = await waitForIrenetJob(String(response?.data?.id || ''))
+    pushMessage('assistant', result)
+  } catch (error: any) {
+    const code = String(error?.response?.data?.code || '')
+    const status = Number(error?.response?.status)
+    pushMessage('assistant', code === 'request_not_found'
+      ? 'No se encontró esa solicitud en VITI.'
+      : code === 'irenet_bridge_disabled' || status === 503
+        ? 'El puente IRENET local está deshabilitado en Render.'
+        : status === 403
+          ? 'Tu usuario no tiene permisos para analizar solicitudes.'
+          : 'No pude analizar la solicitud. Revisa el conector de Windows y la conexión a Render.')
+  } finally {
+    state.value = 'online'
+  }
+}
+
+function handleRequestAnalysis(event: Event) {
+  const code = String((event as CustomEvent<{ codigo?: string }>).detail?.codigo || '').trim()
+  if (!/^SOL-\d{3,10}$/i.test(code)) return
+  open.value = true
+  expanded.value = true
+  void analyzeIrenetRequest(code)
+}
+
+onMounted(() => window.addEventListener('viti:analyze-request', handleRequestAnalysis))
+
 const messages = ref<Message[]>([{ role: 'assistant', text: '006 en línea. VITI está operativo. ¿Qué necesitas?' }])
 const state = ref<'online' | 'thinking' | 'attention'>('online')
 const voiceArmed = ref(false)
@@ -217,6 +259,11 @@ async function runLocalAction(message: string): Promise<boolean> {
 async function ask(message: string) {
   const value = message.trim()
   if (!value || !visible.value) return
+  const analysisMatch = /^(?:analiza|analizar|revisa|evalua)\s+(?:la\s+)?solicitud\s+(SOL-\d{3,10})$/i.exec(normalize(value))
+  if (analysisMatch) {
+    await analyzeIrenetRequest(analysisMatch[1])
+    return
+  }
   if (await runLocalAction(value)) return
 
   state.value = 'thinking'
@@ -427,6 +474,7 @@ function stopAudio(clearSpeaking = true) {
 }
 
 onBeforeUnmount(() => {
+  window.removeEventListener('viti:analyze-request', handleRequestAnalysis)
   recognitionSuppressed = true
   recognition?.stop()
   if (restartTimer) clearTimeout(restartTimer)
