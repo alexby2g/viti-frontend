@@ -25,4 +25,12 @@ assert.match(panel, /api\.post\('\/assistant\/local\/analyze-request'/, 'El aná
 assert.match(panel, /window\.addEventListener\('viti:analyze-request'/, 'Las tarjetas deben abrir el análisis en el chat')
 assert.match(requests, /Analizar con IRENET local \(solo lectura\)/, 'Botón de análisis explícito')
 assert.doesNotMatch(requests, /api\.(post|put|delete)\('\/solicitudes/, 'Analizar no modifica solicitudes')
+assert.match(panel, /v-if="latestAnalysis && !latestAnalysis.saved"/, 'Guardar es explícito y solo para informes finalizados')
+assert.match(panel, /api\.post\('\/assistant\/local\/analyses'/, 'Los informes se archivan únicamente mediante API autorizada')
+assert.match(panel, /api\.get\('\/assistant\/local\/analyses'/, 'El historial se consulta por solicitud')
+assert.match(panel, /api\.get\('\/assistant\/local\/analyses\/' \+ entry\.id/, 'Las versiones se leen individualmente')
+assert.match(panel, /window\.addEventListener\('viti:view-analysis-history'/, 'El chat escucha la petición de historial')
+assert.match(requests, /Historial de análisis guardados/, 'Cada solicitud ofrece su historial')
+assert.doesNotMatch(panel, /localStorage\.setItem\([^,]+,\s*.*analysis/i, 'No se almacenan informes en el navegador')
+
 console.log('Chat legible y análisis seguro de solicitudes: comprobados.')
