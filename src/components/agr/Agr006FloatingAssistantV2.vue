@@ -628,6 +628,15 @@ onBeforeUnmount(() => {
 }
 @media (max-width:640px) {.agr006-expand{display:none}}
 
+
+.agr006-archive-tools{border:1px solid rgba(88,165,220,.25);background:rgba(10,36,59,.88);border-radius:12px;padding:10px 12px;margin:8px 0;display:grid;gap:7px;flex:0 0 auto}
+.agr006-archive-buttons{display:flex;gap:8px;flex-wrap:wrap}
+.agr006-archive-buttons button,.agr006-archive-history button{font:inherit;font-size:12px;color:#d9f4ff;background:rgba(29,111,166,.20);border:1px solid rgba(102,191,237,.36);border-radius:8px;padding:7px 10px;cursor:pointer}
+.agr006-archive-buttons button:hover,.agr006-archive-history button:hover{background:rgba(29,111,166,.36);border-color:#83cdeb}
+.agr006-archive-buttons button:disabled{opacity:.5;cursor:wait}
+.agr006-archive-tools small{font-size:11px;line-height:1.45;color:#b6d5e5}
+.agr006-archive-history{max-height:115px;overflow:auto;display:flex;gap:6px;flex-wrap:wrap;align-items:center;font-size:12px;color:#9fc0d2}
+
 </style>
 
 <style>
