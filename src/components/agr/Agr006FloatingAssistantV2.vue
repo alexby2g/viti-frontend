@@ -230,6 +230,77 @@ async function analyzeIrenetRequest(code: string): Promise<void> {
   }
 }
 
+async function saveLatestAnalysis(): Promise<void> {
+  const current = latestAnalysis.value
+  if (!current || current.saved || savingAnalysis.value) return
+  savingAnalysis.value = true
+  analysisNotice.value = ''
+  try {
+    const response = await api.post('/assistant/local/analyses', {
+      job_id: current.jobId,
+    }, { timeout: 40000 })
+    const version = Number(response?.data?.version || 0)
+    latestAnalysis.value = { ...current, saved: true, version }
+    analysisNotice.value = 'Análisis de ' + current.codigo + ' guardado como versión ' + version + ' (borrador). No se ha aprobado ni modificado la solicitud.'
+    await loadAnalysisHistory(current.codigo)
+  } catch (error: any) {
+    const status = Number(error?.response?.status)
+    analysisNotice.value = status === 409
+      ? 'El análisis ya no está listo para guardar. Genera uno nuevo y vuelve a intentarlo.'
+      : status === 404
+        ? 'La respuesta temporal ya no está disponible. Genera de nuevo el análisis.'
+        : 'No pude guardar el análisis. Inténtalo otra vez sin cerrar VITI.'
+  } finally {
+    savingAnalysis.value = false
+  }
+}
+
+async function loadAnalysisHistory(code: string): Promise<void> {
+  if (!/^SOL-\d{3,10}$/i.test(code)) return
+  selectedAnalysisCode.value = code.toUpperCase()
+  loadingHistory.value = true
+  try {
+    const response = await api.get('/assistant/local/analyses', {
+      params: { codigo: selectedAnalysisCode.value },
+      timeout: 40000,
+    })
+    savedAnalyses.value = Array.isArray(response?.data?.items) ? response.data.items : []
+    showAnalysisHistory.value = true
+  } catch (error: any) {
+    showAnalysisHistory.value = false
+    analysisNotice.value = Number(error?.response?.status) === 403
+      ? 'Tu usuario no tiene permisos para consultar el historial.'
+      : 'No pude cargar las versiones guardadas de esta solicitud.'
+  } finally {
+    loadingHistory.value = false
+  }
+}
+
+async function openSavedAnalysis(entry: SavedAnalysis): Promise<void> {
+  try {
+    const response = await api.get('/assistant/local/analyses/' + entry.id, { timeout: 40000 })
+    const record = response?.data
+    if (record?.codigo !== selectedAnalysisCode.value) return
+    const content = String(record?.content || '')
+    if (!content) return
+    open.value = true
+    expanded.value = true
+    pushMessage('assistant', 'Versión ' + record.version + ' · ' + record.estado + ' · ' + record.codigo + '\n\n' + content)
+    analysisNotice.value = 'Estás viendo una versión guardada. Es un borrador y no modifica la solicitud.'
+  } catch {
+    analysisNotice.value = 'No pude abrir esa versión guardada.'
+  }
+}
+
+function handleAnalysisHistoryEvent(event: Event): void {
+  const code = String((event as CustomEvent<{ codigo?: string }>).detail?.codigo || '').trim().toUpperCase()
+  if (!/^SOL-\d{3,10}$/.test(code)) return
+  open.value = true
+  expanded.value = true
+  if (latestAnalysis.value?.codigo !== code) latestAnalysis.value = null
+  void loadAnalysisHistory(code)
+}
+
 function handleRequestAnalysis(event: Event) {
   const code = String((event as CustomEvent<{ codigo?: string }>).detail?.codigo || '').trim()
   if (!/^SOL-\d{3,10}$/i.test(code)) return
