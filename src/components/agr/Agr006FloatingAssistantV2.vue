@@ -2,7 +2,7 @@
   <div
     v-if="visible"
     class="agr006-root"
-    :class="{ open, active: voiceActive, speaking, listening }"
+    :class="{ open, expanded, active: voiceActive, speaking, listening }"
   >
     <div v-if="voiceActive" class="hologram-layer" aria-hidden="true">
       <div class="holo-aura"></div>
@@ -66,7 +66,10 @@
     <section v-if="open" class="agr006-panel" aria-label="Asistente 006">
       <header class="agr006-header">
         <div><strong>006</strong><small>VITI Intelligence Core · Voz propia</small></div>
-        <button type="button" class="agr006-close" @click="open = false">×</button>
+        <div class="agr006-header-actions">
+          <button type="button" class="agr006-expand" :aria-expanded="expanded" :aria-label="expanded ? 'Reducir chat de AGR 006' : 'Ampliar chat de AGR 006'" @click="expanded = !expanded">{{ expanded ? 'Reducir' : 'Ampliar' }}</button>
+          <button type="button" class="agr006-close" aria-label="Cerrar chat de AGR 006" @click="open = false">×</button>
+        </div>
       </header>
       <div class="agr006-body">
         <p class="agr006-presence">{{ presence }}</p>
@@ -81,7 +84,10 @@
           <small v-if="localEnabled">Usa Ollama de tu PC mediante Render. Las preguntas y respuestas pasan cifradas por HTTPS y se almacenan temporalmente cifradas en VITI. Respuestas por texto; sin voz externa.</small>
         </div>
         <div class="agr006-messages" aria-live="polite">
-          <div v-for="(item, index) in messages" :key="index" :class="['agr006-message', item.role]">{{ item.text }}</div>
+          <div v-for="(item, index) in messages" :key="index" :class="['agr006-message', item.role]">
+            <AgrMessageContent v-if="item.role === 'assistant'" :content="item.text"/>
+            <span v-else>{{ item.text }}</span>
+          </div>
         </div>
         <div v-if="voiceActive" class="agr006-live-transcript"><span></span>{{ draft || 'Escuchando…' }}</div>
         <div class="agr006-actions">
@@ -101,10 +107,11 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { api } from '../../boot/axios'
 import { resolveAgr006LocalAction, type Agr006LocalAction } from '../../utils/agr006CommandRouter'
+import AgrMessageContent from './AgrMessageContent.vue'
 
 interface Message { role: 'user' | 'assistant'; text: string }
 type AiTurn = { role: 'user' | 'assistant'; content: string }
@@ -114,6 +121,7 @@ const route = useRoute()
 const router = useRouter()
 const visible = computed(() => route.meta?.requiresAuth === true)
 const open = ref(false)
+const expanded = ref(false)
 const draft = ref('')
 const aiEnabled = ref(false)
 const localEnabled = ref(false)
