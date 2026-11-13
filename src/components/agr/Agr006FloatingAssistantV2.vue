@@ -209,7 +209,7 @@ async function ask(message: string) {
         const code = String(cloudError?.response?.data?.code || '')
         const failureMessages: Record<string, string> = {
           ollama_not_configured: 'Ollama Cloud todavía no está configurado en Render. Revisa las variables del backend.',
-          ollama_auth_failed: 'Ollama rechazó la clave API. Revisa OLLAMA_API_KEY en Render, sin compartirla.',
+          ollama_auth_failed: 'Ollama rechazó la autenticación. Comprueba la clave de Ollama en Render, sin compartirla.',
           ollama_billing_required: 'Ollama Cloud requiere saldo o un plan habilitado. Revisa Billing en tu cuenta.',
           ollama_model_unavailable: 'El modelo configurado no está disponible. Revisa AGR_OLLAMA_CLOUD_MODEL en Render.',
           ollama_rate_limited: 'Ollama alcanzó el límite de uso o solicitudes. Revisa Usage en tu cuenta.',
