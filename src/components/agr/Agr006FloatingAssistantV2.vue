@@ -89,6 +89,23 @@
             <span v-else>{{ item.text }}</span>
           </div>
         </div>
+        <div v-if="selectedAnalysisCode" class="agr006-archive-tools">
+          <div class="agr006-archive-buttons">
+            <button v-if="latestAnalysis && !latestAnalysis.saved" type="button" :disabled="savingAnalysis" @click="saveLatestAnalysis">
+              {{ savingAnalysis ? 'Guardando…' : 'Guardar análisis de ' + latestAnalysis.codigo }}
+            </button>
+            <button type="button" :disabled="loadingHistory" @click="loadAnalysisHistory(selectedAnalysisCode)">
+              {{ loadingHistory ? 'Consultando…' : 'Historial de ' + selectedAnalysisCode }}
+            </button>
+          </div>
+          <small v-if="analysisNotice" role="status">{{ analysisNotice }}</small>
+          <div v-if="showAnalysisHistory" class="agr006-archive-history">
+            <span v-if="savedAnalyses.length === 0">Todavía no hay versiones guardadas.</span>
+            <button v-for="entry in savedAnalyses" :key="entry.id" type="button" @click="openSavedAnalysis(entry)">
+              Versión {{ entry.version }} · {{ entry.estado }} · {{ new Date(entry.created_at).toLocaleDateString('es-BO') }}
+            </button>
+          </div>
+        </div>
         <div v-if="voiceActive" class="agr006-live-transcript"><span></span>{{ draft || 'Escuchando…' }}</div>
         <div class="agr006-actions">
           <button type="button" @click="submitCommand('resumen')">Resumen</button>
@@ -126,6 +143,15 @@ const draft = ref('')
 const aiEnabled = ref(false)
 const localEnabled = ref(false)
 const aiHistory = ref<AiTurn[]>([])
+type SavedAnalysis = { id: number; version: number; estado: string; created_at: string }
+type LatestAnalysis = { codigo: string; jobId: string; saved: boolean; version?: number }
+const latestAnalysis = ref<LatestAnalysis | null>(null)
+const selectedAnalysisCode = ref('')
+const savedAnalyses = ref<SavedAnalysis[]>([])
+const showAnalysisHistory = ref(false)
+const savingAnalysis = ref(false)
+const loadingHistory = ref(false)
+const analysisNotice = ref('')
 
 function toggleAi() {
   aiEnabled.value = !aiEnabled.value
@@ -139,13 +165,17 @@ function toggleLocal() {
   aiHistory.value = []
 }
 
-async function waitForIrenetJob(id: string): Promise<string> {
+async function waitForIrenetJob(id: string, onCompleted?: (content: string) => void): Promise<string> {
   if (!/^[0-9a-f-]{36}$/i.test(id)) return 'VITI no devolvió un identificador válido.'
   for (let attempt = 0; attempt < 110; attempt++) {
     await new Promise<void>((resolve) => setTimeout(resolve, 3000))
     const response = await api.get('/assistant/local/jobs/' + id, { timeout: 40000 })
     const status = String(response?.data?.status || '')
-    if (status === 'completed') return String(response?.data?.message || 'IRENET devolvió una respuesta vacía.')
+    if (status === 'completed') {
+      const content = String(response?.data?.message || '').trim()
+      if (content) onCompleted?.(content)
+      return content || 'IRENET devolvió una respuesta vacía.'
+    }
     if (status === 'failed') return 'IRENET no pudo procesar la consulta. Verifica que Ollama local esté funcionando.'
     if (status === 'expired') return 'La consulta expiró. Comprueba que tu PC y el conector estén encendidos.'
   }
@@ -169,11 +199,21 @@ async function analyzeIrenetRequest(code: string): Promise<void> {
     return
   }
   state.value = 'thinking'
+  latestAnalysis.value = null
+  selectedAnalysisCode.value = normalizedCode
+  savedAnalyses.value = []
+  showAnalysisHistory.value = false
+  analysisNotice.value = ''
   pushMessage('user', 'Analiza solicitud ' + normalizedCode)
   try {
     // Only the backend constructs an authorized, minimal, read-only context.
     const response = await api.post('/assistant/local/analyze-request', { codigo: normalizedCode }, { timeout: 40000 })
-    const result = await waitForIrenetJob(String(response?.data?.id || ''))
+    const jobId = String(response?.data?.id || '')
+    const result = await waitForIrenetJob(jobId, () => {
+      // Never archive automatically: user must press "Guardar análisis".
+      latestAnalysis.value = { codigo: normalizedCode, jobId, saved: false }
+      analysisNotice.value = 'El análisis está listo. Pulsa «Guardar análisis» para conservar una versión en VITI.'
+    })
     pushMessage('assistant', result)
   } catch (error: any) {
     const code = String(error?.response?.data?.code || '')
@@ -198,7 +238,10 @@ function handleRequestAnalysis(event: Event) {
   void analyzeIrenetRequest(code)
 }
 
-onMounted(() => window.addEventListener('viti:analyze-request', handleRequestAnalysis))
+onMounted(() => {
+  window.addEventListener('viti:analyze-request', handleRequestAnalysis)
+  window.addEventListener('viti:view-analysis-history', handleAnalysisHistoryEvent)
+})
 
 const messages = ref<Message[]>([{ role: 'assistant', text: '006 en línea. VITI está operativo. ¿Qué necesitas?' }])
 const state = ref<'online' | 'thinking' | 'attention'>('online')
@@ -475,6 +518,7 @@ function stopAudio(clearSpeaking = true) {
 
 onBeforeUnmount(() => {
   window.removeEventListener('viti:analyze-request', handleRequestAnalysis)
+  window.removeEventListener('viti:view-analysis-history', handleAnalysisHistoryEvent)
   recognitionSuppressed = true
   recognition?.stop()
   if (restartTimer) clearTimeout(restartTimer)
