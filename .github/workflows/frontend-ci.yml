@@ -32,6 +32,9 @@ jobs:
       - name: IRENET local mode smoke
         run: npm run test:viti-irenet-local
 
+      - name: AGR readable chat and request analysis smoke
+        run: npm run test:viti-chat-ux
+
       - name: Production dependency audit
         run: npm audit --omit=dev --audit-level=high
 
