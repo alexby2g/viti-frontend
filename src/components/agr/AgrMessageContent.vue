@@ -1,8 +1,8 @@
-<script setup lang="ts">
+<script setup>
 import { computed } from 'vue'
 import { parseAgrMarkdown } from '../../utils/agrMarkdown.mjs'
 
-const props = defineProps<{ content: string }>()
+const props = defineProps({ content: { type: String, required: true } })
 const blocks = computed(() => parseAgrMarkdown(props.content))
 </script>
 
