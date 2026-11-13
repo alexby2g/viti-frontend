@@ -75,6 +75,10 @@
             {{ aiEnabled ? 'IA Ollama: activada' : 'IA Ollama: desactivada' }}
           </button>
           <small v-if="aiEnabled">Las preguntas abiertas se enviarán a Ollama Cloud. Evita datos privados. Los comandos de VITI siguen protegidos.</small>
+          <button type="button" :aria-pressed="localEnabled" @click="toggleLocal">
+            {{ localEnabled ? 'IRENET local: activado' : 'IRENET local: desactivado' }}
+          </button>
+          <small v-if="localEnabled">Usa Ollama de tu PC mediante Render. Las preguntas y respuestas pasan cifradas por HTTPS y se almacenan temporalmente cifradas en VITI. Respuestas por texto; sin voz externa.</small>
         </div>
         <div class="agr006-messages" aria-live="polite">
           <div v-for="(item, index) in messages" :key="index" :class="['agr006-message', item.role]">{{ item.text }}</div>
@@ -112,11 +116,39 @@ const visible = computed(() => route.meta?.requiresAuth === true)
 const open = ref(false)
 const draft = ref('')
 const aiEnabled = ref(false)
+const localEnabled = ref(false)
 const aiHistory = ref<AiTurn[]>([])
 
 function toggleAi() {
   aiEnabled.value = !aiEnabled.value
+  if (aiEnabled.value) localEnabled.value = false
   aiHistory.value = []
+}
+
+function toggleLocal() {
+  localEnabled.value = !localEnabled.value
+  if (localEnabled.value) aiEnabled.value = false
+  aiHistory.value = []
+}
+
+async function queryIrenetLocal(message: string): Promise<string> {
+  const job = await api.post('/assistant/local/jobs', { message }, { timeout: 40000 })
+  const id = String(job?.data?.id || '')
+  if (!/^[0-9a-f-]{36}$/i.test(id)) return 'VITI no devolvió un identificador válido para la consulta local.'
+
+  // The PC polls Render via HTTPS and runs the model at 127.0.0.1.
+  // Browser requests never connect directly to Ollama or the private PC.
+  for (let attempt = 0; attempt < 65; attempt++) {
+    await new Promise<void>((resolve) => setTimeout(resolve, 3000))
+    const response = await api.get('/assistant/local/jobs/' + id, { timeout: 40000 })
+    const state = String(response?.data?.status || '')
+    if (state === 'completed') {
+      return String(response?.data?.message || 'IRENET devolvió una respuesta vacía.')
+    }
+    if (state === 'failed') return 'IRENET no pudo procesar la consulta. Verifica que Ollama local siga funcionando.'
+    if (state === 'expired') return 'La consulta expiró. Comprueba que tu computadora y el conector IRENET estén encendidos.'
+  }
+  return 'IRENET no respondió dentro del plazo de espera. Comprueba el conector en tu computadora.'
 }
 const messages = ref<Message[]>([{ role: 'assistant', text: '006 en línea. VITI está operativo. ¿Qué necesitas?' }])
 const state = ref<'online' | 'thinking' | 'attention'>('online')
@@ -187,8 +219,25 @@ async function ask(message: string) {
     let answer = String(payload?.data?.message ?? payload?.message ?? payload?.data?.data?.message ?? 'No tengo una respuesta disponible todavía.')
     const action: Action | null = payload?.data?.action ?? payload?.action ?? payload?.data?.data?.action ?? null
 
-    // Los comandos deterministas mantienen prioridad. Ollama solo responde
-    // a consultas no reconocidas cuando el usuario habilitó explícitamente IA.
+    // Los comandos de VITI mantienen prioridad. El modo local nunca utiliza
+    // créditos de Ollama Cloud y solo transmite mensajes no reconocidos.
+    if (localEnabled.value && payload?.intent === 'unknown') {
+      try {
+        answer = await queryIrenetLocal(value)
+      } catch (localError: any) {
+        const status = Number(localError?.response?.status)
+        const code = String(localError?.response?.data?.code || '')
+        answer = code === 'irenet_bridge_disabled' || status === 503
+          ? 'El puente de IRENET todavía no está habilitado en Render.'
+          : status === 401
+            ? 'La sesión de VITI ha caducado.'
+            : status === 403
+              ? 'Tu usuario no tiene permiso para consultar IRENET.'
+              : 'No pude comunicarme con IRENET local. Revisa la conexión con Render.'
+      }
+    }
+
+    // Ollama Cloud es una alternativa voluntaria y nunca se combina con IRENET local.
     if (aiEnabled.value && payload?.intent === 'unknown') {
       try {
         const cloud = await api.post('/assistant/ollama', {
@@ -233,7 +282,8 @@ async function ask(message: string) {
     pushMessage('assistant', answer)
     state.value = 'online'
     await executeAction(action)
-    await speak(answer)
+    // No enviar respuestas del modelo local a proveedores de voz externos.
+    if (!(localEnabled.value && payload?.intent === 'unknown')) await speak(answer)
   } catch (error: any) {
     state.value = Number(error?.response?.status) === 401 ? 'attention' : 'attention'
     pushMessage('assistant', Number(error?.response?.status) === 401 ? 'La sesión de VITI no está lista.' : 'No pude consultar VITI en este momento. Revisa la conexión del sistema.')
