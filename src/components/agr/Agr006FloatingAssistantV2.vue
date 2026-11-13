@@ -194,7 +194,7 @@ async function ask(message: string) {
         const cloud = await api.post('/assistant/ollama', {
           message: value,
           history: aiHistory.value.slice(-6),
-        }, { timeout: 28000 })
+        }, { timeout: 52000 })
         const result = cloud?.data || {}
         if (result?.intent === 'ollama_answer' && typeof result?.message === 'string') {
           answer = result.message.trim() || answer
@@ -206,9 +206,28 @@ async function ask(message: string) {
         }
       } catch (cloudError: any) {
         const status = Number(cloudError?.response?.status)
-        answer = status === 503
-          ? 'Ollama Cloud todavía no está configurado en Render. Los comandos locales de 006 siguen funcionando.'
-          : 'No se pudo consultar Ollama. Puedes continuar con los comandos de VITI.'
+        const code = String(cloudError?.response?.data?.code || '')
+        const failureMessages: Record<string, string> = {
+          ollama_not_configured: 'Ollama Cloud todavía no está configurado en Render. Revisa las variables del backend.',
+          ollama_auth_failed: 'Ollama rechazó la autenticación. Comprueba la clave de Ollama en Render, sin compartirla.',
+          ollama_billing_required: 'Ollama Cloud requiere saldo o un plan habilitado. Revisa Billing en tu cuenta.',
+          ollama_model_unavailable: 'El modelo configurado no está disponible. Revisa AGR_OLLAMA_CLOUD_MODEL en Render.',
+          ollama_rate_limited: 'Ollama alcanzó el límite de uso o solicitudes. Revisa Usage en tu cuenta.',
+          ollama_invalid_request: 'Ollama rechazó la solicitud. Comprueba el modelo configurado en Render.',
+          ollama_provider_unavailable: 'Ollama Cloud no está respondiendo correctamente. Intenta de nuevo.',
+          ollama_connection_failed: 'Render no pudo conectarse con Ollama Cloud. Intenta de nuevo.',
+          ollama_empty_answer: 'Ollama devolvió una respuesta vacía. Prueba con otra pregunta.',
+        }
+        answer = failureMessages[code]
+          ?? (status === 429
+            ? 'Demasiadas consultas a la IA en poco tiempo. Inténtalo después.'
+            : status === 401
+              ? 'La sesión de VITI ha caducado. Vuelve a iniciar sesión.'
+              : status === 403
+                ? 'Tu usuario no tiene permiso para consultar Ollama.'
+                : status === 503
+                  ? 'Ollama Cloud todavía no está configurado en Render.'
+                  : 'No se pudo consultar Ollama. Los comandos locales de VITI siguen funcionando.')
       }
     }
     pushMessage('assistant', answer)
