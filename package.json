@@ -20,7 +20,8 @@
     "test:viti-forms": "node scripts/check-viti-forms-admin.mjs",
     "test:viti-assistant-transport": "node scripts/check-agr-assistant-transport.mjs",
     "test:viti-ollama-optin": "node scripts/check-agr-ollama-optin.mjs",
-    "test:viti-irenet-local": "node scripts/check-agr-irenet-local.mjs"
+    "test:viti-irenet-local": "node scripts/check-agr-irenet-local.mjs",
+    "test:viti-chat-ux": "node scripts/check-agr-chat-ux.mjs"
   },
   "dependencies": {
     "@quasar/extras": "^1.16.17",
