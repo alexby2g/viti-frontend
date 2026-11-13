@@ -78,7 +78,7 @@
           <button type="button" :aria-pressed="localEnabled" @click="toggleLocal">
             {{ localEnabled ? 'IRENET local: activado' : 'IRENET local: desactivado' }}
           </button>
-          <small v-if="localEnabled">Usa Ollama qwen2.5:7b de tu computadora mediante el conector HTTPS de IRENET. Requiere que el conector esté abierto.</small>
+          <small v-if="localEnabled">Usa Ollama de tu PC mediante Render. Las preguntas y respuestas pasan cifradas por HTTPS y se almacenan temporalmente cifradas en VITI. Respuestas por texto; sin voz externa.</small>
         </div>
         <div class="agr006-messages" aria-live="polite">
           <div v-for="(item, index) in messages" :key="index" :class="['agr006-message', item.role]">{{ item.text }}</div>
@@ -282,7 +282,8 @@ async function ask(message: string) {
     pushMessage('assistant', answer)
     state.value = 'online'
     await executeAction(action)
-    await speak(answer)
+    // No enviar respuestas del modelo local a proveedores de voz externos.
+    if (!(localEnabled.value && payload?.intent === 'unknown')) await speak(answer)
   } catch (error: any) {
     state.value = Number(error?.response?.status) === 401 ? 'attention' : 'attention'
     pushMessage('assistant', Number(error?.response?.status) === 401 ? 'La sesión de VITI no está lista.' : 'No pude consultar VITI en este momento. Revisa la conexión del sistema.')
