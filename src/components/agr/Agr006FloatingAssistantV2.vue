@@ -81,7 +81,7 @@
           <button type="button" :aria-pressed="localEnabled" @click="toggleLocal">
             {{ localEnabled ? 'IRENET local: activado' : 'IRENET local: desactivado' }}
           </button>
-          <small v-if="localEnabled">Usa Ollama de tu PC mediante Render. Las preguntas y respuestas pasan cifradas por HTTPS y se almacenan temporalmente cifradas en VITI. Respuestas por texto; sin voz externa.</small>
+          <small v-if="localEnabled">Usa Ollama de tu PC mediante Render. Las preguntas y respuestas pasan cifradas por HTTPS y se almacenan temporalmente cifradas en VITI. Respuestas por texto; sin voz externa. Para analizar requisitos escribe: «Analiza solicitud SOL-00079».</small>
         </div>
         <div class="agr006-messages" aria-live="polite">
           <div v-for="(item, index) in messages" :key="index" :class="['agr006-message', item.role]">
@@ -260,7 +260,7 @@ async function ask(message: string) {
   const value = message.trim()
   if (!value || !visible.value) return
   const analysisMatch = /^(?:analiza|analizar|revisa|evalua)\s+(?:la\s+)?solicitud\s+(SOL-\d{3,10})$/i.exec(normalize(value))
-  if (analysisMatch) {
+  if (analysisMatch?.[1]) {
     await analyzeIrenetRequest(analysisMatch[1])
     return
   }
@@ -499,6 +499,20 @@ onBeforeUnmount(() => {
 .holo-body path,.holo-head path,.holo-head circle{fill:url(#holoFillV2);stroke:url(#holoStrokeV2);stroke-width:2}.holo-head .hair{fill:rgba(91,230,255,.16)}.holo-head .mouth{fill:none;stroke-linecap:round}.holo-head .mouth.talking{animation:mouthTalk .18s steps(2,end) infinite}.holo-caption{position:absolute;bottom:92px;display:flex;gap:10px;align-items:center;letter-spacing:.18em;font-size:12px;color:#b8eeff;text-shadow:0 0 12px rgba(104,227,255,.8)}.status-dot{width:9px;height:9px;border-radius:50%;background:#68efff;box-shadow:0 0 12px #68efff}.holo-wave{position:absolute;bottom:56px;display:flex;gap:4px;align-items:center}.holo-wave i{display:block;width:4px;height:10px;border-radius:4px;background:#64eaff;box-shadow:0 0 8px rgba(100,234,255,.65)}.holo-wave.active i{animation:wave .6s ease-in-out infinite alternate}.holo-wave i:nth-child(2){animation-delay:.08s}.holo-wave i:nth-child(3){animation-delay:.16s}.holo-wave i:nth-child(4){animation-delay:.24s}.holo-wave i:nth-child(5){animation-delay:.32s}.holo-wave i:nth-child(6){animation-delay:.4s}.holo-wave i:nth-child(7){animation-delay:.48s}.holo-wave i:nth-child(8){animation-delay:.56s}
 @keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-7px)}}@keyframes spin{to{transform:rotate(382deg)}}@keyframes spinReverse{to{transform:rotate(-382deg)}}@keyframes pulse{50%{opacity:.35}}@keyframes breathe{0%,100%{transform:scale(.96);opacity:.75}50%{transform:scale(1.04);opacity:1}}@keyframes materialize{from{opacity:0;transform:scale(.96) translateY(20px);filter:drop-shadow(0 0 2px rgba(72,214,255,.2))}to{opacity:1;transform:scale(1) translateY(0)}}@keyframes mouthTalk{0%,100%{transform:scaleY(.35)}50%{transform:scaleY(1.25)}}@keyframes wave{from{height:7px;opacity:.45}to{height:24px;opacity:1}}
 @media (max-width:640px){.agr006-root{right:14px;bottom:14px}.agr006-orb{width:68px;height:68px}.agr006-panel{bottom:82px}.hologram-layer{place-items:center}.hologram{width:92vw;height:78vh}.holo-caption{bottom:60px}}
+
+.agr006-header-actions{display:flex;align-items:center;gap:12px}
+.agr006-expand{border:1px solid rgba(133,220,255,.24);border-radius:8px;background:rgba(40,130,186,.12);color:#cbecff;padding:7px 11px;font-size:12px;cursor:pointer}
+.agr006-expand:hover{border-color:rgba(133,220,255,.7)}
+.agr006-message.assistant{min-width:0;overflow-wrap:anywhere}
+@media (min-width:641px) {
+  .agr006-root.expanded .agr006-panel{display:flex;flex-direction:column;width:min(830px,calc(100vw - 40px));height:min(790px,calc(100vh - 124px));max-height:calc(100vh - 124px)}
+  .agr006-root.expanded .agr006-header{flex:0 0 auto}
+  .agr006-root.expanded .agr006-body{display:flex;flex:1;flex-direction:column;min-height:0}
+  .agr006-root.expanded .agr006-messages{flex:1;min-height:120px;max-height:none;overflow-y:auto}
+  .agr006-root.expanded .agr006-message{max-width:95%}
+}
+@media (max-width:640px) {.agr006-expand{display:none}}
+
 </style>
 
 <style>
