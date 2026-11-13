@@ -20,6 +20,7 @@ assert.doesNotMatch(reader, /v-html|innerHTML|DOMParser|eval\(/, 'Las respuestas
 assert.match(reader, /\{\{\s*part\.text\s*\}\}/, 'Los mensajes deben escapar texto mediante Vue')
 assert.match(panel, /:content="item\.text"/, 'El chat usa el renderizador seguro')
 assert.match(panel, /aria-label="Ampliar chat de AGR 006"|'Ampliar chat de AGR 006'/, 'El chat debe poder ampliarse')
+assert.match(panel, /attempt < 110/, 'El frontend espera análisis largos de IRENET local')
 assert.match(panel, /api\.post\('\/assistant\/local\/analyze-request'/, 'El análisis debe ejecutarse por API segura')
 assert.match(panel, /window\.addEventListener\('viti:analyze-request'/, 'Las tarjetas deben abrir el análisis en el chat')
 assert.match(requests, /Analizar con IRENET local \(solo lectura\)/, 'Botón de análisis explícito')
