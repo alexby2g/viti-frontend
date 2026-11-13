@@ -141,7 +141,7 @@ function toggleLocal() {
 
 async function waitForIrenetJob(id: string): Promise<string> {
   if (!/^[0-9a-f-]{36}$/i.test(id)) return 'VITI no devolvió un identificador válido.'
-  for (let attempt = 0; attempt < 65; attempt++) {
+  for (let attempt = 0; attempt < 110; attempt++) {
     await new Promise<void>((resolve) => setTimeout(resolve, 3000))
     const response = await api.get('/assistant/local/jobs/' + id, { timeout: 40000 })
     const status = String(response?.data?.status || '')
