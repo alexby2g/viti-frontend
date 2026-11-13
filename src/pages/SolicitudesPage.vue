@@ -46,6 +46,10 @@ function analyzeWithIrenet(row) {
   if (!/^SOL-\d{3,10}$/i.test(String(row.codigo || ''))) return
   window.dispatchEvent(new CustomEvent('viti:analyze-request', { detail: { codigo: row.codigo } }))
 }
+function viewSavedAnalyses(row) {
+  if (!/^SOL-\d{3,10}$/i.test(String(row.codigo || ''))) return
+  window.dispatchEvent(new CustomEvent('viti:view-analysis-history', { detail: { codigo: row.codigo } }))
+}
 function clearFilters() { search.value=''; statusFilter.value='todas' }
 function remove(row) {
   $q.dialog({ title:'Eliminar solicitud', message:`¿Eliminar ${row.codigo}?`, cancel:true, persistent:true }).onOk(async () => {
@@ -113,6 +117,7 @@ onMounted(load)
           <b>{{formatDateTime(row.created_at)}}</b>
           <div class="request-actions" @click.stop>
             <q-btn flat round dense icon="auto_awesome" color="cyan-4" aria-label="Analizar esta solicitud con IRENET local" @click="analyzeWithIrenet(row)"><q-tooltip>Analizar con IRENET local (solo lectura)</q-tooltip></q-btn>
+            <q-btn flat round dense icon="history_edu" color="light-blue-3" aria-label="Ver versiones guardadas del análisis de esta solicitud" @click="viewSavedAnalyses(row)"><q-tooltip>Historial de análisis guardados</q-tooltip></q-btn>
             <q-btn flat round dense icon="edit" @click="edit(row)"><q-tooltip>Editar</q-tooltip></q-btn>
             <q-btn flat round dense icon="open_in_new" color="orange" @click="open(row)"><q-tooltip>Abrir solicitud</q-tooltip></q-btn>
             <q-btn v-if="!row.proyecto" flat round dense icon="delete_outline" color="negative" @click="remove(row)"><q-tooltip>Eliminar</q-tooltip></q-btn>
