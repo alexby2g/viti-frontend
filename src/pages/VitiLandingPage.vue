@@ -10,10 +10,10 @@ const solutions = [
 ]
 
 const workflow = [
-  { number:'01', icon:'chat_bubble_outline', title:'Nos cuentas qué necesitas', text:'Una solicitud corta basta para empezar. Explica el problema con tus propias palabras.' },
-  { number:'02', icon:'fact_check', title:'VITI ordena la idea', text:'Revisamos la necesidad, aclaramos lo importante y definimos contigo el alcance real.' },
-  { number:'03', icon:'developer_mode', title:'Construimos y validamos', text:'Desarrollamos por etapas y te mostramos avances útiles antes de llegar a la entrega.' },
-  { number:'04', icon:'rocket_launch', title:'Recibes tu sistema', text:'Entregamos accesos, dejamos todo organizado y continuamos con el soporte acordado.' },
+  { number:'01', icon:'chat_bubble_outline', title:'Creas tu cuenta', text:'Registra tus datos de contacto para tener un espacio privado en VITI.' },
+  { number:'02', icon:'fact_check', title:'Nos cuentas tu idea', text:'Completa tu perfil y solicita tu sistema desde tu espacio personal.' },
+  { number:'03', icon:'developer_mode', title:'Revisamos y desarrollamos', text:'Evaluamos tu solicitud, acordamos el alcance y compartimos avances.' },
+  { number:'04', icon:'rocket_launch', title:'Recibes tu sistema', text:'Consultas la entrega y el soporte acordado desde tu cuenta.' },
 ]
 
 const subscription = [
@@ -73,7 +73,7 @@ const subscription = [
             </p>
 
             <div class="hero-actions">
-              <q-btn color="primary" unelevated no-caps size="lg" class="hero-main-btn" icon-right="arrow_forward" label="Solicitar evaluación" to="/solicitud" />
+              <q-btn color="primary" unelevated no-caps size="lg" class="hero-main-btn" icon-right="arrow_forward" label="Crear cuenta y solicitar" to="/registro" />
               <q-btn outline no-caps size="lg" class="btn-outline" label="Ver demo" to="/demo" />
               <q-btn flat no-caps size="lg" class="btn-text" label="Ver precios" to="/viti/planes" />
             </div>
@@ -156,11 +156,11 @@ const subscription = [
         </div>
 
         <div class="landing-container hero-trust reveal-block" style="animation-delay:.18s">
-          <div><q-icon name="description" /><span><b>1.</b> Envías tu necesidad</span></div>
+          <div><q-icon name="description" /><span><b>1.</b> Creas tu cuenta</span></div>
           <span class="trust-line"></span>
-          <div><q-icon name="fact_check" /><span><b>2.</b> Acordamos el trabajo</span></div>
+          <div><q-icon name="fact_check" /><span><b>2.</b> Envías tu solicitud</span></div>
           <span class="trust-line"></span>
-          <div><q-icon name="developer_mode" /><span><b>3.</b> Lo desarrollamos</span></div>
+          <div><q-icon name="developer_mode" /><span><b>3.</b> Desarrollamos</span></div>
           <span class="trust-line"></span>
           <div><q-icon name="verified" /><span><b>4.</b> Recibes tu sistema</span></div>
         </div>
@@ -199,7 +199,7 @@ const subscription = [
             </div>
             <div class="workflow-heading-copy">
               <p>Empiezas contando el problema. VITI convierte esa necesidad en un trabajo ordenado y te acompaña hasta la entrega.</p>
-              <q-btn flat no-caps class="text-action" icon-right="arrow_forward" label="Iniciar una solicitud" to="/solicitud" />
+              <q-btn flat no-caps class="text-action" icon-right="arrow_forward" label="Crear cuenta para solicitar" to="/registro" />
             </div>
           </div>
 
@@ -269,10 +269,10 @@ const subscription = [
           <div class="cta-copy">
             <div class="section-kicker">Empecemos</div>
             <h2>Cuéntanos qué quieres resolver.</h2>
-            <p>La solicitud toma pocos minutos. Si tu proyecto es viable, VITI te mostrará el siguiente paso para confirmar alcance, precio y forma de trabajo.</p>
+            <p>Crea tu cuenta, completa tu perfil y envía tu solicitud desde tu espacio privado. VITI te informará sobre alcance, precio y próximos pasos.</p>
           </div>
           <div class="cta-actions">
-            <q-btn color="primary" unelevated no-caps size="lg" icon-right="arrow_forward" label="Solicitar mi sistema" to="/solicitud"/>
+            <q-btn color="primary" unelevated no-caps size="lg" icon-right="arrow_forward" label="Registrarme y solicitar" to="/registro"/>
             <q-btn outline no-caps size="lg" class="btn-outline" label="Crear cuenta" to="/registro"/>
             <q-btn flat no-caps size="lg" class="btn-text" label="Ya tengo acceso" to="/login"/>
           </div>
@@ -291,7 +291,7 @@ const subscription = [
           <router-link to="/viti/planes">Precios</router-link>
           <router-link to="/demo">Demo</router-link>
           <router-link to="/registro">Crear cuenta</router-link>
-          <router-link to="/solicitud">Solicitar sistema</router-link>
+          <router-link to="/registro">Solicitar sistema</router-link>
           <router-link to="/login">Ingresar</router-link>
         </div>
       </div>
