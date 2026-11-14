@@ -24,7 +24,7 @@ export default defineRouter(({ store }) => {
   })
 
   const clientHubRoutes = [
-    { name:'client-portal', path:'/mi-cuenta', component:() => import('../pages/ClientHubPage.vue') },
+    { name:'client-portal', path:'/mi-cuenta', component:() => import('../pages/ClientPortalPage.vue') },
     { name:'client-apps', path:'/mi-aplicaciones', component:() => import('../pages/ClientAppsPage.vue') },
     { name:'client-project', path:'/mi-proyecto', component:() => import('../pages/ClientProjectPage.vue') },
     { name:'client-messages', path:'/mi-buzon', component:() => import('../pages/ClientMessagesPage.vue') },
@@ -67,8 +67,6 @@ export default defineRouter(({ store }) => {
 
   router.beforeEach(async (to, from) => {
     if (to.meta.publicLanding || to.name === 'viti-landing' || to.name === 'viti-plans') return true
-
-    if (to.name === 'public-request') return true
 
     const auth = useAuthStore(store)
     if (auth.setupRequired === null) await auth.checkSetup()
