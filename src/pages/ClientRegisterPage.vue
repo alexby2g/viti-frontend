@@ -12,10 +12,9 @@ const auth = useAuthStore()
 const showPassword = ref(false)
 const formRef = ref(null)
 
-const googleMode = computed(() => String(route.query.google || '') === 'created' && Boolean(route.query.token))
 const fromRequest = computed(() => String(route.query.origen || '') === 'solicitud')
 const form = reactive({
-  nombre:'', correo:'', celular:'', whatsapp_same:true, whatsapp:'',
+  nombre:'', celular:'', whatsapp_same:true, whatsapp:'',
   business_whatsapp_different:false, whatsapp_business:'', password:'', password_confirmation:'',
 })
 const effectiveWhatsapp = computed(() => form.whatsapp_same ? form.celular : form.whatsapp)
@@ -32,20 +31,14 @@ function errorMessage(error) { const errors=error?.response?.data?.errors; retur
 async function submit() {
   const valid=await formRef.value?.validate(); if(valid===false)return
   try {
-    if(googleMode.value){
-      await auth.registerClient({
-        token:String(route.query.token), nombre:form.nombre.trim(), celular:form.celular,
-        whatsapp:effectiveWhatsapp.value||null,
-        whatsapp_business:form.business_whatsapp_different?form.whatsapp_business:null,
-      })
-    } else {
-      await auth.createClientAccount({
-        nombre:form.nombre.trim(), correo:form.correo.trim().toLowerCase() || null, celular:form.celular,
-        whatsapp:effectiveWhatsapp.value||null,
-        whatsapp_business:form.business_whatsapp_different?form.whatsapp_business:null,
-        password:form.password, password_confirmation:form.password_confirmation,
-      })
-    }
+    await auth.createClientAccount({
+      nombre:form.nombre.trim(),
+      celular:form.celular,
+      whatsapp:effectiveWhatsapp.value||null,
+      whatsapp_business:form.business_whatsapp_different?form.whatsapp_business:null,
+      password:form.password,
+      password_confirmation:form.password_confirmation,
+    })
     $q.notify({type:'positive',message:'Tu cuenta VITI está lista.'})
     await router.replace('/mi-cuenta?bienvenida=1')
   } catch(error) {
@@ -62,18 +55,11 @@ async function submit() {
   }
 }
 
-onMounted(async()=>{
-  if(googleMode.value){
-    await auth.initialize(true).catch(()=>{})
-    const full=[auth.user?.nombre,auth.user?.apellido].filter(Boolean).join(' ').trim()
-    if(full)form.nombre=full
-    if(auth.user?.correo)form.correo=auth.user.correo
-  } else {
-    if(route.query.nombre) form.nombre=String(route.query.nombre)
-    if(route.query.correo) form.correo=String(route.query.correo).toLowerCase()
-    if(route.query.celular) form.celular=digits(route.query.celular)
-    if(route.query.whatsapp){ form.whatsapp_same=false; form.whatsapp=digits(route.query.whatsapp) }
-  }
+onMounted(()=>{
+  if(route.query.nombre) form.nombre=String(route.query.nombre)
+  if(route.query.celular) form.celular=digits(route.query.celular)
+  if(route.query.whatsapp){ form.whatsapp_same=false; form.whatsapp=digits(route.query.whatsapp) }
+
 })
 </script>
 
@@ -94,12 +80,11 @@ onMounted(async()=>{
       </section>
 
       <q-card flat class="register-card"><q-card-section class="q-pa-lg">
-        <div class="card-kicker">{{googleMode?'COMPLETA TU ACCESO':'REGISTRO SIMPLE'}}</div>
-        <h2>{{googleMode?'Solo faltan tus datos de contacto.':'Crea tu cuenta en pocos pasos.'}}</h2>
+        <div class="card-kicker">REGISTRO SIMPLE</div>
+        <h2>Crea tu cuenta en pocos pasos.</h2>
         <p>Crear una cuenta no activa un plan ni genera cobros.</p>
         <q-form ref="formRef" @submit="submit">
           <q-input v-model="form.nombre" outlined label="Nombre completo *" autocomplete="name" class="q-mt-lg" :rules="[v=>String(v||'').trim().length>=3||'Escribe tu nombre completo.']"/>
-          <q-input v-model="form.correo" outlined :readonly="googleMode" :label="googleMode ? 'Correo de Google' : 'Correo electrónico (recomendado)'" type="email" autocomplete="email" class="q-mt-sm" :rules="[v=>!v||/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v)||'Escribe un correo válido.']"/>
           <q-input :model-value="form.celular" outlined label="Celular *" inputmode="numeric" autocomplete="tel" class="q-mt-sm" :rules="[v=>validPhone(v)]" @update:model-value="v=>normalize('celular',v)"/>
 
           <div class="contact-option q-mt-sm">
@@ -111,7 +96,7 @@ onMounted(async()=>{
             <q-input v-if="form.business_whatsapp_different" :model-value="form.whatsapp_business" outlined label="WhatsApp del negocio *" inputmode="numeric" class="q-mt-sm" :rules="[v=>validPhone(v)]" @update:model-value="v=>normalize('whatsapp_business',v)"/>
           </div>
 
-          <template v-if="!googleMode">
+          <template>
             <q-input v-model="form.password" outlined :type="showPassword?'text':'password'" label="Contraseña *" autocomplete="new-password" class="q-mt-md" :rules="[v=>String(v||'').length>=8||'Mínimo 8 caracteres.',v=>/[A-Za-z]/.test(v)&&/\d/.test(v)||'Incluye letras y números.']"><template #append><q-icon :name="showPassword?'visibility_off':'visibility'" class="cursor-pointer" @click="showPassword=!showPassword"/></template></q-input>
             <q-input v-model="form.password_confirmation" outlined :type="showPassword?'text':'password'" label="Confirmar contraseña *" autocomplete="new-password" class="q-mt-sm" :rules="[v=>v===form.password||'Las contraseñas no coinciden.']"/>
           </template>
