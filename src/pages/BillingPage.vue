@@ -1,13 +1,16 @@
 <script setup>
 import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
 import { useQuasar } from 'quasar'
+import { useRoute } from 'vue-router'
 import { api } from '../boot/axios'
 import { downloadFile } from '../utils/download'
 import PageHeader from '../components/PageHeader.vue'
 
 const $q=useQuasar()
+const route=useRoute()
 const loading=ref(true)
-const tab=ref('comprobantes')
+const selectedProjectId=computed(()=> /^\d+$/.test(String(route.query.proyecto||'')) ? Number(route.query.proyecto) : null)
+const tab=ref(selectedProjectId.value ? 'proyectos' : 'comprobantes')
 const data=ref({resumen:{},configuracion:null,proyectos:[],suscripciones:[]})
 const companies=ref([])
 const dialog=ref(false)
@@ -57,6 +60,7 @@ const clientProofs=computed(()=>{
   return rows.sort((a,b)=>String(b.payment.enviado_at||b.payment.created_at||'').localeCompare(String(a.payment.enviado_at||a.payment.created_at||'')))
 })
 const pendingProofs=computed(()=>clientProofs.value.filter(x=>x.payment.estado_revision==='pendiente_revision'))
+const visibleProjects=computed(()=>selectedProjectId.value ? (data.value.proyectos||[]).filter(row=>Number(row.id)===selectedProjectId.value) : (data.value.proyectos||[]))
 
 const projectColumns=[
   {name:'proyecto',label:'Proyecto',field:'nombre',align:'left'},
@@ -173,6 +177,15 @@ onBeforeUnmount(()=>{if(qrPreview.value)URL.revokeObjectURL(qrPreview.value);rel
     <div class="col-12 col-sm-6 col-xl"><q-card flat class="viti-card q-pa-lg"><q-icon name="sync" color="teal" size="28px"/><div class="stat-value q-mt-sm">{{money(data.resumen?.ingreso_recurrente_mensual)}}</div><div class="stat-label">Recurrente mensual equivalente</div></q-card></div>
   </div>
 
+  <q-banner v-if="selectedProjectId" rounded class="bg-blue-10 text-white q-mb-md">
+    <div class="row items-center q-gutter-sm">
+      <q-icon name="folder_open" size="sm"/>
+      <div class="col">Estás viendo los cobros del trabajo seleccionado. Los comprobantes siguen sujetos a verificación bancaria.</div>
+      <q-btn outline no-caps color="white" icon="arrow_back" label="Volver al trabajo" :to="'/trabajos/' + selectedProjectId"/>
+      <q-btn flat no-caps color="white" label="Ver todos" to="/pagos"/>
+    </div>
+  </q-banner>
+
   <q-tabs v-model="tab" align="left" no-caps active-color="primary" indicator-color="primary" class="q-mb-md">
     <q-tab name="comprobantes" icon="fact_check" :label="`Comprobantes${pendingProofs.length?` (${pendingProofs.length})`:''}`"/>
     <q-tab name="proyectos" icon="account_tree" label="Implementación"/>
@@ -189,7 +202,7 @@ onBeforeUnmount(()=>{if(qrPreview.value)URL.revokeObjectURL(qrPreview.value);rel
     </q-tab-panel>
 
     <q-tab-panel name="proyectos" class="q-pa-none">
-      <q-table flat class="viti-table" :rows="data.proyectos||[]" :columns="projectColumns" row-key="id" :pagination="{rowsPerPage:15}">
+      <q-table flat class="viti-table" :rows="visibleProjects" :columns="projectColumns" row-key="id" :pagination="{rowsPerPage:15}">
         <template #body-cell-proyecto="p"><q-td :props="p"><div class="text-weight-bold">{{p.row.codigo}} · {{p.row.nombre}}</div><div class="text-caption text-grey-6">{{p.row.aplicacion?.nombre||'Aplicación todavía no registrada'}}</div></q-td></template>
         <template #body-cell-empresa="p"><q-td :props="p"><div class="text-weight-bold">{{p.row.empresa?.nombre_comercial||p.row.cliente?.nombre||'Sin empresa'}}</div><div class="text-caption text-grey-6">{{companyPlan(p.row.empresa?.id)?.nombre||'Plan sin asignar'}} · método {{pretty(p.row.empresa?.metodo_pago_preferido||'qr')}}</div></q-td></template>
         <template #body-cell-total="p"><q-td :props="p" class="text-right">{{p.row.precio_acordado===null?'Sin acuerdo':money(p.row.precio_acordado)}}</q-td></template>
