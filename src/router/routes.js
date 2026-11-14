@@ -41,9 +41,9 @@ export default [
   { path: '/configuracion-inicial', component: AuthLayout, children: [{ path: '', name: 'setup', component: () => import('../pages/SetupPage.vue') }] },
   { path: '/registro', component: AuthLayout, children: [{ path: '', name: 'client-register', component: () => import('../pages/ClientRegisterPage.vue') }] },
   { path: '/registro-cliente/:token', component: AuthLayout, children: [{ path: '', name: 'client-onboarding', component: () => import('../pages/ClientOnboardingPage.vue') }] },
-  { path: '/acceso', redirect: '/solicitud' },
-  { path: '/solicitud', component: AuthLayout, children: [{ path: '', name: 'public-application', component: () => import('../pages/PublicSolicitudStartPage.vue') }] },
-  { path: '/solicitar/:token', component: AuthLayout, children: [{ path: '', name: 'public-request', component: () => import('../pages/IdeaBuilderPage.vue') }] },
+  { path: '/acceso', redirect: '/registro' },
+  { path: '/solicitud', redirect: '/registro' },
+  { path: '/solicitar/:token', component: AuthLayout, meta:{requiresAuth:true,clientOnly:true}, children: [{ path: '', name: 'client-request-form', component: () => import('../pages/IdeaBuilderPage.vue'), meta:{requiresAuth:true,clientOnly:true} }] },
   { path: '/login', component: AuthLayout, children: [{ path: '', name: 'login', component: () => import('../pages/LoginPage.vue') }] },
   { path:'/electrofrio/acceso',component:AuthLayout,children:[{path:'',name:'electro-customer-login',component:()=>import('../pages/ElectrofrioCustomerLoginPage.vue')}]},
   { path:'/portal/electrofrio',component:ElectrofrioCustomerLayout,meta:{requiresAuth:true,electroCustomerOnly:true},children:[
