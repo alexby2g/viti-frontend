@@ -1,12 +1,15 @@
 <script setup>
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useQuasar } from 'quasar'
+import { useRoute } from 'vue-router'
 import { api } from '../boot/axios'
 import { downloadFile } from '../utils/download'
 import PageHeader from '../components/PageHeader.vue'
 import { formatDateTime } from '../utils/date'
 
 const $q = useQuasar()
+const route = useRoute()
+const returnToWork = computed(() => /^\d+$/.test(String(route.query.proyecto || '')) ? `/trabajos/${route.query.proyecto}` : null)
 const rows = ref([])
 const loading = ref(false)
 const dialog = ref(false)
@@ -194,7 +197,17 @@ function closePreview() {
   previewRow.value = null
 }
 
-onMounted(load)
+// Sólo preselecciona un trabajo existente; el usuario sigue confirmando cada archivo.
+onMounted(async () => {
+  await load()
+  const recordId = Number(route.query.proyecto)
+  if (!Number.isInteger(recordId) || recordId <= 0) return
+  if (!catalogs.value.proyecto.some(row => Number(row.id) === recordId)) return
+  open()
+  type.value = 'proyecto'
+  entityId.value = recordId
+  category.value = 'entrega'
+})
 onBeforeUnmount(() => {
   revokeSelectedPreviews()
   if (previewUrl.value) URL.revokeObjectURL(previewUrl.value)
@@ -204,6 +217,7 @@ onBeforeUnmount(() => {
 <template>
   <q-page class="viti-page files-page">
     <PageHeader eyebrow="Soporte documental" title="Archivos e imágenes" subtitle="Adjunta logotipos, capturas, documentos, referencias, actas y evidencias a cualquier proceso.">
+      <q-btn v-if="returnToWork" outline no-caps icon="arrow_back" label="Volver al trabajo" :to="returnToWork" />
       <q-btn color="primary" unelevated icon="upload_file" label="Subir archivos" no-caps @click="open" />
     </PageHeader>
 
