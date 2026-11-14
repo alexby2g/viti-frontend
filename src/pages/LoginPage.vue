@@ -77,7 +77,7 @@ onMounted(async()=>{
       <section class="access-panel">
         <div class="panel-kicker">Acceso a la plataforma</div>
         <h2>Bienvenido a VITI</h2>
-        <p class="panel-copy">Ingresa con tu celular o usuario y tu contraseña. No necesitas una cuenta de Google.</p>
+        <p class="panel-copy">Ingresa con tu número de celular o usuario y tu contraseña.</p>
 
         <q-form ref="formRef" class="login-form" @submit="submit">
           <div data-error-field="acceso" class="field-block">
