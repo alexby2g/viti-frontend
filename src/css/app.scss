@@ -353,3 +353,18 @@ body.viti-main-active input:-webkit-autofill:focus{-webkit-box-shadow:0 0 0 1000
 .client-hub-layout .hub-page .quick-card .q-avatar{background:rgba(211,175,105,.12)!important;color:#e0bd7b!important}
 .client-hub-layout .hub-page .ring{border-color:#c6a362!important;background:#29261e!important}
 @media(max-width:600px){.landing-page,.auth-page,.register-page{overflow-x:hidden}}
+
+/* Landing clara: menos distracciones visuales y motion respetuoso. */
+.landing-page .background-noise,.landing-page .section-watermark,
+.landing-page .float-card,.landing-page .signal-chip{display:none!important}
+.landing-page .hero-section,.landing-page .landing-section{background-color:transparent!important}
+.landing-page .hero-grid{gap:clamp(24px,4vw,66px)}
+.landing-page .customer-preview{box-shadow:none!important}
+.landing-page .hero-actions .q-btn,.landing-page .cta-actions .q-btn{border-radius:12px!important}
+.landing-page .hero-trust{border-color:#39362d!important;color:#c7c3ba!important}
+.landing-page .hero-points{color:#d0c9bb!important}
+.landing-page .solution-card,.landing-page .workflow-card{box-shadow:none!important;transition:border-color .2s ease!important}
+.landing-page .solution-card:hover,.landing-page .workflow-card:hover{border-color:#a58753!important;transform:none!important}
+@media(prefers-reduced-motion:reduce){
+  .landing-page .reveal-block,.landing-page .interactive-card{animation:none!important;transition:none!important}
+}
