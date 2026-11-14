@@ -6,6 +6,7 @@ const read = (path) => readFileSync(new URL('../' + path, import.meta.url), 'utf
 const dashboard = read('src/pages/DashboardPage.vue')
 const client = read('src/pages/ClientPortalPage.vue')
 const work = read('src/pages/ProyectoDetallePage.vue')
+const billing = read('src/pages/BillingPage.vue')
 const files = read('src/pages/ArchivosPage.vue')
 const routes = read('src/router/routes.js')
 
@@ -36,6 +37,9 @@ for (const label of ['Solicitudes', 'Pagos', 'Trabajos', 'Sistemas', 'comprobant
 assert.match(client, /to="\/mi-pagos"/, 'El cliente puede subir comprobantes desde su espacio.')
 assert.match(client, /Tu pago solo se confirma/, 'El QR no se confirma al subir la imagen.')
 assert.ok(work.includes('archivos?proyecto='), 'Entrega con contexto de proyecto.')
+assert.ok(work.includes('pagos?proyecto='), 'El trabajo enlaza a sus propios cobros.')
+assert.match(billing, /visibleProjects/, 'El área de pagos respeta el filtro del trabajo.')
+assert.match(billing, /selectedProjectId/, 'No duplica la API financiera.')
 assert.match(work, /auth\.user\?\.rol === 'superadmin'/, 'No mostrar pagos administrativos a otros roles.')
 assert.match(work, /100 %/, 'Se avisa si el trabajo muestra 100 % sin estar cerrado.')
 assert.match(files, /catalogs\.value\.proyecto\.some/, 'Nunca autoseleccionar un proyecto que no esté disponible.')
