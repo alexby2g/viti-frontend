@@ -26,19 +26,8 @@ function go(path) {
 }
 
 async function newRequest() {
-  if (creating.value) return
-  creating.value = true
-  try {
-    const { data } = await (await import('../boot/axios')).api.post('/mi/solicitud')
-    const link = data?.data?.enlace_publico
-    if (link) window.location.href = link
-    else throw new Error('missing_link')
-  } catch (error) {
-    const message = error?.response?.data?.message || 'No pudimos iniciar una nueva solicitud desde tu cuenta.'
-    $q.notify({ type: 'negative', message })
-  } finally {
-    creating.value = false
-  }
+  // El portal principal valida que el perfil esté completo antes de crear.
+  await router.push('/mi-cuenta#viti-client-requests')
 }
 
 async function logout() {
