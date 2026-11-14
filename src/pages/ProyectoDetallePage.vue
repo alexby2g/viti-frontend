@@ -5,6 +5,7 @@ import { useQuasar } from 'quasar'
 import { api } from '../boot/axios'
 import { downloadFile } from '../utils/download'
 import PageHeader from '../components/PageHeader.vue'
+import ProyectoTaskBoard from '../components/trabajos/ProyectoTaskBoard.vue'
 import { formatDate, formatDateTime } from '../utils/date'
 
 const route=useRoute(),$q=useQuasar(),item=ref(null),loading=ref(true),advanceDialog=ref(false),editDialog=ref(false),developmentDialog=ref(false)
@@ -235,6 +236,8 @@ onUnmounted(()=>{ clearAdvanceFiles(); closeGallery() })
             <div class="q-mt-sm" style="white-space:pre-wrap">{{item.descripcion||'Sin descripción.'}}</div>
           </q-card-section>
         </q-card>
+
+        <ProyectoTaskBoard :proyecto="item" />
 
         <q-card flat class="viti-card q-mt-lg">
           <q-card-section><div class="text-h6 text-weight-bold">Historial de avances</div></q-card-section>
