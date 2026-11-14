@@ -112,9 +112,8 @@ async function handleItem(item) {
     return
   }
   if (item.action === 'request') {
-    // El formulario oficial crea el negocio cuando hace falta y reutiliza la cuenta
-    // existente. No exigimos un negocio previo para solicitar un sistema.
-    window.location.href = '/solicitud'
+    // Las nuevas solicitudes se inician desde el espacio autenticado.
+    router.push(isClient.value ? '/mi-cuenta#viti-client-requests' : '/solicitudes')
     return
   }
   if (item.to) router.push(item.to)
