@@ -3,7 +3,7 @@ import { onMounted, reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useQuasar } from 'quasar'
 import { useAuthStore } from '../stores/auth'
-import { api, warmBackend } from '../boot/axios'
+import { warmBackend } from '../boot/axios'
 import { useFormErrors } from '../composables/useFormErrors'
 import AppBrand from '../components/AppBrand.vue'
 
@@ -15,12 +15,6 @@ const fieldErrors=useFormErrors()
 function clearField(field){fieldErrors.clear(field)}
 function credentialsChanged(field){clearField(field);needsAdminSecret.value=false;form.codigo_secreto=''}
 function errorMessage(e){return fieldErrors.fromResponse(e,'No se pudo iniciar sesión. Revisa los datos marcados.')}
-
-function continueWithGoogle(){
-  // OAuth comparte el mismo dominio que la API y Sanctum.
-  const base=String(api.defaults.baseURL||'').replace(/\/api\/v1\/?$/,'')
-  window.location.assign(`${base}/auth/google/redirect`)
-}
 
 function targetAfterLogin(){
   const requested=typeof route.query.redirect==='string'?route.query.redirect:''
@@ -58,20 +52,7 @@ onMounted(async()=>{
   if (typeof route.query.celular === 'string' && route.query.celular.trim()) form.acceso = route.query.celular.trim()
   else if (typeof route.query.correo === 'string' && route.query.correo.trim()) form.acceso = route.query.correo.trim()
   await warmBackend().catch(()=>{})
-  const google=String(route.query.google||'')
-  if(google==='success'){
-    const logged=await auth.initialize(true)
-    if(logged){
-      $q.notify({type:'positive',message:'Google conectado. Bienvenido a VITI.'})
-      await router.replace(targetAfterLogin())
-      return
-    }
-    $q.notify({type:'negative',message:'Google validó la cuenta, pero VITI no pudo recuperar la sesión. Inténtalo nuevamente.'})
-  }
-  if(google==='needs_access')$q.notify({type:'warning',message:'Esta cuenta de Google todavía no tiene acceso a VITI.'})
-  if(google==='not_configured')$q.notify({type:'warning',message:'Google todavía no está configurado en el servidor de VITI.'})
-  if(google==='cancelled')$q.notify({type:'info',message:'Inicio con Google cancelado.'})
-  if(google==='state_mismatch')$q.notify({type:'negative',message:'No pudimos validar la sesión de Google. Inténtalo nuevamente.'})
+
 })
 </script>
 
@@ -96,14 +77,7 @@ onMounted(async()=>{
       <section class="access-panel">
         <div class="panel-kicker">Acceso a la plataforma</div>
         <h2>Bienvenido a VITI</h2>
-        <p class="panel-copy">Ingresa con tu cuenta o continúa con Google.</p>
-
-        <button type="button" class="google-button" @click="continueWithGoogle">
-          <span class="google-mark" aria-hidden="true">G</span>
-          <span>Continuar con Google</span>
-        </button>
-
-        <div class="divider"><span>o continúa con tu cuenta VITI</span></div>
+        <p class="panel-copy">Ingresa con tu celular o usuario y tu contraseña. No necesitas una cuenta de Google.</p>
 
         <q-form ref="formRef" class="login-form" @submit="submit">
           <div data-error-field="acceso" class="field-block">
@@ -134,7 +108,7 @@ onMounted(async()=>{
         </q-form>
 
         <div class="under-action"><span>¿Aún no tienes cuenta?</span><router-link to="/registro">Crear cuenta gratis</router-link></div>
-        <div class="guest-action"><router-link to="/demo"><q-icon name="visibility"/> Explorar VITI como invitado</router-link><span>·</span><router-link to="/solicitud">Solicitar un sistema</router-link></div>
+        <div class="guest-action"><router-link to="/demo"><q-icon name="visibility"/> Explorar VITI como invitado</router-link><span>·</span><router-link to="/registro">Crear cuenta para solicitar</router-link></div>
       </section>
     </main>
 
