@@ -47,6 +47,9 @@ jobs:
       - name: VITI project task board smoke
         run: npm run test:viti-work-tasks
 
+      - name: VITI unified simple commercial flow smoke
+        run: npm run test:viti-unified
+
       - name: VITI public presentation smoke
         run: npm run test:viti-public
 
