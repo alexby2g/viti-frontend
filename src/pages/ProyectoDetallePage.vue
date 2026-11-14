@@ -231,7 +231,7 @@ onUnmounted(()=>{ clearAdvanceFiles(); closeGallery() })
         </div>
         <div class="col-12 col-md-auto row q-gutter-sm">
           <q-btn outline no-caps icon="upload_file" label="Subir entregables" :to="`/archivos?proyecto=${item.id}`"/>
-          <q-btn v-if="auth.user?.rol === 'superadmin'" outline no-caps icon="qr_code_2" label="Pagos del proyecto" to="/pagos"/>
+          <q-btn v-if="auth.user?.rol === 'superadmin'" outline no-caps icon="qr_code_2" label="Pagos del proyecto" :to="`/pagos?proyecto=${item.id}`"/>
           <q-btn outline no-caps icon="devices" label="Sistemas" to="/sistemas"/>
         </div>
       </q-card-section>
