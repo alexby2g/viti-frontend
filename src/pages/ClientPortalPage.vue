@@ -23,6 +23,7 @@ const statusLabels = {
   convertida:'Convertida en proyecto', cerrada:'Cerrada'
 }
 const statusColors = { borrador:'grey-7', en_revision:'orange', aprobada:'positive', rechazada:'negative', convertida:'purple', cerrada:'grey' }
+const profileComplete = computed(() => Boolean(profile.value?.nombre?.trim() && profile.value?.telefono && profile.value?.documento && profile.value?.ciudad?.trim()))
 const request = computed(() => requests.value[0] || null)
 const previousRequests = computed(() => requests.value.slice(1))
 const photoSrc = computed(() => {
@@ -63,6 +64,11 @@ async function load(){
 }
 
 async function start(){
+  if (!profileComplete.value) {
+    edit.value = true
+    $q.notify({type:'info',message:'Completa tu cédula de identidad y ciudad antes de enviar una solicitud.'})
+    return
+  }
   if(starting.value)return
   starting.value=true
   try{
@@ -110,7 +116,12 @@ onMounted(load)
 <q-page class="viti-page">
   <q-inner-loading :showing="loading" />
   <template v-if="profile">
-    <PageHeader eyebrow="Mi espacio VITI" title="Mi cuenta" subtitle="Tu solicitud, tus pagos y tu entrega sin complicaciones." />
+    <PageHeader eyebrow="Mi espacio VITI" title="Mi cuenta" subtitle="Primero completa tus datos; después podrás solicitar y seguir tu proyecto." />
+    <q-banner v-if="!profileComplete" rounded class="bg-blue-1 text-blue-10 q-mb-lg">
+      <div class="text-weight-bold">Antes de solicitar un sistema, completa tu perfil.</div>
+      Registra tu cédula de identidad y ciudad. Esos datos se guardan en tu cuenta y no tendrás que repetirlos en cada solicitud.
+      <template #action><q-btn flat no-caps color="primary" label="Completar mis datos" @click="edit=true"/></template>
+    </q-banner>
 
     <q-card flat class="viti-card q-mb-lg">
       <q-card-section>
