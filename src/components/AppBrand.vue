@@ -23,5 +23,13 @@ const vitiVersion = packageMeta.version
 </template>
 
 <style scoped>
-.viti-product-brand{color:inherit;min-width:0}.viti-mark{position:relative;display:grid;place-items:center;width:46px;height:46px;flex:0 0 46px;border-radius:12px;background:linear-gradient(145deg,#0c2340,#1457b8);border:1px solid #315171;color:#f7faff;font-size:21px;font-weight:950;letter-spacing:.02em;overflow:hidden}.viti-mark:after{content:'';position:absolute;left:8px;right:8px;bottom:5px;height:2px;border-radius:99px;background:#f28b30;opacity:.95}.viti-mark img{width:100%;height:100%;object-fit:contain;padding:4px;background:#fff}.brand-copy{min-width:0}.product-line{font-size:24px;font-weight:900;letter-spacing:.15em;line-height:1.02}.brand-meaning{font-size:9.5px;line-height:1.2;font-weight:700;opacity:.84;max-width:200px;margin-top:3px}.brand-caption{font-size:9px;line-height:1.2;opacity:.58;max-width:200px;margin-top:2px}.studio-line{font-size:8px;line-height:1.2;opacity:.48;max-width:205px;margin-top:4px}.brand-version{font-size:7.5px;line-height:1.1;opacity:.38;max-width:186px;margin-top:2px;letter-spacing:.08em;text-transform:uppercase}
+.viti-product-brand{color:inherit;min-width:0;gap:2px}
+.viti-mark{display:grid;place-items:center;width:42px;height:42px;flex:0 0 42px;border-radius:11px;background:linear-gradient(140deg,#30291b,#171716);border:1px solid rgba(211,172,99,.45);color:#eccb84;font-size:23px;font-weight:900;letter-spacing:.01em;overflow:hidden}
+.viti-mark img{width:100%;height:100%;object-fit:contain;padding:4px;background:#151515}
+.brand-copy{min-width:0}
+.product-line{font-size:25px;font-weight:900;letter-spacing:.16em;line-height:1.05;color:#f8f5ee}
+.brand-meaning{font-size:9px;line-height:1.35;font-weight:650;opacity:.8;max-width:190px;margin-top:4px}
+.brand-caption{font-size:9px;line-height:1.3;opacity:.66;max-width:192px;margin-top:3px}
+.studio-line{font-size:8px;line-height:1.25;opacity:.55;max-width:195px;margin-top:5px}
+.brand-version{font-size:8px;line-height:1.15;opacity:.42;max-width:186px;margin-top:3px;letter-spacing:.08em;text-transform:uppercase}
 </style>
