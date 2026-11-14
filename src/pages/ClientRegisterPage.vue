@@ -40,7 +40,7 @@ async function submit() {
       })
     } else {
       await auth.createClientAccount({
-        nombre:form.nombre.trim(), celular:form.celular,
+        nombre:form.nombre.trim(), correo:form.correo.trim().toLowerCase() || null, celular:form.celular,
         whatsapp:effectiveWhatsapp.value||null,
         whatsapp_business:form.business_whatsapp_different?form.whatsapp_business:null,
         password:form.password, password_confirmation:form.password_confirmation,
@@ -87,9 +87,9 @@ onMounted(async()=>{
     <main class="register-shell">
       <section class="register-copy">
         <div class="eyebrow">CREAR CUENTA VITI</div>
-        <h1>{{ fromRequest ? 'Tu solicitud ya está guardada.' : 'Empieza sin elegir un plan.' }}</h1>
-        <p v-if="fromRequest">Para proteger tus datos, VITI enviará una invitación de acceso cuando apruebe tu solicitud. Conocer el celular no basta para vincularla.</p>
-        <p v-else>Tu cuenta sirve para guardar solicitudes, revisar avances y recibir tus sistemas. Puedes elegir un plan después.</p>
+        <h1>{{ fromRequest ? 'Crea tu espacio VITI.' : 'Empieza sin elegir un plan.' }}</h1>
+        <p v-if="fromRequest">Primero crea tu cuenta, después completa tu perfil y solicita un sistema desde tu propio espacio.</p>
+        <p v-else>Primero crea tu cuenta, completa tus datos y luego solicita tu sistema. Podrás consultar avances y pagos desde un solo lugar.</p>
         <div class="benefits"><div><q-icon name="check_circle"/> Sin plan obligatorio</div><div><q-icon name="check_circle"/> Sin datos técnicos</div><div><q-icon name="check_circle"/> Vinculación mediante acceso verificado</div></div>
       </section>
 
@@ -99,7 +99,7 @@ onMounted(async()=>{
         <p>Crear una cuenta no activa un plan ni genera cobros.</p>
         <q-form ref="formRef" @submit="submit">
           <q-input v-model="form.nombre" outlined label="Nombre completo *" autocomplete="name" class="q-mt-lg" :rules="[v=>String(v||'').trim().length>=3||'Escribe tu nombre completo.']"/>
-          <q-input v-if="googleMode" v-model="form.correo" outlined label="Correo de Google" readonly class="q-mt-sm"/>
+          <q-input v-model="form.correo" outlined :readonly="googleMode" :label="googleMode ? 'Correo de Google' : 'Correo electrónico (recomendado)'" type="email" autocomplete="email" class="q-mt-sm" :rules="[v=>!v||/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v)||'Escribe un correo válido.']"/>
           <q-input :model-value="form.celular" outlined label="Celular *" inputmode="numeric" autocomplete="tel" class="q-mt-sm" :rules="[v=>validPhone(v)]" @update:model-value="v=>normalize('celular',v)"/>
 
           <div class="contact-option q-mt-sm">
@@ -117,7 +117,7 @@ onMounted(async()=>{
           </template>
           <q-btn type="submit" color="primary" unelevated no-caps size="lg" class="full-width register-btn q-mt-lg" :loading="auth.loading" label="Crear mi cuenta VITI" icon-right="arrow_forward"/>
         </q-form>
-        <div class="account-note"><q-icon name="info"/> Si ya enviaste una solicitud, espera la invitación de VITI para acceder de forma segura. No reclamamos solicitudes solo por coincidir el celular.</div>
+        <div class="account-note"><q-icon name="info"/> Primero creas tu cuenta; las solicitudes nuevas se generan únicamente dentro de tu espacio privado.</div>
       </q-card-section></q-card>
     </main>
     <footer class="register-footer">VITI · Plataforma de sistemas y proyectos <span>· Tecnología desarrollada por AGR Studio</span></footer>
