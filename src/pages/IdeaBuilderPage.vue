@@ -143,7 +143,7 @@ async function saveDraft({ notify = false } = {}) {
   savingDraft.value = true
   saveState.value = 'saving'
   try {
-    await api.put(`/publico/solicitudes/${route.params.token}`, payload(false), { timeout: 20000 })
+    await api.put(`/mi/solicitudes/${route.params.token}/formulario`, payload(false), { timeout: 20000 })
     saveState.value = 'saved'
     if (notify) $q.notify({ type: 'positive', message: 'Borrador guardado.' })
     return true
@@ -183,8 +183,8 @@ async function submit() {
   }
   sending.value = true
   try {
-    await api.put(`/publico/solicitudes/${route.params.token}`, payload(true), { timeout: 20000 })
-    await api.post(`/publico/solicitudes/${route.params.token}/enviar`, {}, { timeout: 30000 })
+    await api.put(`/mi/solicitudes/${route.params.token}/formulario`, payload(true), { timeout: 20000 })
+    await api.post(`/mi/solicitudes/${route.params.token}/formulario/enviar`, {}, { timeout: 30000 })
     $q.notify({ type: 'positive', message: 'Solicitud enviada. VITI la revisará contigo.' })
     router.replace('/mi-cuenta')
   } catch (error) {
@@ -207,7 +207,7 @@ function hydrateAnswers() {
 
 onMounted(async () => {
   try {
-    const { data } = await api.get(`/publico/solicitudes/${route.params.token}`)
+    const { data } = await api.get(`/mi/solicitudes/${route.params.token}/formulario`)
     item.value = data?.data || null
     form.empresa_nombre = item.value?.empresa?.nombre_comercial === 'Mi negocio' ? '' : (item.value?.empresa?.nombre_comercial || '')
     form.empresa_actividad = item.value?.empresa?.actividad || ''
