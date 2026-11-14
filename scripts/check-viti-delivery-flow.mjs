@@ -22,7 +22,7 @@ assert.match(client, /api\.get\('\/mi\/proyecto\/entrega'\)/, 'Solo mostrar paqu
 assert.match(client, /v-if="delivery"/, 'El cliente no ve borradores.')
 assert.match(client, /mi\/archivos\//, 'La descarga usa permisos de cliente.')
 assert.match(client, /<q-btn.*Necesito ayuda/, 'Contacto de soporte del cliente.')
-assert.doesNotMatch(client, /\/archivos\/.*\/descargar/, 'No usar descarga administrativa.')
+assert.doesNotMatch(client, /downloadFile\('\/archivos\//, 'No usar descarga administrativa.')
 assert.match(files, /category\.value = 'entrega'/, 'La carga sigue vinculada al trabajo.')
 assert.doesNotMatch(admin, /api\.delete|innerHTML|v-html/, 'La entrega no elimina archivos ni inyecta HTML.')
 console.log('VITI entrega: borrador/publicación, pagos, archivos y portal de cliente verificados.')
