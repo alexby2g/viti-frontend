@@ -110,7 +110,29 @@ onMounted(load)
 <q-page class="viti-page">
   <q-inner-loading :showing="loading" />
   <template v-if="profile">
-    <PageHeader eyebrow="Mi espacio VITI" title="Mi cuenta" subtitle="Tu identificación, solicitudes y seguimiento en un solo lugar." />
+    <PageHeader eyebrow="Mi espacio VITI" title="Mi cuenta" subtitle="Tu solicitud, tus pagos y tu entrega sin complicaciones." />
+
+    <q-card flat class="viti-card q-mb-lg">
+      <q-card-section>
+        <div class="section-label">TU PROYECTO, PASO A PASO</div>
+        <div class="text-h6 text-weight-bold q-mt-xs">Todo lo importante en un solo lugar</div>
+        <p class="text-caption text-grey-5 q-mb-md">Solicita un proyecto, acepta el acuerdo, envía el comprobante y consulta el desarrollo. Tu pago solo se confirma después de que VITI compruebe el abono.</p>
+        <div class="row q-col-gutter-sm">
+          <div class="col-12 col-sm-6 col-lg-3">
+            <q-btn outline no-caps class="full-width" icon="description" label="Mis solicitudes" href="#viti-client-requests" />
+          </div>
+          <div class="col-12 col-sm-6 col-lg-3">
+            <q-btn outline no-caps class="full-width" icon="qr_code_2" label="Pagos y comprobantes" to="/mi-pagos" :disable="!profile?.empresas?.length"/>
+          </div>
+          <div class="col-12 col-sm-6 col-lg-3">
+            <q-btn outline no-caps class="full-width" icon="account_tree" label="Mi proyecto" to="/mi-proyecto" :disable="!profile?.empresas?.length"/>
+          </div>
+          <div class="col-12 col-sm-6 col-lg-3">
+            <q-btn outline no-caps class="full-width" icon="devices" label="Mis sistemas" to="/mi-aplicaciones" :disable="!profile?.empresas?.length"/>
+          </div>
+        </div>
+      </q-card-section>
+    </q-card>
 
     <div class="row q-col-gutter-lg">
       <div class="col-12 col-lg-5">
@@ -156,7 +178,7 @@ onMounted(load)
       </div>
 
       <div class="col-12 col-lg-7">
-        <q-card flat class="viti-card current-request-card">
+        <q-card id="viti-client-requests" flat class="viti-card current-request-card">
           <q-card-section class="row items-start q-col-gutter-md">
             <div class="col">
               <div class="section-label">Solicitud más reciente</div>

@@ -2,119 +2,213 @@
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { api } from '../boot/axios'
+import { useAuthStore } from '../stores/auth'
 import PageHeader from '../components/PageHeader.vue'
 import { formatDateTime } from '../utils/date'
 
 const router = useRouter()
+const auth = useAuthStore()
 const loading = ref(true)
-const data = ref({ resumen: {}, solicitudes_recientes: [], proyectos_recientes: [], requieren_atencion: [] })
-
-const metrics = computed(() => [
-  { key: 'solicitudes_por_revisar', fallback: 'solicitudes_activas', label: 'Solicitudes por revisar', hint: 'Entrada comercial', icon: 'inbox', to: '/solicitudes' },
-  { key: 'proyectos_activos', label: 'Trabajos activos', hint: 'Producción en curso', icon: 'account_tree', to: '/trabajos' },
-  { key: 'sistemas_entregados', fallback: 'aplicaciones_activas', label: 'Sistemas entregados', hint: 'Operación externa', icon: 'language', to: '/sistemas' },
-  { key: 'clientes_registrados', fallback: 'negocios_activos', label: 'Clientes registrados', hint: 'Relación comercial', icon: 'groups', to: '/clientes' },
+const updating = ref(false)
+const error = ref('')
+const data = ref({ resumen: {}, solicitudes_recientes: [], proyectos_recientes: [] })
+const billing = ref(null)
+const isSuperAdmin = computed(() => auth.user?.rol === 'superadmin')
+const value = (key, fallback) => data.value.resumen?.[key] ?? data.value.resumen?.[fallback] ?? 0
+const cards = computed(() => [
+  {
+    key: 'solicitudes', icon: 'inbox', title: 'Solicitudes',
+    value: value('solicitudes_por_revisar', 'solicitudes_activas'), suffix: 'por revisar',
+    description: 'Recibe pedidos, revisa requisitos y aprueba proyectos.',
+    action: 'Revisar solicitudes', to: '/solicitudes',
+  },
+  ...(isSuperAdmin.value ? [{
+    key: 'pagos', icon: 'qr_code_2', title: 'Pagos',
+    value: billing.value?.resumen?.comprobantes_pendientes ?? '—', suffix: 'comprobantes por verificar',
+    description: 'Comprueba el abono en tu banco y confirma o rechaza el comprobante.',
+    action: 'Verificar pagos', to: '/pagos',
+  }] : []),
+  {
+    key: 'trabajos', icon: 'account_tree', title: 'Trabajos',
+    value: value('proyectos_activos'), suffix: 'en desarrollo',
+    description: 'Organiza tareas, registra avances y adjunta entregables.',
+    action: 'Abrir trabajos', to: '/trabajos',
+  },
+  {
+    key: 'sistemas', icon: 'devices', title: 'Sistemas',
+    value: value('sistemas_entregados', 'aplicaciones_activas'), suffix: 'registrados / entregados',
+    description: 'Conserva los enlaces, versiones y accesos de los sistemas.',
+    action: 'Ver sistemas', to: '/sistemas',
+  },
 ])
-
-const workflow = [
-  { number: '01', title: 'Solicitud', text: 'El cliente explica qué necesita y deja sus datos.', icon: 'description', to: '/solicitudes' },
-  { number: '02', title: 'Decisión', text: 'VITI revisa, rechaza o acepta el trabajo.', icon: 'fact_check', to: '/solicitudes' },
-  { number: '03', title: 'Trabajo', text: 'El desarrollo se planifica, produce, prueba y entrega.', icon: 'account_tree', to: '/trabajos' },
-  { number: '04', title: 'Sistema', text: 'VITI conserva URLs, hosting, repositorios y soporte.', icon: 'open_in_new', to: '/sistemas' },
-]
-
-const attentionCount = computed(() => data.value.requieren_atencion?.length || 0)
-const metricValue = item => data.value.resumen?.[item.key] ?? data.value.resumen?.[item.fallback] ?? 0
-function go(to) { router.push(to) }
-
-onMounted(async () => {
-  try { data.value = (await api.get('/dashboard')).data }
-  finally { loading.value = false }
+const actions = computed(() => {
+  const queue = []
+  if (Number(value('solicitudes_por_revisar', 'solicitudes_activas')) > 0) {
+    queue.push({ icon:'inbox', title:'Solicitudes pendientes', caption:'Revisa las necesidades y responde al cliente.', to:'/solicitudes' })
+  }
+  if (isSuperAdmin.value && Number(billing.value?.resumen?.comprobantes_pendientes || 0) > 0) {
+    queue.push({ icon:'receipt_long', title:'Comprobantes por verificar', caption:'Confirma el pago solamente después de comprobarlo en el banco.', to:'/pagos' })
+  }
+  if (Number(value('proyectos_activos')) > 0) {
+    queue.push({ icon:'construction', title:'Trabajos en curso', caption:'Revisa las tareas y registra los avances.', to:'/trabajos' })
+  }
+  return queue
 })
+function go(path) { router.push(path) }
+async function load() {
+  updating.value = true
+  error.value = ''
+  try {
+    const [dashboard, payments] = await Promise.allSettled([
+      api.get('/dashboard'),
+      isSuperAdmin.value ? api.get('/pagos') : Promise.resolve(null),
+    ])
+    if (dashboard.status === 'fulfilled') data.value = dashboard.value.data
+    else error.value = 'No se pudo actualizar el resumen. Los accesos a módulos siguen disponibles.'
+    if (payments.status === 'fulfilled') billing.value = payments.value?.data?.data ?? null
+    else billing.value = null
+  } finally {
+    updating.value = false
+    loading.value = false
+  }
+}
+onMounted(load)
 </script>
 
 <template>
-  <q-page class="viti-page dashboard-page">
+  <q-page class="viti-page unified-home">
     <q-inner-loading :showing="loading" />
-
     <PageHeader
-      eyebrow="Centro VITI"
-      title="Controla el trabajo, no el negocio del cliente."
-      subtitle="VITI recibe solicitudes, organiza el desarrollo y mantiene centralizada la información de los sistemas que entregas."
+      eyebrow="AGR Studio · Centro de operaciones"
+      title="Tu trabajo, en un solo lugar."
+      subtitle="Recibe solicitudes, confirma pagos, desarrolla y entrega. Las herramientas técnicas siguen disponibles cuando las necesites."
     >
-      <q-btn class="viti-btn viti-btn--ghost" outline no-caps icon="open_in_new" label="Solicitud pública" to="/solicitud" />
-      <q-btn class="viti-btn viti-btn--primary" unelevated no-caps icon="inbox" label="Revisar solicitudes" to="/solicitudes" />
+      <q-btn outline no-caps color="primary" icon="refresh" label="Actualizar" :loading="updating" @click="load" />
+      <q-btn color="primary" unelevated no-caps icon="add" label="Compartir solicitud" to="/solicitud" />
     </PageHeader>
 
-    <section class="metrics-grid">
-      <button v-for="item in metrics" :key="item.key" class="metric-card" type="button" @click="go(item.to)">
-        <span class="metric-icon"><q-icon :name="item.icon" /></span>
-        <span class="metric-copy"><small>{{ item.label }}</small><b>{{ metricValue(item) }}</b><em>{{ item.hint }}</em></span>
-        <q-icon name="arrow_forward" class="metric-arrow" />
-      </button>
+    <q-banner v-if="error" rounded class="bg-orange-10 text-white q-mb-md">{{ error }}</q-banner>
+
+    <section aria-label="Acciones principales">
+      <div class="unified-section-line">
+        <div>
+          <div class="section-label">LO MÁS IMPORTANTE</div>
+          <h2>¿Qué necesitas hacer hoy?</h2>
+        </div>
+        <span>Una ruta de trabajo, sin módulos duplicados</span>
+      </div>
+      <div class="unified-action-grid">
+        <button v-for="card in cards" :key="card.key" type="button" class="unified-card" @click="go(card.to)">
+          <div class="unified-card-top">
+            <span class="unified-icon"><q-icon :name="card.icon" size="25px"/></span>
+            <q-icon name="arrow_outward" size="19px" class="unified-arrow" />
+          </div>
+          <div class="unified-count"><strong>{{ card.value }}</strong><span>{{ card.suffix }}</span></div>
+          <h3>{{ card.title }}</h3>
+          <p>{{ card.description }}</p>
+          <span class="unified-card-link">{{ card.action }} <q-icon name="arrow_forward"/></span>
+        </button>
+      </div>
     </section>
 
-    <section class="command-grid q-mt-lg">
-      <article class="workflow-panel">
-        <div class="panel-heading">
-          <div><div class="section-label">Modelo operativo</div><h2>Solicitud → Trabajo → Sistema</h2></div>
-          <span>VITI coordina el ciclo completo</span>
+    <section class="unified-bottom-grid q-mt-lg">
+      <article class="unified-panel">
+        <div class="unified-panel-head">
+          <div><div class="section-label">SIGUIENTE PASO</div><h2>Por atender</h2></div>
+          <q-icon name="task_alt" size="27px" color="primary"/>
         </div>
-        <div class="workflow-grid">
-          <button v-for="step in workflow" :key="step.number" type="button" class="workflow-step" @click="go(step.to)">
-            <span class="step-number">{{ step.number }}</span>
-            <span class="step-icon"><q-icon :name="step.icon" /></span>
-            <strong>{{ step.title }}</strong>
-            <p>{{ step.text }}</p>
+        <div v-if="actions.length" class="unified-queue">
+          <button v-for="action in actions" :key="action.to" type="button" class="unified-queue-row" @click="go(action.to)">
+            <q-icon :name="action.icon" size="24px" color="primary"/>
+            <span><b>{{ action.title }}</b><small>{{ action.caption }}</small></span>
+            <q-icon name="chevron_right"/>
           </button>
         </div>
+        <div v-else class="unified-empty">
+          <q-icon name="verified" size="30px" color="positive"/>
+          No hay solicitudes ni comprobantes pendientes detectados.
+        </div>
       </article>
-
-      <article class="attention-panel">
-        <div class="section-label">Atención</div>
-        <div class="attention-value">{{ attentionCount }}</div>
-        <h3>{{ attentionCount ? 'Elementos requieren revisión' : 'Todo bajo control' }}</h3>
-        <p>{{ attentionCount ? 'Hay sistemas, cobros o entregas que necesitan seguimiento.' : 'No hay alertas operativas pendientes en este momento.' }}</p>
-        <q-btn flat no-caps icon-right="arrow_forward" label="Abrir soporte" to="/soporte" />
+      <article class="unified-panel">
+        <div class="unified-panel-head">
+          <div><div class="section-label">SIN COMPLICACIONES</div><h2>De la idea a la entrega</h2></div>
+        </div>
+        <div class="unified-steps">
+          <div><span>01</span><p><b>Solicitud</b><small>El cliente explica qué necesita.</small></p></div>
+          <div><span>02</span><p><b>Acuerdo</b><small>Revisas alcance, precio y anticipo.</small></p></div>
+          <div><span>03</span><p><b>Pago verificado</b><small>El cliente adjunta su comprobante QR; tú lo compruebas.</small></p></div>
+          <div><span>04</span><p><b>Trabajo y entrega</b><small>Registras avances, archivos y accesos al sistema.</small></p></div>
+        </div>
       </article>
     </section>
 
-    <section class="dashboard-columns q-mt-lg">
-      <article class="viti-panel">
-        <div class="panel-head">
-          <div><div class="section-label">Entrada</div><h3>Solicitudes recientes</h3></div>
-          <q-btn flat round icon="arrow_forward" to="/solicitudes"><q-tooltip>Ver solicitudes</q-tooltip></q-btn>
-        </div>
-        <div v-if="data.solicitudes_recientes?.length" class="activity-list">
-          <button v-for="item in data.solicitudes_recientes" :key="item.id" type="button" class="activity-row" @click="go(`/solicitudes/${item.id}`)">
-            <span class="activity-icon"><q-icon name="description" /></span>
-            <span class="activity-copy"><b>{{ item.titulo || item.codigo }}</b><small>{{ item.empresa?.nombre_comercial || item.cliente?.nombre || 'Sin cliente' }}</small></span>
-            <span class="activity-date">{{ formatDateTime(item.created_at) }}</span>
-          </button>
-        </div>
-        <div v-else class="panel-empty"><q-icon name="inbox" /><b>Sin solicitudes recientes</b><span>Las nuevas solicitudes aparecerán aquí.</span></div>
-      </article>
-
-      <article class="viti-panel">
-        <div class="panel-head">
-          <div><div class="section-label">Producción</div><h3>Trabajos recientes</h3></div>
-          <q-btn flat round icon="arrow_forward" to="/trabajos"><q-tooltip>Ver trabajos</q-tooltip></q-btn>
-        </div>
-        <div v-if="data.proyectos_recientes?.length" class="activity-list">
-          <button v-for="item in data.proyectos_recientes" :key="item.id" type="button" class="activity-row" @click="go(`/trabajos/${item.id}`)">
-            <span class="activity-icon"><q-icon name="account_tree" /></span>
-            <span class="activity-copy"><b>{{ item.nombre || item.codigo }}</b><small>{{ item.empresa?.nombre_comercial || item.cliente?.nombre || 'Sin cliente' }}</small></span>
-            <span class="progress-pill">{{ item.progreso || 0 }}%</span>
-          </button>
-        </div>
-        <div v-else class="panel-empty"><q-icon name="conversion_path" /><b>Sin trabajos activos</b><span>Un trabajo nace cuando aceptas una solicitud.</span></div>
-      </article>
+    <section class="unified-recent q-mt-lg" aria-label="Actividad reciente">
+      <div class="unified-section-line">
+        <div><div class="section-label">ACTIVIDAD</div><h2>Lo que se está moviendo</h2></div>
+        <q-btn flat no-caps icon="folder_shared" label="Archivos y entregables" to="/archivos"/>
+      </div>
+      <div class="unified-bottom-grid">
+        <article class="unified-panel">
+          <div class="unified-panel-head"><h3>Solicitudes recientes</h3><q-btn flat round dense icon="arrow_forward" to="/solicitudes" aria-label="Todas las solicitudes"/></div>
+          <div v-if="data.solicitudes_recientes?.length" class="unified-queue">
+            <button v-for="row in data.solicitudes_recientes.slice(0,4)" :key="row.id" class="unified-queue-row" type="button" @click="go('/solicitudes/' + row.id)">
+              <q-icon name="description" color="primary" size="22px"/>
+              <span><b>{{ row.titulo || row.codigo }}</b><small>{{ row.empresa?.nombre_comercial || row.cliente?.nombre || row.codigo }} · {{ formatDateTime(row.created_at) }}</small></span>
+              <q-icon name="chevron_right"/>
+            </button>
+          </div>
+          <div v-else class="unified-empty">Todavía no hay solicitudes recientes.</div>
+        </article>
+        <article class="unified-panel">
+          <div class="unified-panel-head"><h3>Trabajos recientes</h3><q-btn flat round dense icon="arrow_forward" to="/trabajos" aria-label="Todos los trabajos"/></div>
+          <div v-if="data.proyectos_recientes?.length" class="unified-queue">
+            <button v-for="row in data.proyectos_recientes.slice(0,4)" :key="row.id" class="unified-queue-row" type="button" @click="go('/trabajos/' + row.id)">
+              <q-icon name="work_outline" color="primary" size="22px"/>
+              <span><b>{{ row.nombre || row.codigo }}</b><small>{{ row.empresa?.nombre_comercial || row.codigo }} · {{ row.progreso ?? 0 }}% de avance</small></span>
+              <q-icon name="chevron_right"/>
+            </button>
+          </div>
+          <div v-else class="unified-empty">Todavía no hay trabajos recientes.</div>
+        </article>
+      </div>
     </section>
   </q-page>
 </template>
 
 <style scoped>
-.dashboard-page{padding-top:34px}.metrics-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px}.metric-card,.workflow-step,.activity-row{font:inherit;color:inherit;text-align:left}.metric-card{border:1px solid var(--viti-border);background:linear-gradient(180deg,rgba(15,40,70,.72),rgba(8,27,48,.72));border-radius:19px;padding:18px;display:flex;align-items:center;gap:14px;cursor:pointer;transition:.2s ease;min-height:112px}.metric-card:hover{transform:translateY(-2px);border-color:rgba(242,139,48,.5)}.metric-icon{width:46px;height:46px;border-radius:14px;background:rgba(242,139,48,.1);color:#ff9a3c;display:grid;place-items:center;font-size:23px}.metric-copy{display:grid;min-width:0}.metric-copy small{color:#a9bbcb;font-size:11px}.metric-copy b{font-size:30px;line-height:1.05;margin:3px 0}.metric-copy em{font-style:normal;color:#718ba2;font-size:9px;text-transform:uppercase;letter-spacing:.08em}.metric-arrow{margin-left:auto;color:#6f89a4}.command-grid{display:grid;grid-template-columns:minmax(0,1fr) 290px;gap:14px}.workflow-panel,.attention-panel,.viti-panel{border:1px solid var(--viti-border);background:rgba(8,25,45,.62);border-radius:22px}.workflow-panel{padding:23px}.panel-heading,.panel-head{display:flex;align-items:center;justify-content:space-between;gap:20px}.panel-heading h2,.panel-head h3{margin:4px 0 0}.panel-heading h2{font-size:23px}.panel-heading>span{color:var(--viti-muted);font-size:11px}.workflow-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:18px}.workflow-step{border:1px solid rgba(99,129,160,.18);background:rgba(16,43,72,.48);border-radius:16px;padding:16px;cursor:pointer;transition:.18s}.workflow-step:hover{border-color:rgba(242,139,48,.4);background:rgba(20,53,88,.75)}.step-number{font-size:9px;font-weight:900;letter-spacing:.13em;color:#728ba3}.step-icon{display:grid;place-items:center;width:37px;height:37px;border-radius:11px;margin:12px 0;background:rgba(20,87,184,.17);color:#7db4ff;font-size:20px}.workflow-step strong{display:block;font-size:14px}.workflow-step p{margin:6px 0 0;color:#8ea5b9;font-size:10px;line-height:1.5}.attention-panel{padding:24px;background:linear-gradient(145deg,rgba(14,39,65,.82),rgba(17,52,84,.7))}.attention-value{font-size:46px;font-weight:900;line-height:1;margin:20px 0 6px;color:#f5f8fb}.attention-panel h3{font-size:17px;margin:0 0 7px}.attention-panel p{color:#93a9bb;font-size:11px;line-height:1.6;min-height:54px}.attention-panel .q-btn{color:#ff9b42;padding-left:0}.dashboard-columns{display:grid;grid-template-columns:1fr 1fr;gap:14px}.viti-panel{overflow:hidden}.panel-head{padding:20px 22px;border-bottom:1px solid rgba(88,118,148,.14)}.panel-head h3{font-size:18px}.activity-row{width:100%;border:0;border-bottom:1px solid rgba(88,118,148,.12);background:transparent;padding:14px 18px;display:flex;align-items:center;gap:12px;cursor:pointer}.activity-row:last-child{border-bottom:0}.activity-row:hover{background:rgba(255,255,255,.025)}.activity-icon{width:36px;height:36px;border-radius:10px;background:rgba(20,87,184,.15);color:#79b1ff;display:grid;place-items:center}.activity-copy{display:grid;min-width:0;flex:1}.activity-copy b{font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.activity-copy small{font-size:9px;color:#7f98ad;margin-top:3px}.activity-date{font-size:9px;color:#71899e}.progress-pill{font-size:10px;font-weight:800;color:#9fd0ff;border:1px solid rgba(80,145,216,.25);border-radius:999px;padding:4px 8px}.panel-empty{min-height:160px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;color:#768ea3}.panel-empty .q-icon{font-size:30px;color:#56738f}.panel-empty b{color:#cfdbe5;margin-top:9px}.panel-empty span{font-size:10px;margin-top:3px}.viti-btn{border-radius:12px;min-height:42px}.viti-btn--ghost{background:rgba(255,255,255,.025)!important}.viti-btn--primary{background:linear-gradient(135deg,#1457b8,#1a69cf)!important}
-@media(max-width:1120px){.metrics-grid{grid-template-columns:repeat(2,1fr)}.command-grid{grid-template-columns:1fr}.workflow-grid{grid-template-columns:repeat(2,1fr)}}
-@media(max-width:760px){.dashboard-page{padding-top:18px}.metrics-grid,.dashboard-columns{grid-template-columns:1fr}.workflow-grid{grid-template-columns:1fr 1fr}.panel-heading{align-items:flex-start;flex-direction:column}.activity-date{display:none}}
+.unified-home{padding-top:28px;padding-bottom:45px}
+.unified-section-line{display:flex;align-items:end;justify-content:space-between;gap:15px;margin:18px 0 16px}
+.unified-section-line h2,.unified-panel h2{margin:4px 0 0;font-size:23px;font-weight:800;letter-spacing:-.03em}
+.unified-section-line span{color:#89a6be;font-size:12px}
+.unified-action-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px}
+.unified-card{text-align:left;font:inherit;color:#edf6ff;cursor:pointer;min-width:0;display:flex;flex-direction:column;min-height:255px;border:1px solid rgba(116,164,209,.21);border-radius:19px;padding:20px;background:linear-gradient(145deg,rgba(18,52,85,.92),rgba(8,28,48,.95));transition:border-color .2s,transform .2s}
+.unified-card:hover,.unified-card:focus-visible{border-color:#ef934c;transform:translateY(-2px);outline:none}
+.unified-card-top{display:flex;justify-content:space-between;align-items:start}
+.unified-icon{height:46px;width:46px;display:grid;place-items:center;background:rgba(242,139,48,.13);color:#ffad65;border-radius:13px}
+.unified-arrow{color:#8cabc6}
+.unified-count{display:flex;align-items:baseline;gap:8px;margin-top:16px}
+.unified-count strong{font-size:30px;line-height:1.1;font-variant-numeric:tabular-nums}
+.unified-count span{font-size:11px;color:#a5bfd5}
+.unified-card h3{font-size:19px;font-weight:800;margin:10px 0 5px}
+.unified-card p{font-size:12px;color:#a7bfd3;line-height:1.55;margin:0 0 15px;flex:1}
+.unified-card-link{font-size:12px;color:#ffa85f;font-weight:750;display:flex;align-items:center;gap:7px}
+.unified-bottom-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.unified-panel{border:1px solid rgba(116,164,209,.19);border-radius:19px;background:#0b2037;overflow:hidden}
+.unified-panel-head{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:20px 20px 15px;border-bottom:1px solid rgba(116,164,209,.12)}
+.unified-panel h3{font-size:16px;margin:0;font-weight:800}
+.unified-queue-row{display:flex;align-items:center;text-align:left;gap:12px;width:100%;border:0;border-bottom:1px solid rgba(116,164,209,.10);background:none;color:inherit;cursor:pointer;padding:15px 20px;font:inherit}
+.unified-queue-row:hover{background:rgba(30,88,145,.18)}
+.unified-queue-row span{flex:1;min-width:0;display:grid;gap:4px}
+.unified-queue-row b{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px}
+.unified-queue-row small{font-size:11px;color:#9db5cc;line-height:1.4}
+.unified-queue-row:last-child{border-bottom:0}
+.unified-empty{padding:30px 20px;min-height:90px;color:#a5bdd1;display:flex;align-items:center;gap:10px}
+.unified-steps{padding:14px 20px;display:grid;gap:15px}
+.unified-steps>div{display:flex;gap:12px}
+.unified-steps>div>span{font-weight:800;font-size:11px;color:#ffab62;background:rgba(242,139,48,.11);border-radius:9px;display:grid;place-items:center;width:34px;height:34px;flex:0 0 34px}
+.unified-steps p{margin:0;display:grid;gap:3px}
+.unified-steps b{font-size:13px}
+.unified-steps small{font-size:11px;color:#a5b9cf}
+@media(max-width:1350px){.unified-action-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:760px){.unified-action-grid,.unified-bottom-grid{grid-template-columns:1fr}.unified-section-line{align-items:start;flex-direction:column}.unified-card{min-height:190px}.unified-count{margin-top:10px}}
 </style>

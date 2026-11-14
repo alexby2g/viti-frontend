@@ -2,12 +2,14 @@
 import { computed, onMounted, onUnmounted, reactive, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import { useQuasar } from 'quasar'
+import { useAuthStore } from '../stores/auth'
 import { api } from '../boot/axios'
 import { downloadFile } from '../utils/download'
 import PageHeader from '../components/PageHeader.vue'
 import ProyectoTaskBoard from '../components/trabajos/ProyectoTaskBoard.vue'
 import { formatDate, formatDateTime } from '../utils/date'
 
+const auth = useAuthStore()
 const route=useRoute(),$q=useQuasar(),item=ref(null),loading=ref(true),advanceDialog=ref(false),editDialog=ref(false),developmentDialog=ref(false)
 const advance=reactive({fase:'desarrollo',area:'general',titulo:'',descripcion:'',progreso:0,visible_cliente:true})
 const advanceFiles=ref([])
@@ -211,7 +213,7 @@ onUnmounted(()=>{ clearAdvanceFiles(); closeGallery() })
 <q-page class="viti-page">
   <q-inner-loading :showing="loading"/>
   <template v-if="item">
-    <PageHeader eyebrow="Trabajo" :title="`${item.codigo} · ${item.nombre}`" :subtitle="`${item.empresa?.nombre_comercial} · ${item.cliente?.nombre}`">
+    <PageHeader eyebrow="Trabajo" :title="`${item.codigo} · ${item.nombre}`" :subtitle="`${item.empresa?.nombre_comercial || 'Sin empresa'} · ${item.cliente?.nombre || 'Sin responsable'}`">
       <div class="row q-gutter-sm">
         <q-btn outline color="primary" icon="picture_as_pdf" label="PDF" no-caps @click="downloadFile(`/reportes/proyectos/${item.id}.pdf`,`${item.codigo}.pdf`)"/>
         <q-btn outline color="primary" icon="edit" label="Editar" no-caps @click="editDialog=true"/>
@@ -219,6 +221,24 @@ onUnmounted(()=>{ clearAdvanceFiles(); closeGallery() })
         <q-btn color="primary" unelevated icon="add_task" label="Registrar avance" no-caps @click="openAdvance"/>
       </div>
     </PageHeader>
+
+    <q-card flat class="viti-card q-mb-lg">
+      <q-card-section class="row items-center q-gutter-md">
+        <div class="col-12 col-md">
+          <div class="section-label">EXPEDIENTE DEL TRABAJO</div>
+          <div class="text-h6 text-weight-bold">Todo este proyecto, conectado</div>
+          <div class="text-caption text-grey-5">Desde aquí registras avances, adjuntas entregables y consultas el sistema. Los pagos se revisan por separado para mantener el control.</div>
+        </div>
+        <div class="col-12 col-md-auto row q-gutter-sm">
+          <q-btn outline no-caps icon="upload_file" label="Subir entregables" :to="`/archivos?proyecto=${item.id}`"/>
+          <q-btn v-if="auth.user?.rol === 'superadmin'" outline no-caps icon="qr_code_2" label="Pagos del proyecto" :to="`/pagos?proyecto=${item.id}`"/>
+          <q-btn outline no-caps icon="devices" label="Sistemas" to="/sistemas"/>
+        </div>
+      </q-card-section>
+      <q-banner v-if="item.progreso >= 100 && item.estado === 'activo'" rounded class="q-mx-md q-mb-md bg-blue-10 text-white">
+        El avance está en 100 %, pero el trabajo sigue activo. Revisa la entrega, el pago y la aceptación antes de cerrarlo.
+      </q-banner>
+    </q-card>
 
     <div class="row q-col-gutter-lg">
       <div class="col-12 col-lg-8">

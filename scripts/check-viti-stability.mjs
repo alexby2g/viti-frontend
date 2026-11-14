@@ -7,5 +7,5 @@ has(login,'Crear cuenta gratis','Login');has(login,'Explorar VITI como invitado'
 has(demo,'MODO INVITADO','Demo');has(demo,'Continúa con tu propia cuenta','Demo');not(demo,"api.post",'Demo sin escritura');not(demo,"api.put",'Demo sin escritura');not(demo,"api.delete",'Demo sin escritura');
 has(detail,'/solicitudes/${item.value.id}/invitacion','Invitación administrativa');has(detail,'Crear acceso','Invitación administrativa');has(detail,'Iniciar trabajo','Proyecto');
 has(clientHub,"api.get('/mi/solicitud')",'Portal cliente');not(clientHub,"api.get('/mi/solicitudes')",'Portal cliente');has(idea,'¿Qué necesitas ahora?','Nueva solicitud cliente');not(idea,'visibleQuestions','Nueva solicitud cliente');
-has(menu,'Operación','Menú');has(menu,'Planes y precios','Menú');has(layout,'useNotificationsStore','Layout');has(notifications,'/notificaciones/centro','Notificaciones');not(notifications,'/notificaciones/buzon','Notificaciones');
+has(menu,'Centro de trabajo','Menú simplificado');has(menu,'Planes y precios','Menú');has(layout,'useNotificationsStore','Layout');has(notifications,'/notificaciones/centro','Notificaciones');not(notifications,'/notificaciones/buzon','Notificaciones');
 console.log('VITI stability smoke: PASS');
