@@ -7,6 +7,7 @@ import { api } from '../boot/axios'
 import { downloadFile } from '../utils/download'
 import PageHeader from '../components/PageHeader.vue'
 import ProyectoTaskBoard from '../components/trabajos/ProyectoTaskBoard.vue'
+import ProyectoDeliveryPanel from '../components/trabajos/ProyectoDeliveryPanel.vue'
 import { formatDate, formatDateTime } from '../utils/date'
 
 const auth = useAuthStore()
@@ -258,6 +259,8 @@ onUnmounted(()=>{ clearAdvanceFiles(); closeGallery() })
         </q-card>
 
         <ProyectoTaskBoard :proyecto="item" />
+
+        <ProyectoDeliveryPanel :proyecto="item" />
 
         <q-card flat class="viti-card q-mt-lg">
           <q-card-section><div class="text-h6 text-weight-bold">Historial de avances</div></q-card-section>

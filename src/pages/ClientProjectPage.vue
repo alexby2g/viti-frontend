@@ -8,6 +8,8 @@ import PageHeader from '../components/PageHeader.vue'
 
 const router=useRouter()
 const item=ref(null)
+const delivery=ref(null)
+const deliveryError=ref('')
 const loading=ref(true)
 const plan=computed(()=>item.value?.empresa?.plan_viti||item.value?.solicitud?.plan_viti||null)
 const galleryDialog=ref(false)
@@ -62,7 +64,23 @@ function downloadGalleryFile(){
 }
 
 
-async function load(){ loading.value=true; try{ item.value=(await api.get('/mi/proyecto')).data.data } finally{ loading.value=false } }
+async function load(){
+  loading.value = true
+  deliveryError.value = ''
+  try {
+    // Una falla del paquete de entrega no debe ocultar el seguimiento del proyecto.
+    const [projectResult, deliveryResult] = await Promise.allSettled([
+      api.get('/mi/proyecto'),
+      api.get('/mi/proyecto/entrega'),
+    ])
+    if (projectResult.status === 'rejected') throw projectResult.reason
+    item.value = projectResult.value.data.data
+    delivery.value = deliveryResult.status === 'fulfilled' ? (deliveryResult.value.data.data || null) : null
+    if (deliveryResult.status === 'rejected') deliveryError.value = 'No pudimos comprobar la entrega. Intenta actualizar.'
+  } finally {
+    loading.value = false
+  }
+}
 function money(value){ return value===null||value===undefined ? 'Por definir' : `${Number(value).toFixed(0)} Bs` }
 function pretty(value){ return String(value||'').replaceAll('_',' ').replace(/\b\w/g,c=>c.toUpperCase()) }
 function openApplication(){
@@ -94,6 +112,42 @@ onUnmounted(closeGallery)
         </div>
         <div class="progress-ring"><strong>{{item.progreso||0}}%</strong><span>avance</span></div>
       </section>
+
+      <q-card v-if="delivery" flat class="client-card q-mt-lg client-delivery">
+        <q-card-section>
+          <div class="row items-center q-gutter-sm q-mb-sm">
+            <q-icon name="verified" color="positive" size="26px"/>
+            <div class="col">
+              <div class="eyebrow">ENTREGA DISPONIBLE</div>
+              <h3>{{ delivery.titulo }}</h3>
+            </div>
+          </div>
+          <div v-if="delivery.instrucciones" class="delivery-instructions">{{ delivery.instrucciones }}</div>
+          <div v-if="delivery.archivos?.length" class="delivery-downloads">
+            <div class="text-weight-medium q-mb-sm">Archivos para descargar</div>
+            <q-list bordered separator class="rounded-borders">
+              <q-item v-for="file in delivery.archivos" :key="file.id">
+                <q-item-section avatar><q-icon name="description" color="primary"/></q-item-section>
+                <q-item-section>
+                  <q-item-label>{{ file.nombre_original }}</q-item-label>
+                  <q-item-label v-if="file.descripcion" caption>{{ file.descripcion }}</q-item-label>
+                </q-item-section>
+                <q-item-section side>
+                  <q-btn outline no-caps color="primary" dense icon="download" label="Descargar"
+                    @click="downloadFile('/mi/archivos/' + file.id + '/descargar', file.nombre_original)"/>
+                </q-item-section>
+              </q-item>
+            </q-list>
+          </div>
+          <div class="row items-center q-gutter-sm q-mt-md">
+            <q-btn v-if="item.aplicacion?.acceso_cliente" color="primary" unelevated no-caps icon="devices" label="Abrir mi sistema" @click="openApplication"/>
+            <q-btn outline no-caps icon="support_agent" label="Necesito ayuda" to="/mi-buzon"/>
+          </div>
+        </q-card-section>
+      </q-card>
+      <q-banner v-else-if="deliveryError" rounded class="bg-blue-grey-10 text-white q-mt-lg">
+        {{ deliveryError }} <q-btn flat no-caps color="orange" label="Actualizar" @click="load"/>
+      </q-banner>
 
       <div class="project-grid q-mt-lg">
         <div>
@@ -205,4 +259,5 @@ onUnmounted(closeGallery)
 .client-photo-viewer{width:min(980px,96vw);max-width:96vw;background:#07192a!important;color:#edf4fb;border:1px solid rgba(95,134,170,.32);border-radius:20px;overflow:hidden}.client-viewer-head{display:flex;align-items:center;gap:8px;padding:14px 16px}.client-viewer-count{padding:5px 9px;border-radius:999px;background:rgba(58,120,197,.12);border:1px solid rgba(86,143,213,.2);font-size:11px;color:#a9c6e4}.client-viewer-stage{position:relative;display:grid;place-items:center;min-height:520px;max-height:72vh;background:radial-gradient(circle at 50% 45%,rgba(32,82,135,.16),transparent 45%),#030e18}.client-viewer-image{width:100%;height:min(68vh,720px)}.client-viewer-error{display:flex;flex-direction:column;align-items:center;gap:8px;color:#8199ad}.client-viewer-error b{color:#dce7f0}.client-photo-nav{position:absolute;top:50%;transform:translateY(-50%);background:rgba(7,22,37,.86)!important;color:#f4f8fc!important;border:1px solid rgba(110,153,190,.24);backdrop-filter:blur(10px)}.client-photo-left{left:14px}.client-photo-right{right:14px}.client-viewer-meta{display:flex;align-items:center;gap:9px;color:#9fb2c3;font-size:12px}.client-viewer-meta>.q-icon{color:#72aaff;font-size:18px}
 @media(max-width:600px){.client-photo-viewer{width:100vw;max-width:100vw;border-radius:0}.client-viewer-stage{min-height:62vh}.client-photo-left{left:8px}.client-photo-right{right:8px}.client-gallery-copy small{display:none}}
 
+.client-delivery{border-color:rgba(84,187,132,.38)!important}.delivery-instructions{white-space:pre-wrap;color:#c0d3e5;line-height:1.65;margin-top:10px}.delivery-downloads{margin-top:18px}.delivery-downloads :deep(.q-item){min-height:64px}@media(max-width:600px){.delivery-downloads :deep(.q-item){flex-wrap:wrap;padding:12px}.delivery-downloads :deep(.q-item__section--side){padding-left:0;margin-top:8px}}
 </style>

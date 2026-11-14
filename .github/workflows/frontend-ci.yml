@@ -50,6 +50,9 @@ jobs:
       - name: VITI unified simple commercial flow smoke
         run: npm run test:viti-unified
 
+      - name: VITI formal delivery and customer portal smoke
+        run: npm run test:viti-delivery
+
       - name: VITI public presentation smoke
         run: npm run test:viti-public
 
