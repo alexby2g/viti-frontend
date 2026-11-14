@@ -308,3 +308,48 @@ body.viti-main-active .drawer-primary-action{background:linear-gradient(135deg,#
 body.viti-main-active input:-webkit-autofill,
 body.viti-main-active input:-webkit-autofill:focus{-webkit-box-shadow:0 0 0 1000px #222320 inset!important;box-shadow:0 0 0 1000px #222320 inset!important}
 @media(prefers-reduced-motion:reduce){body.viti-main-active .q-btn,body.viti-main-active .viti-card{transition:none!important}}
+
+/* VITI 2.0 · Portal público y experiencia del cliente.
+   Solo cambia la identidad visual: no altera permisos ni formularios. */
+.landing-page,.register-page,.auth-page{
+  --viti-gold:#d3af69;
+  color:#f7f5ee!important;
+  background:radial-gradient(circle at 86% 12%,rgba(147,114,59,.12),transparent 33rem),#111210!important;
+}
+.landing-page .landing-nav,.register-page .register-header,.auth-page .access-header{
+  background:rgba(18,19,18,.92)!important;border-color:rgba(214,185,128,.15)!important
+}
+.landing-page .hero-copy h1,.register-page .register-copy h1,.auth-page .access-intro h1{color:#fcfaf5!important}
+.landing-page .hero-copy h1 span,.auth-page .access-intro h1 span{color:#dfbd79!important}
+.landing-page .eyebrow,.landing-page .section-kicker,.register-page .eyebrow,.register-page .card-kicker,.auth-page .eyebrow,.auth-page .panel-kicker{color:#d4b373!important}
+.landing-page .hero-lead,.landing-page .landing-section p,.register-page .register-copy>p,.auth-page .access-intro p{color:#c3c0b7!important}
+.landing-page .q-btn.bg-primary,.register-page .q-btn.bg-primary,.auth-page .q-btn.bg-primary{
+  background:linear-gradient(135deg,#e4c88d,#b99555)!important;
+  color:#171613!important;border:1px solid #d7b574!important;
+  box-shadow:none!important
+}
+.landing-page .solution-card,.landing-page .workflow-card,.landing-page .price-columns>div,
+.landing-page .customer-preview,.register-page .register-card,.auth-page .access-panel{
+  background:linear-gradient(150deg,#232420,#191a18)!important;
+  color:#f5f2ea!important;border-color:#474238!important
+}
+.register-page .contact-option,.register-page .q-field__control,.auth-page .q-field__control{
+  background:#24241f!important;border-color:#585043!important
+}
+.register-page .q-field__control:before,.auth-page .q-field__control:before{border-color:#5a5142!important}
+.register-page .q-field__label,.auth-page .q-field__label{color:#c0b9aa!important}
+.register-page .q-field--focused .q-field__control:after,.auth-page .q-field--focused .q-field__control:after{color:#ddbc7b!important}
+.client-hub-layout{background:#111210!important;color:#f5f2eb!important}
+.client-hub-layout .hub-header{background:#191a18!important;border-color:#393730!important}
+.client-hub-layout .hub-sidebar{background:linear-gradient(180deg,#1b1c19,#201f1b)!important;border-color:#3d3a32!important}
+.client-hub-layout .hub-content{background:#111210!important}
+.client-hub-layout .hub-kicker,.client-hub-layout .hub-nav-active{color:#dbb97a!important}
+.client-hub-layout .hub-nav-active{background:rgba(211,175,105,.1)!important;border-color:rgba(211,175,105,.3)!important}
+.client-hub-layout .hub-page .hero-status,.client-hub-layout .quick-card,.client-hub-layout .info-card{
+  background:linear-gradient(150deg,#25251f,#1c1d1a)!important;
+  border-color:#494339!important;color:#f6f3eb!important
+}
+.client-hub-layout .hub-page .kicker,.client-hub-layout .hub-page .status-eyebrow{color:#dbb97a!important}
+.client-hub-layout .hub-page .quick-card .q-avatar{background:rgba(211,175,105,.12)!important;color:#e0bd7b!important}
+.client-hub-layout .hub-page .ring{border-color:#c6a362!important;background:#29261e!important}
+@media(max-width:600px){.landing-page,.auth-page,.register-page{overflow-x:hidden}}
