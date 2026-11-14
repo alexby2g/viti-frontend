@@ -31,13 +31,13 @@ export function buildMainMenu({
     ...(isSuperAdmin ? [{ label: 'Pagos', icon: 'receipt_long', to: '/pagos' }] : []),
     { label: 'Trabajos', icon: 'account_tree', to: '/trabajos' },
     { label: 'Sistemas', icon: 'language', to: '/sistemas' },
+    { label: 'Clientes', icon: 'groups', to: '/clientes' },
     { label: 'Soporte', icon: 'support_agent', to: '/soporte', badge: unreadCount },
     { type: 'section', label: 'Herramientas' },
     {
-      label: 'Más herramientas',
+      label: 'Gestión adicional',
       icon: 'tune',
       children: [
-        { label: 'Clientes y negocios', icon: 'groups', to: '/clientes' },
         { label: 'Archivos y entregables', icon: 'folder_shared', to: '/archivos' },
         { label: 'Reportes', icon: 'analytics', to: '/reportes' },
       ],
