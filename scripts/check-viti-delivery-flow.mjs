@@ -1,0 +1,28 @@
+import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
+
+const read = path => readFileSync(new URL('../' + path, import.meta.url), 'utf8')
+const admin = read('src/components/trabajos/ProyectoDeliveryPanel.vue')
+const project = read('src/pages/ProyectoDetallePage.vue')
+const client = read('src/pages/ClientProjectPage.vue')
+const files = read('src/pages/ArchivosPage.vue')
+
+assert.match(project, /<ProyectoDeliveryPanel :proyecto="item"/, 'La entrega debe aparecer dentro de un trabajo.')
+assert.match(admin, /api\.get\('\/proyectos\/' \+ props\.proyecto\.id \+ '\/entrega'\)/, 'Debe consultar el manifiesto por proyecto.')
+assert.match(admin, /api\.put\('\/proyectos\/' \+ props\.proyecto\.id \+ '\/entrega'/, 'Debe guardar un borrador privado.')
+assert.match(admin, /'\/entrega\/publicar'/, 'Publicación explícita.')
+assert.match(admin, /'\/entrega\/retirar'/, 'Retirada explícita sin borrar archivos.')
+assert.match(admin, /precio_acordado/, 'Verificación del pago del proyecto.')
+assert.match(admin, /estado_pago === 'pagado'/, 'No habilitar publicación con pago pendiente.')
+assert.match(admin, /dirty\.value/, 'Evita publicar cambios sin guardar.')
+assert.match(admin, /archivo_ids/, 'Selección de archivos individual.')
+assert.match(admin, /Retirar entrega/, 'Se debe advertir la consecuencia de retirar el paquete.')
+assert.match(admin, /acceso a una aplicación ya entregada se administra por separado/, 'No promete revocación de licencia.')
+assert.match(client, /api\.get\('\/mi\/proyecto\/entrega'\)/, 'Solo mostrar paquetes publicados por API de cliente.')
+assert.match(client, /v-if="delivery"/, 'El cliente no ve borradores.')
+assert.match(client, /mi\/archivos\//, 'La descarga usa permisos de cliente.')
+assert.match(client, /<q-btn.*Necesito ayuda/, 'Contacto de soporte del cliente.')
+assert.doesNotMatch(client, /\/archivos\/.*\/descargar/, 'No usar descarga administrativa.')
+assert.match(files, /category\.value = 'entrega'/, 'La carga sigue vinculada al trabajo.')
+assert.doesNotMatch(admin, /api\.delete|innerHTML|v-html/, 'La entrega no elimina archivos ni inyecta HTML.')
+console.log('VITI entrega: borrador/publicación, pagos, archivos y portal de cliente verificados.')
