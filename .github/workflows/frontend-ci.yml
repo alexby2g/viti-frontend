@@ -44,6 +44,9 @@ jobs:
       - name: VITI stability smoke
         run: npm run test:viti-stability
 
+      - name: VITI project task board smoke
+        run: npm run test:viti-work-tasks
+
       - name: VITI public presentation smoke
         run: npm run test:viti-public
 
