@@ -219,3 +219,92 @@ body.viti-main-active .q-btn:not(.q-btn--round){
 body.viti-main-active .q-btn.q-btn--outline:before{
   border-width:1.35px!important;
 }
+
+
+/* VITI 2.0 · Paleta unificada grafito y dorado mate.
+   Se limita a VITI: no cambia las aplicaciones entregadas. */
+body.viti-main-active{
+  --viti-bg:#101110;--viti-card:#1b1c1a;--viti-text:#f5f3ee;
+  --viti-muted:#b5b3ab;--viti-border:#393833;
+  --viti-accent:#d3af69;--viti-accent-soft:#ead09a;
+  --viti-brand:#b99656;--viti-brand-dark:#242016;
+  background:#101110!important;color:var(--viti-text);
+}
+body.viti-main-active .q-page-container,
+body.viti-main-active .q-page{background:transparent!important;color:var(--viti-text)}
+body.viti-main-active .viti-header{
+  background:rgba(20,21,20,.98)!important;
+  border-bottom:1px solid rgba(220,204,173,.14)!important;
+  box-shadow:none!important;
+}
+body.viti-main-active .viti-drawer{
+  background:linear-gradient(180deg,#171817,#1d1c19)!important;
+  color:#f0ede6!important;border-right:1px solid #37352f!important;
+}
+body.viti-main-active .viti-drawer .q-item{border-radius:12px;margin:3px 8px;color:#d0cec7}
+body.viti-main-active .viti-drawer .q-item.q-router-link--active,
+body.viti-main-active .viti-drawer .q-item.q-item--active{
+  background:linear-gradient(100deg,rgba(210,172,99,.18),rgba(210,172,99,.04))!important;
+  color:#f4dfb6!important;
+}
+body.viti-main-active .viti-drawer .q-item.q-router-link--active:before{background:#d3af69!important}
+body.viti-main-active .viti-drawer .q-item.q-router-link--active .q-icon{color:#e6c786!important}
+body.viti-main-active .drawer-section-label{color:#898981!important}
+body.viti-main-active .page-title{color:#faf8f3!important}
+body.viti-main-active .page-subtitle{color:#b7b6ae!important}
+body.viti-main-active .section-label,
+body.viti-main-active .text-primary{color:#d9b875!important}
+body.viti-main-active .viti-card,
+body.viti-main-active .viti-table,
+body.viti-main-active .q-card{
+  background:linear-gradient(160deg,#1d1e1c,#191a18)!important;
+  border-color:#3c3b36!important;color:#f5f3ee!important;
+  box-shadow:none;
+}
+body.viti-main-active .viti-table thead tr,
+body.viti-main-active .viti-table thead th{
+  background:#222320!important;color:#d6d2c9!important;
+  border-color:#393833!important;
+}
+body.viti-main-active .viti-table tbody td{color:#ebe8e0!important;border-color:#35352f!important}
+body.viti-main-active .viti-table tbody tr:hover{background:#292822!important}
+body.viti-main-active .q-separator{background:#3b3933!important}
+body.viti-main-active .text-grey-6,
+body.viti-main-active .text-grey-7,
+body.viti-main-active .q-item__label--caption{color:#b7b4ac!important}
+body.viti-main-active .q-btn.bg-primary,
+body.viti-main-active .bg-primary{
+  background:linear-gradient(135deg,#dcc083,#b99351)!important;
+  color:#171512!important;border-color:#dbbe80!important;
+  box-shadow:none!important;
+}
+body.viti-main-active .q-btn.bg-primary:hover{
+  background:linear-gradient(135deg,#ebce90,#cba45e)!important;
+  box-shadow:0 7px 24px rgba(183,143,68,.16)!important;
+}
+body.viti-main-active .q-btn.q-btn--outline:hover,
+body.viti-main-active .q-btn.q-btn--flat:hover{
+  background:rgba(217,181,107,.09)!important;border-color:rgba(217,181,107,.4)!important;
+}
+body.viti-main-active .q-field--outlined .q-field__control,
+body.viti-main-active .q-field--filled .q-field__control{
+  background:#222320!important;color:#f3f1eb!important;border-radius:12px;
+}
+body.viti-main-active .q-field--outlined .q-field__control:before{border-color:#4a4840!important}
+body.viti-main-active .q-field--outlined:hover .q-field__control:before{border-color:#8d7750!important}
+body.viti-main-active .q-field--focused .q-field__control{
+  background:#27261f!important;box-shadow:0 0 0 2px rgba(211,175,105,.11)!important;
+}
+body.viti-main-active .q-field--focused .q-field__control:after{color:#d3af69!important}
+body.viti-main-active .q-field__label{color:#b9b6ad!important}
+body.viti-main-active .q-field__marginal{color:#a4a096!important}
+body.viti-main-active .q-field__native,
+body.viti-main-active .q-field__input{color:#f7f5ef!important}
+body.viti-main-active .q-menu,
+body.viti-main-active .q-dialog .q-card{background:#222320!important;color:#f4f2eb!important;border-color:#444239!important}
+body.viti-main-active .q-tab--active{color:#dfbf80!important;background:rgba(217,181,107,.10)!important}
+body.viti-main-active .q-banner{border:1px solid #454137}
+body.viti-main-active .drawer-primary-action{background:linear-gradient(135deg,#dfc184,#b99455)!important;color:#151411!important;border:1px solid #d0ad6e!important;box-shadow:none!important}
+body.viti-main-active input:-webkit-autofill,
+body.viti-main-active input:-webkit-autofill:focus{-webkit-box-shadow:0 0 0 1000px #222320 inset!important;box-shadow:0 0 0 1000px #222320 inset!important}
+@media(prefers-reduced-motion:reduce){body.viti-main-active .q-btn,body.viti-main-active .viti-card{transition:none!important}}
