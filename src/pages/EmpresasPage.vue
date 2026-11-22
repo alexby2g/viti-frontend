@@ -12,8 +12,14 @@ const empty=()=>({cliente_id:null,usuario_id:null,nombre_comercial:'',razon_soci
 const form=reactive(empty())
 const activeCount=computed(()=>rows.value.filter(x=>x.estado==='activo').length)
 const isSuperAdmin=computed(()=>auth.user?.rol==='superadmin')
-function owner(row){const u=(row?.usuarios||[]).find(item=>item?.pivot?.rol_negocio==='propietario'&&item?.pivot?.activo!==false);if(!u)return null;return {...u,nombre_completo:[u.nombre,u.apellido].filter(Boolean).join(' ')||u.usuario}}
-function userLabel(user){const name=[user.nombre,user.apellido].filter(Boolean).join(' ')||user.usuario;return `${name} · @${user.usuario}`}
+function accountName(user) {
+  const name = (user.nombre || '').trim()
+  const surname = (user.apellido || '').trim()
+  if (!surname || name === surname || name.endsWith(' ' + surname)) return name || user.usuario
+  return [name, surname].filter(Boolean).join(' ') || user.usuario
+}
+function owner(row){const u=(row?.usuarios||[]).find(item=>item?.pivot?.rol_negocio==='propietario'&&item?.pivot?.activo!==false);if(!u)return null;return {...u,nombre_completo:accountName(u)}}
+function userLabel(user){const name=accountName(user);return `${name} · @${user.usuario}`}
 async function load(){loading.value=true;try{const [e,c,u]=await Promise.all([api.get('/empresas',{params:{buscar:search.value,per_page:100}}),api.get('/clientes',{params:{per_page:100}}),isSuperAdmin.value?api.get('/usuarios',{params:{per_page:100}}).catch(()=>({data:{data:[]}})):Promise.resolve({data:{data:[]}})]);rows.value=e.data.data||[];clients.value=c.data.data||[];users.value=(u.data.data||[]).filter(user=>user.estado==='activo'&&user.rol==='cliente'&&user.cliente_id)}catch(error){$q.notify({type:'negative',message:error?.response?.data?.message||'No se pudieron cargar las empresas.'})}finally{loading.value=false}}
 function open(row=null){editing.value=row;Object.assign(form,empty(),row||{});form.usuario_id=owner(row)?.id||null;dialog.value=true;logoFile.value=null}
 async function save(){if(saving.value||!form.nombre_comercial.trim())return;saving.value=true;try{let id;const payload={...form};delete payload.usuario_id;if(editing.value){id=editing.value.id;await api.put(`/empresas/${id}`,{...payload,usuario_id:form.usuario_id})}else{const created=(await api.post('/empresas',payload)).data.data;id=created.id;if(form.usuario_id)await api.put(`/empresas/${id}`,{...payload,usuario_id:form.usuario_id})}if(logoFile.value){const fd=new FormData();fd.append('logo',logoFile.value);await api.post(`/empresas/${id}/logo`,fd)}$q.notify({type:'positive',message:editing.value?'Empresa actualizada.':'Empresa registrada.'});dialog.value=false;await load()}catch(e){$q.notify({type:'negative',message:e.response?.data?.message||'No se pudo guardar.'})}finally{saving.value=false}}
