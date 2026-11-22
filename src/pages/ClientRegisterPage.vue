@@ -96,10 +96,8 @@ onMounted(()=>{
             <q-input v-if="form.business_whatsapp_different" :model-value="form.whatsapp_business" outlined label="WhatsApp del negocio *" inputmode="numeric" class="q-mt-sm" :rules="[v=>validPhone(v)]" @update:model-value="v=>normalize('whatsapp_business',v)"/>
           </div>
 
-          <template>
-            <q-input v-model="form.password" outlined :type="showPassword?'text':'password'" label="Contraseña *" autocomplete="new-password" class="q-mt-md" :rules="[v=>String(v||'').length>=8||'Mínimo 8 caracteres.',v=>/[A-Za-z]/.test(v)&&/\d/.test(v)||'Incluye letras y números.']"><template #append><q-icon :name="showPassword?'visibility_off':'visibility'" class="cursor-pointer" @click="showPassword=!showPassword"/></template></q-input>
-            <q-input v-model="form.password_confirmation" outlined :type="showPassword?'text':'password'" label="Confirmar contraseña *" autocomplete="new-password" class="q-mt-sm" :rules="[v=>v===form.password||'Las contraseñas no coinciden.']"/>
-          </template>
+          <q-input v-model="form.password" outlined :type="showPassword?'text':'password'" label="Contraseña *" autocomplete="new-password" class="q-mt-md" :rules="[v=>String(v||'').length>=8||'Mínimo 8 caracteres.',v=>/[A-Za-z]/.test(v)&&/\d/.test(v)||'Incluye letras y números.']"><template #append><q-icon :name="showPassword?'visibility_off':'visibility'" class="cursor-pointer" @click="showPassword=!showPassword"/></template></q-input>
+          <q-input v-model="form.password_confirmation" outlined :type="showPassword?'text':'password'" label="Confirmar contraseña *" autocomplete="new-password" class="q-mt-sm" :rules="[v=>v===form.password||'Las contraseñas no coinciden.']"/>
           <q-btn type="submit" color="primary" unelevated no-caps size="lg" class="full-width register-btn q-mt-lg" :loading="auth.loading" label="Crear mi cuenta VITI" icon-right="arrow_forward"/>
         </q-form>
         <div class="account-note"><q-icon name="info"/> Primero creas tu cuenta; las solicitudes nuevas se generan únicamente dentro de tu espacio privado.</div>
