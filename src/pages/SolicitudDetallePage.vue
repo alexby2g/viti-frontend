@@ -91,7 +91,7 @@ async function saveAnswers(){
   finally{saving.value=false}
 }
 async function submit(){if(!item.value?.id)return;const saved=await saveAnswers();if(!saved)return;try{await api.post(`/solicitudes/${item.value.id}/enviar`);$q.notify({type:'positive',message:'Solicitud enviada a revisión.'});await load()}catch(error){$q.notify({type:'negative',message:error.response?.data?.message||'No se pudo enviar la solicitud.'})}}
-async function copyPublicLink(){if(!item.value?.enlace_publico)return;if($q.platform.is.secureContext!==false)await navigator.clipboard.writeText(item.value.enlace_publico);$q.notify({type:'positive',message:'Enlace del formulario copiado.'})}
+async function copyPublicLink(){if(!item.value?.enlace_publico)return;if($q.platform.is.secureContext!==false)await navigator.clipboard.writeText(new URL(item.value.enlace_publico, window.location.origin).href);$q.notify({type:'positive',message:'Enlace del formulario copiado.'})}
 function openPublic(){if(item.value?.enlace_publico)window.open(item.value.enlace_publico,'_blank','noopener')}
 async function createInvitation(){
   if(!item.value?.id)return
