@@ -51,6 +51,7 @@ export function buildMainMenu({
         icon: 'admin_panel_settings',
         children: [
           { label: 'Planes y precios', icon: 'sell', to: '/saas' },
+          { label: 'Empresas', icon: 'business', to: '/empresas' },
           { label: 'Usuarios', icon: 'manage_accounts', to: '/usuarios' },
           { label: 'Formulario de apoyo', icon: 'dynamic_form', to: '/formularios-viti' },
           { label: 'Auditoría', icon: 'history', to: '/auditoria' },
