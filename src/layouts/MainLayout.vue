@@ -189,7 +189,7 @@ onBeforeUnmount(() => {
       <div class="column fit no-wrap">
         <div class="q-pa-lg"><AppBrand /></div>
         <div v-if="!isClient" class="q-px-md q-pb-md">
-          <q-btn unelevated color="primary" icon="add" label="Nueva solicitud" no-caps class="full-width drawer-primary-action" to="/solicitud" @click="closeMobileDrawer" />
+          <q-btn unelevated color="primary" icon="list_alt" label="Ver solicitudes" no-caps class="full-width drawer-primary-action" to="/solicitudes" @click="closeMobileDrawer" />
         </div>
         <div v-else class="q-px-md q-pb-md">
           <div class="client-badge">
