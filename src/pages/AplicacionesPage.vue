@@ -10,7 +10,7 @@ const apps=ref([]), companies=ref([]), projects=ref([]), loading=ref(false), dia
 const form=reactive({empresa_id:null,proyecto_id:null,nombre:'',version:'',tipo:'web',tecnologias:'',entorno:'desarrollo',estado:'en_pruebas',url:'',url_administracion:'',repositorio_url:'',proveedor_hosting:'',notas:''})
 const activeApps=computed(()=>apps.value.filter(item=>item.estado!=='retirado'))
 const filteredApps=computed(()=>{const term=search.value.trim().toLowerCase();return !term?activeApps.value:activeApps.value.filter(app=>`${app.nombre||''} ${app.empresa?.nombre_comercial||''} ${app.url||''} ${app.proveedor_hosting||''}`.toLowerCase().includes(term))})
-const onlineCount=computed(()=>activeApps.value.filter(app=>app.entorno==='produccion'&&app.estado==='activo'&&app.url).length)
+const onlineCount=computed(()=>activeApps.value.filter(app=>Boolean(app.url)).length)
 const deliveredCount=computed(()=>activeApps.value.filter(app=>app.acceso_cliente).length)
 
 function reset(){Object.assign(form,{empresa_id:null,proyecto_id:null,nombre:'',version:'',tipo:'web',tecnologias:'',entorno:'desarrollo',estado:'en_pruebas',url:'',url_administracion:'',repositorio_url:'',proveedor_hosting:'',notas:''})}
@@ -39,7 +39,7 @@ onMounted(load)
     </PageHeader>
 
     <section class="systems-summary q-mb-lg">
-      <div><small>REGISTRADOS</small><b>{{activeApps.length}}</b></div><div><small>EN LÍNEA</small><b>{{onlineCount}}</b></div><div><small>ENTREGADOS</small><b>{{deliveredCount}}</b></div>
+      <div><small>REGISTRADOS</small><b>{{activeApps.length}}</b></div><div><small>CON URL</small><b>{{onlineCount}}</b></div><div><small>ENTREGADOS</small><b>{{deliveredCount}}</b></div>
       <q-input v-model="search" outlined dense clearable placeholder="Buscar sistema, cliente o URL"><template #prepend><q-icon name="search"/></template></q-input>
     </section>
 
