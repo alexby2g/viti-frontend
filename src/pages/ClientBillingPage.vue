@@ -21,6 +21,10 @@ const pretty=value=>String(value||'').replaceAll('_',' ').replace(/\b\w/g,c=>c.t
 const today=()=>new Date().toISOString().slice(0,10)
 const statusColor=value=>({pagado:'positive',pendiente_saldo:'orange',pendiente_anticipo:'negative',activa:'positive',al_dia:'positive',por_vencer:'amber-9',gracia:'orange',suspendida:'negative',cancelada:'grey',prueba:'positive',pendiente_revision:'orange',confirmado:'positive',rechazado:'negative'}[value]||'grey')
 const reviewLabel=value=>({pendiente_revision:'Pendiente de revisión',confirmado:'Confirmado',rechazado:'Rechazado'}[value]||pretty(value||'confirmado'))
+const billingStatus=project=>project.estado_pago==='sin_acuerdo'&&project.acuerdo_comercial?.aceptado?'Acuerdo aceptado · cuotas por configurar':pretty(project.estado_pago)
+const billingStatusColor=project=>project.estado_pago==='sin_acuerdo'&&project.acuerdo_comercial?.aceptado?'blue-grey-7':statusColor(project.estado_pago)
+const displayImplementation=project=>project.precio_acordado??project.acuerdo_comercial?.precio_implementacion
+const agreedSubscription=project=>project.acuerdo_comercial?.frecuencia==='mensual'&&project.acuerdo_comercial?.tarifa_mensual!=null
 const subscriptionStage=value=>value?.etapa_cobro||(value?.en_prueba?'prueba':value?.estado||'al_dia')
 const subscriptionStageLabel=value=>({prueba:'Prueba gratuita',al_dia:'Al día',por_vencer:'Por vencer',gracia:'Periodo de gracia',suspendida:'Suspendida',cancelada:'Cancelada'}[subscriptionStage(value)]||pretty(subscriptionStage(value)))
 const subscriptionBannerClass=value=>({prueba:'bg-green-1 text-green-9',al_dia:'bg-blue-1 text-primary',por_vencer:'bg-amber-1 text-amber-10',gracia:'bg-orange-1 text-orange-10',suspendida:'bg-red-1 text-negative',cancelada:'bg-grey-2 text-grey-8'}[subscriptionStage(value)]||'bg-blue-1 text-primary')
@@ -103,16 +107,21 @@ onMounted(load)
           <q-card flat class="viti-card q-mb-lg">
             <q-card-section class="row items-start q-col-gutter-md">
               <div class="col"><div class="section-label">Pago del proyecto · {{project.codigo}}</div><div class="text-h6 text-weight-bold">{{project.nombre}}</div><div class="text-caption text-grey-6">Desarrollo del sistema · no incluye la mensualidad VITI</div></div>
-              <div class="col-auto"><q-badge :color="statusColor(project.estado_pago)">{{pretty(project.estado_pago)}}</q-badge></div>
+              <div class="col-auto"><q-badge :color="billingStatusColor(project)">{{billingStatus(project)}}</q-badge></div>
             </q-card-section>
             <q-separator/>
             <q-card-section>
               <div class="row q-col-gutter-md">
-                <div class="col-12 col-sm-4"><div class="text-caption text-grey-6">Precio del desarrollo</div><div class="text-h6 text-weight-bold">{{project.precio_acordado===null?'Por definir':money(project.precio_acordado)}}</div></div>
+                <div class="col-12 col-sm-4"><div class="text-caption text-grey-6">{{project.precio_acordado===null&&project.acuerdo_comercial?.aceptado?'Importe de implementación aceptado':'Precio del desarrollo'}}</div><div class="text-h6 text-weight-bold">{{displayImplementation(project)==null?'Por definir':money(displayImplementation(project))}}</div></div>
                 <div class="col-12 col-sm-4"><div class="text-caption text-grey-6">Pagado y confirmado</div><div class="text-h6 text-positive text-weight-bold">{{money(project.pagado)}}</div></div>
                 <div class="col-12 col-sm-4"><div class="text-caption text-grey-6">Saldo pendiente</div><div class="text-h6 text-weight-bold">{{money(project.pendiente)}}</div></div>
               </div>
 
+              <q-banner v-if="project.acuerdo_comercial?.aceptado&&!project.acuerdo_comercial.cuotas_configuradas" rounded class="bg-blue-grey-1 text-blue-grey-10 q-mt-md">
+                <template #avatar><q-icon name="fact_check"/></template>
+                <div class="text-weight-bold">Acuerdo comercial aceptado · distribución de pagos pendiente</div>
+                <div class="text-caption">El importe de implementación figura en la solicitud. VITI todavía debe establecer el anticipo y el saldo final. No se ha registrado ningún abono; el envío de comprobantes de este proyecto se habilitará cuando se configuren las cuotas.</div>
+              </q-banner>
               <q-card v-if="project.siguiente_pago?.monto>0" flat bordered class="next-payment q-mt-lg">
                 <q-card-section class="row items-center q-col-gutter-md">
                   <div class="col"><div class="text-caption text-grey-6">Siguiente pago</div><div class="text-h6 text-weight-bold">{{project.siguiente_pago.tipo==='anticipo'?'Anticipo':'Saldo final'}} · {{money(project.siguiente_pago.monto)}}</div><div class="text-caption">Realiza el pago por QR/transferencia y luego adjunta el comprobante aquí.</div></div>
@@ -169,7 +178,11 @@ onMounted(load)
                 </q-card-section>
               </q-card>
             </q-card-section>
-            <q-card-section v-else class="text-grey-7"><q-icon name="schedule" class="q-mr-sm"/>La suscripción todavía no ha comenzado. Se configurará cuando la beta sea habilitada para uso.</q-card-section>
+            <q-card-section v-else class="text-grey-7">
+                <q-icon name="schedule" class="q-mr-sm"/>La suscripción todavía no se ha activado.
+                <span v-if="agreedSubscription(project)">El acuerdo seleccionado es {{project.acuerdo_comercial.nombre_plan}}: <strong>{{money(project.acuerdo_comercial.tarifa_mensual)}} al mes</strong>. La fecha de inicio y el primer cobro se confirmarán por separado.</span>
+                <span v-else>Se configurará cuando corresponda según el acuerdo.</span>
+              </q-card-section>
 
             <template v-if="project.pagos_suscripcion?.length">
               <q-separator/><q-card-section><div class="text-subtitle2 text-weight-bold">Historial de suscripción</div></q-card-section>
@@ -183,7 +196,7 @@ onMounted(load)
 
       <div class="col-12 col-lg-4">
         <q-card flat class="viti-card sticky-card">
-          <q-card-section><div class="text-h6 text-weight-bold">Pagar a VITI</div><div class="text-caption text-grey-6">1. Escanea el QR. 2. Realiza el pago. 3. Regresa al concepto correspondiente y sube el comprobante.</div></q-card-section>
+          <q-card-section><div class="text-h6 text-weight-bold">Pagar a VITI</div><div class="text-caption text-grey-6">Usa el QR solo cuando VITI haya configurado un pago pendiente y se habilite «Enviar comprobante». No realices un nuevo abono por una cuota aún sin definir.</div></q-card-section>
           <q-card-section class="text-center q-pt-none"><div class="qr-stage"><img :src="qrSrc" alt="QR de pago VITI" class="qr-img" @error="qrFailed=true"/></div></q-card-section>
           <q-separator/>
           <q-list><q-item><q-item-section avatar><q-icon name="account_balance" color="primary"/></q-item-section><q-item-section><q-item-label caption>Banco</q-item-label><q-item-label class="text-weight-bold">{{data.configuracion?.banco||'Banco Ganadero'}}</q-item-label></q-item-section></q-item><q-item><q-item-section avatar><q-icon name="person" color="primary"/></q-item-section><q-item-section><q-item-label caption>Titular</q-item-label><q-item-label class="text-weight-bold">{{data.configuracion?.titular||'Guzman Ribera Alexander'}}</q-item-label></q-item-section></q-item></q-list>
