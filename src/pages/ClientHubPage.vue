@@ -56,10 +56,38 @@ async function load() {
   }
 }
 
-function startRequest() {
-  // Una cuenta VITI no necesita tener un negocio creado previamente. El formulario
-  // público oficial recoge el negocio y la necesidad, y reutiliza esta misma cuenta.
-  window.location.href = '/solicitud'
+async function startRequest() {
+  if (creating.value) return
+
+  // Continuar el borrador actual, sin generar otra solicitud ni otra empresa.
+  if (currentRequest.value?.estado === 'borrador') {
+    if (currentRequest.value.enlace_publico) {
+      window.location.assign(new URL(currentRequest.value.enlace_publico, window.location.origin).href)
+    } else {
+      $q.notify({ type:'warning', message:'Abre Mi cuenta para continuar tu solicitud pendiente.' })
+      window.location.assign('/mi-cuenta')
+    }
+    return
+  }
+
+  if (!profile.value?.nombre?.trim() || !profile.value?.telefono ||
+      !profile.value?.documento || !profile.value?.ciudad?.trim()) {
+    $q.notify({ type:'warning', message:'Completa tu cédula y ciudad en Mi cuenta antes de iniciar una solicitud.' })
+    window.location.assign('/mi-cuenta')
+    return
+  }
+
+  creating.value = true
+  try {
+    const { data } = await api.post('/mi/solicitud')
+    const link = data?.data?.enlace_publico
+    if (!link) throw new Error('La solicitud se creó, pero no se recibió el enlace del formulario.')
+    window.location.assign(new URL(link, window.location.origin).href)
+  } catch (error) {
+    $q.notify({ type:'negative', message:error?.response?.data?.message || error.message || 'No pudimos iniciar tu solicitud.' })
+  } finally {
+    creating.value = false
+  }
 }
 
 onMounted(load)
