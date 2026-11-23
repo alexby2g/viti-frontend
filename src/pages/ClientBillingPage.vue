@@ -117,6 +117,15 @@ onMounted(load)
                 <div class="col-12 col-sm-4"><div class="text-caption text-grey-6">Saldo pendiente</div><div class="text-h6 text-weight-bold">{{money(project.pendiente)}}</div></div>
               </div>
 
+              <q-card v-if="project.precio_acordado!==null&&project.anticipo_monto!==null&&project.saldo_monto!==null" flat bordered class="next-payment q-mt-md">
+                <q-card-section>
+                  <div class="text-subtitle2 text-weight-bold q-mb-sm">Acuerdo de pago: entrada y contra entrega</div>
+                  <div class="row q-col-gutter-md">
+                    <div class="col-12 col-sm-6"><div class="text-caption text-grey-6">Primera cuota · entrada</div><div class="text-h6 text-weight-bold">{{money(project.anticipo_monto)}}</div><div class="text-caption">Se acredita únicamente después de verificar el comprobante.</div></div>
+                    <div class="col-12 col-sm-6"><div class="text-caption text-grey-6">Segunda cuota · contra entrega</div><div class="text-h6 text-weight-bold">{{money(project.saldo_monto)}}</div><div class="text-caption">No constituye entrega realizada ni pago confirmado.</div></div>
+                  </div>
+                </q-card-section>
+              </q-card>
               <q-banner v-if="project.acuerdo_comercial?.aceptado&&!project.acuerdo_comercial.cuotas_configuradas" rounded class="bg-blue-grey-1 text-blue-grey-10 q-mt-md">
                 <template #avatar><q-icon name="fact_check"/></template>
                 <div class="text-weight-bold">Acuerdo comercial aceptado · distribución de pagos pendiente</div>
