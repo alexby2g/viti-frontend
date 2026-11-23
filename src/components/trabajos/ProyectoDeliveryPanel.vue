@@ -16,7 +16,15 @@ const delivery = ref(null)
 const available = ref([])
 const form = reactive({ titulo: 'Entrega del proyecto', instrucciones: '', archivo_ids: [] })
 const published = computed(() => delivery.value?.estado === 'publicada')
-const paid = computed(() => props.proyecto?.precio_acordado == null || props.proyecto.estado_pago === 'pagado')
+const requestHasAmount = computed(() =>
+  !!props.proyecto?.solicitud?.acuerdo_comercial_requerido
+  && !!props.proyecto?.solicitud?.acuerdo_comercial_aceptado
+  && Number(props.proyecto?.solicitud?.presupuesto_estimado || 0) > 0
+)
+const paymentRequired = computed(() => props.proyecto?.precio_acordado != null || requestHasAmount.value)
+const paid = computed(() =>
+  !paymentRequired.value || (props.proyecto?.precio_acordado != null && props.proyecto?.estado_pago === 'pagado')
+)
 const deliveredApp = computed(() => !!(props.proyecto?.aplicacion?.acceso_cliente && props.proyecto?.aplicacion?.entregado_at))
 const ready = computed(() => !!(form.archivo_ids.length || deliveredApp.value))
 const dirty = computed(() => {
