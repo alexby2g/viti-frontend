@@ -16,6 +16,7 @@ const delivery = ref(null)
 const available = ref([])
 const form = reactive({ titulo: 'Entrega del proyecto', instrucciones: '', archivo_ids: [] })
 const published = computed(() => delivery.value?.estado === 'publicada')
+const qaPending = ref(false)
 const requestHasAmount = computed(() =>
   !!props.proyecto?.solicitud?.acuerdo_comercial_requerido
   && !!props.proyecto?.solicitud?.acuerdo_comercial_aceptado
@@ -49,6 +50,7 @@ async function load() {
     const result = await api.get('/proyectos/' + props.proyecto.id + '/entrega')
     delivery.value = result.data.data
     available.value = result.data.disponibles || []
+    qaPending.value = !!result.data.qa_pendiente
     form.titulo = delivery.value?.titulo || 'Entrega del proyecto'
     form.instrucciones = delivery.value?.instrucciones || ''
     form.archivo_ids = (delivery.value?.archivo_ids || []).map(Number)
@@ -76,7 +78,7 @@ async function save() {
   }
 }
 function publish() {
-  if (published.value || publishing.value || !paid.value || !ready.value || dirty.value || !delivery.value?.id) return
+  if (published.value || publishing.value || qaPending.value || !paid.value || !ready.value || dirty.value || !delivery.value?.id) return
   $q.dialog({
     title: 'Publicar entrega al cliente',
     message: '¿Confirmas que el pago está verificado y que estos archivos e instrucciones están listos? El cliente podrá descargarlos desde Mi proyecto.',
@@ -144,6 +146,9 @@ watch(() => props.proyecto?.id, load)
           La publicación está bloqueada hasta confirmar el pago completo del proyecto.
           <q-btn flat dense no-caps color="orange" label="Ver cobros" :to="paymentLink"/>
         </q-banner>
+        <q-banner v-else-if="qaPending" rounded class="bg-blue-grey-10 text-white q-mb-md">
+          Las pruebas finales del proyecto aún están pendientes. Completa la tarea de calidad y registra sus resultados antes de publicar este paquete.
+        </q-banner>
         <div class="row q-col-gutter-md">
           <div class="col-12">
             <q-input v-model="form.titulo" outlined label="Nombre de la entrega" maxlength="180" :readonly="published"/>
@@ -187,7 +192,7 @@ watch(() => props.proyecto?.id, load)
           <template v-else>
             <q-btn outline color="primary" no-caps icon="save" label="Guardar borrador" :loading="saving" :disable="!form.titulo.trim()" @click="save"/>
             <q-btn color="positive" unelevated no-caps icon="publish" label="Publicar al cliente"
-              :loading="publishing" :disable="!paid || !ready || !delivery?.id || dirty" @click="publish"/>
+              :loading="publishing" :disable="qaPending || !paid || !ready || !delivery?.id || dirty" @click="publish"/>
           </template>
         </div>
         <div v-if="dirty && !published" class="text-caption text-orange q-mt-sm">Guarda los últimos cambios antes de publicar.</div>
