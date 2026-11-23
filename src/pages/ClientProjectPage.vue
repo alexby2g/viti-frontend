@@ -106,9 +106,9 @@ onUnmounted(closeGallery)
         <div>
           <div class="eyebrow">ESTADO ACTUAL</div>
           <h2>{{pretty(item.fase)}}</h2>
-          <p>VITI irá mostrando aquí los avances que necesitas conocer.</p>
+          <p>Seguimiento del trabajo documentado. Las pruebas y la entrega final se confirman por separado.</p>
           <div class="progress-track"><span :style="{width:`${item.progreso||0}%`}"></span></div>
-          <div class="progress-meta"><b>{{item.progreso||0}}% completado</b><span>{{pretty(item.estado)}}</span></div>
+          <div class="progress-meta"><b>{{item.progreso||0}}% de avance registrado</b><span>{{pretty(item.estado)}}</span></div>
         </div>
         <div class="progress-ring"><strong>{{item.progreso||0}}%</strong><span>avance</span></div>
       </section>
@@ -193,8 +193,9 @@ onUnmounted(closeGallery)
           <q-card flat class="client-card dates-card">
             <q-card-section><div class="eyebrow">FECHAS</div><h3>Calendario del proyecto</h3></q-card-section>
             <div class="date-row"><span>Inicio</span><b>{{formatDate(item.fecha_inicio)}}</b></div>
-            <div class="date-row"><span>Beta estimada</span><b>{{formatDate(item.fecha_beta)}}</b></div>
-            <div class="date-row"><span>Entrega estimada</span><b>{{formatDate(item.fecha_entrega)}}</b></div>
+            <div class="date-row"><span>Beta prevista</span><b>{{formatDate(item.fecha_beta)}}</b></div>
+            <div class="date-row"><span>Entrega prevista</span><b>{{formatDate(item.fecha_entrega)}}</b></div>
+            <q-card-section class="text-caption text-grey-5">Estas fechas corresponden a la planificación del proyecto y no certifican por sí solas su entrega efectiva.</q-card-section>
           </q-card>
 
           <q-card v-if="item.aplicacion" flat class="client-card q-mt-lg">
