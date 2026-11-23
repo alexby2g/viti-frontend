@@ -36,7 +36,7 @@ onMounted(load)
       <section v-if="editMode" class="edit-panel q-mb-lg"><div class="edit-head"><div><div class="section-label">Editar ficha</div><h2>URLs e infraestructura</h2></div><q-btn flat round icon="close" @click="editMode=false"/></div><div class="edit-grid"><q-input v-model="form.nombre" outlined label="Nombre *"/><q-input v-model="form.version" outlined label="Versión"/><q-input v-model="form.url" outlined label="URL pública"/><q-input v-model="form.url_administracion" outlined label="URL administrativa"/><q-input v-model="form.repositorio_url" outlined label="Repositorio"/><q-input v-model="form.proveedor_hosting" outlined label="Hosting"/><q-input class="span-2" v-model="form.tecnologias" outlined label="Tecnologías"/><q-input class="span-2" v-model="form.notas" outlined type="textarea" autogrow label="Notas internas"/></div><div class="edit-actions"><q-btn flat no-caps label="Cancelar" @click="editMode=false"/><q-btn color="primary" unelevated no-caps label="Guardar cambios" :loading="saving" @click="save"/></div></section>
 
       <q-banner v-if="item.notas?.includes('DISPONIBILIDAD NO VERIFICADA')" rounded class="bg-orange-10 text-white q-mb-md">Los enlaces de FitFamily están registrados, pero no se ha confirmado que respondan actualmente. Compruébalos antes de compartirlos con el cliente.</q-banner>
-      <section v-else class="system-layout">
+      <section class="system-layout">
         <main>
           <div class="access-grid">
             <article class="access-card"><small>URL PÚBLICA</small><h3>{{item.url||'No registrada'}}</h3><q-btn v-if="item.url" flat no-caps color="orange" icon="open_in_new" label="Abrir" @click="openUrl(item.url)"/></article>
