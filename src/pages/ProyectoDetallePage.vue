@@ -188,6 +188,12 @@ function removeEvidenceFile(index){
   const [removed]=evidenceFiles.value.splice(index,1)
   if(removed)URL.revokeObjectURL(removed.preview)
 }
+function openEvidencePhoto(file){
+  const source=(item.value?.avances||[]).find(a=>a.id===file.avance_id)
+  const images=(source?.archivos||[]).filter(f=>/^image\//i.test(f.mime||'')||/\.(png|jpe?g|webp)$/i.test(f.nombre_original||''))
+  const index=images.findIndex(f=>f.id===file.id)
+  openGallery(images,Math.max(index,0))
+}
 async function saveEvidencePhotos(){
   if(evidenceUploading.value||!evidenceTarget.value?.id||!evidenceFiles.value.length)return
   evidenceUploading.value=true
@@ -358,7 +364,7 @@ onUnmounted(()=>{ clearAdvanceFiles(); resetEvidenceFiles(); closeGallery() })
           <q-separator/>
           <q-card-section>
             <div v-if="photoEvidence.length" class="evidence-overview">
-              <button v-for="f in photoEvidence" :key="f.id" type="button" class="evidence-overview-item" @click="openGallery(item.avances.find(a=>a.id===f.avance_id)?.archivos||[])">
+              <button v-for="f in photoEvidence" :key="f.id" type="button" class="evidence-overview-item" @click="openEvidencePhoto(f)">
                 <q-icon name="image" size="24px"/>
                 <span><b>{{f.nombre_original}}</b><small>{{f.avance_titulo}} · {{f.visible_cliente?'Visible al cliente':'Privada'}}</small></span>
                 <q-icon name="visibility" color="primary"/>
