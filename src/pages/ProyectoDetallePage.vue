@@ -35,6 +35,14 @@ const historyEntries=computed(()=>{
 })
 const historyMilestonesCount=computed(()=>Array.isArray(item.value?.avances)?item.value.avances.filter(a=>a.visible_cliente && Number(a.progreso)>0).length:0)
 const historyNotesCount=computed(()=>Array.isArray(item.value?.avances)?item.value.avances.length-historyMilestonesCount.value:0)
+const evidenceDialog=ref(false)
+const evidenceTarget=ref(null)
+const evidenceFiles=ref([])
+const evidenceInput=ref(null)
+const evidenceUploading=ref(false)
+const evidenceStatus=reactive({total:0,uploaded:0})
+const latestPublicAdvance=computed(()=>[...(item.value?.avances||[])].filter(a=>a.visible_cliente && Number(a.progreso)>0).sort((a,b)=>Number(b.progreso)-Number(a.progreso)||Number(b.id)-Number(a.id))[0]||null)
+const photoEvidence=computed(()=>[...(item.value?.avances||[])].flatMap(a=>(a.archivos||[]).filter(f=>/^image\//i.test(f.mime||'')||/\.(png|jpe?g|webp)$/i.test(f.nombre_original||'')).map(f=>({...f,avance_titulo:a.titulo,avance_id:a.id,visible_cliente:a.visible_cliente}))))
 function historyExpanded(id){return expandedHistoryIds.value.has(id)}
 function toggleHistory(id){const next=new Set(expandedHistoryIds.value);if(next.has(id))next.delete(id);else next.add(id);expandedHistoryIds.value=next}
 function historyExcerpt(description,id){const text=String(description||'');return historyExpanded(id)||text.length<=240?text:text.slice(0,240).trimEnd()+'…'}
@@ -150,6 +158,67 @@ function openAdvance(){
 function openAdvancePicker(){
   advanceInput.value?.click()
 }
+function resetEvidenceFiles(){
+  evidenceFiles.value.forEach(entry=>URL.revokeObjectURL(entry.preview))
+  evidenceFiles.value=[]
+  if(evidenceInput.value)evidenceInput.value.value=''
+  Object.assign(evidenceStatus,{total:0,uploaded:0})
+}
+function openEvidencePicker(advanceRecord){
+  if(!advanceRecord?.id || evidenceUploading.value)return
+  evidenceTarget.value={id:advanceRecord.id,titulo:advanceRecord.titulo,visible_cliente:!!advanceRecord.visible_cliente,progreso:advanceRecord.progreso}
+  resetEvidenceFiles()
+  evidenceDialog.value=true
+}
+function chooseEvidenceFiles(){evidenceInput.value?.click()}
+function onEvidenceSelected(event){
+  const files=Array.from(event.target.files||[])
+  const acceptable=['image/jpeg','image/png','image/webp']
+  const selected=files.filter(f=>acceptable.includes(f.type)&&f.size<=10*1024*1024)
+  const rejected=files.length-selected.length
+  if(rejected)$q.notify({type:'warning',message:`${rejected} archivo(s) omitidos: solo JPG, PNG o WEBP de hasta 10 MB.`})
+  const existing=new Set(evidenceFiles.value.map(e=>`${e.file.name}:${e.file.size}:${e.file.lastModified}`))
+  selected.forEach(file=>{
+    const key=`${file.name}:${file.size}:${file.lastModified}`
+    if(!existing.has(key)){evidenceFiles.value.push({file,preview:URL.createObjectURL(file)});existing.add(key)}
+  })
+  event.target.value=''
+}
+function removeEvidenceFile(index){
+  const [removed]=evidenceFiles.value.splice(index,1)
+  if(removed)URL.revokeObjectURL(removed.preview)
+}
+async function saveEvidencePhotos(){
+  if(evidenceUploading.value||!evidenceTarget.value?.id||!evidenceFiles.value.length)return
+  evidenceUploading.value=true
+  evidenceStatus.total=evidenceFiles.value.length
+  evidenceStatus.uploaded=0
+  const failed=[]
+  for(const entry of [...evidenceFiles.value]){
+    try{
+      const fd=new FormData()
+      fd.append('tipo','avance')
+      fd.append('id',String(evidenceTarget.value.id))
+      fd.append('categoria','avance')
+      fd.append('archivo',entry.file)
+      fd.append('descripcion',`Evidencia fotográfica - ${evidenceTarget.value.titulo}`)
+      await api.post('/archivos',fd)
+      evidenceStatus.uploaded++
+    }catch{failed.push(entry)}
+  }
+  if(failed.length){
+    const failedKeys=new Set(failed)
+    evidenceFiles.value.filter(e=>!failedKeys.has(e)).forEach(e=>URL.revokeObjectURL(e.preview))
+    evidenceFiles.value=failed
+    $q.notify({type:'warning',message:`Se cargaron ${evidenceStatus.uploaded} de ${evidenceStatus.total} fotos. Puedes reintentar las restantes.`})
+  }else{
+    $q.notify({type:'positive',message:`Se cargaron ${evidenceStatus.uploaded} fotos al hito existente; no se creó otro avance.`})
+    evidenceDialog.value=false
+    resetEvidenceFiles()
+  }
+  evidenceUploading.value=false
+  try{await load()}catch{$q.notify({type:'warning',message:'Fotos procesadas. Actualiza el proyecto para comprobarlas.'})}
+}
 
 function onAdvanceFilesSelected(event){
   const selected=Array.from(event.target.files||[]).filter(file=>file.type.startsWith('image/'))
@@ -219,7 +288,7 @@ async function addAdvance(){
 }
 
 onMounted(load)
-onUnmounted(()=>{ clearAdvanceFiles(); closeGallery() })
+onUnmounted(()=>{ clearAdvanceFiles(); resetEvidenceFiles(); closeGallery() })
 </script>
 
 <template>
@@ -278,6 +347,29 @@ onUnmounted(()=>{ clearAdvanceFiles(); closeGallery() })
 
         <q-card flat class="viti-card q-mt-lg">
           <q-card-section class="row items-center q-gutter-sm">
+            <div class="col">
+              <div class="section-label">EVIDENCIAS DEL PROYECTO</div>
+              <div class="text-h6 text-weight-bold">Fotografías del desarrollo</div>
+              <div class="text-caption text-grey-5">Adjunta capturas al hito existente. Se conservan en VITI sin crear otro avance ni modificar el porcentaje.</div>
+            </div>
+            <q-badge outline color="primary">{{photoEvidence.length}} foto{{photoEvidence.length===1?'':'s'}}</q-badge>
+            <q-btn v-if="latestPublicAdvance" color="primary" unelevated no-caps icon="add_photo_alternate" :label="`Subir fotos al ${latestPublicAdvance.progreso}%`" @click="openEvidencePicker(latestPublicAdvance)"/>
+          </q-card-section>
+          <q-separator/>
+          <q-card-section>
+            <div v-if="photoEvidence.length" class="evidence-overview">
+              <button v-for="f in photoEvidence" :key="f.id" type="button" class="evidence-overview-item" @click="openGallery(item.avances.find(a=>a.id===f.avance_id)?.archivos||[])">
+                <q-icon name="image" size="24px"/>
+                <span><b>{{f.nombre_original}}</b><small>{{f.avance_titulo}} · {{f.visible_cliente?'Visible al cliente':'Privada'}}</small></span>
+                <q-icon name="visibility" color="primary"/>
+              </button>
+            </div>
+            <div v-else class="text-caption text-grey-5">Todavía no hay fotografías cargadas en este proyecto. Usa «Subir fotos» para adjuntar capturas de pantalla y verlas aquí y en la galería del avance.</div>
+          </q-card-section>
+        </q-card>
+
+        <q-card flat class="viti-card q-mt-lg">
+          <q-card-section class="row items-center q-gutter-sm">
             <div class="col"><div class="text-h6 text-weight-bold">Historial de avances</div><div class="text-caption text-grey-5">Hitos documentados y notas de seguimiento, organizados por separado.</div></div>
             <q-btn-toggle v-model="historyMode" unelevated no-caps rounded toggle-color="primary" color="blue-grey-10" text-color="grey-4" :options="[{label:`Hitos (${historyMilestonesCount})`,value:'hitos'},{label:`Notas internas (${historyNotesCount})`,value:'internos'}]"/>
           </q-card-section>
@@ -288,7 +380,11 @@ onUnmounted(()=>{ clearAdvanceFiles(); closeGallery() })
             <q-timeline-entry v-for="a in historyEntries" :key="a.id" :title="a.titulo" :subtitle="`${a.fase} · ${a.area||'general'} · Registrado ${formatDateTime(a.created_at)}`" :icon="a.visible_cliente?'visibility':'visibility_off'">
               <div style="white-space:pre-wrap">{{historyExcerpt(a.descripcion,a.id)}}</div>
               <q-btn v-if="a.descripcion?.length>240" flat dense no-caps size="sm" class="q-mt-xs" color="light-blue-3" :icon-right="historyExpanded(a.id)?'expand_less':'expand_more'" :label="historyExpanded(a.id)?'Mostrar menos':'Leer detalles'" @click="toggleHistory(a.id)"/>
-              <div class="q-mt-sm"><q-badge v-if="a.visible_cliente && a.progreso!==null && Number(a.progreso)>0" outline color="primary">{{a.progreso}}% acumulado · visible al cliente</q-badge><q-badge v-else outline color="grey-5">Nota interna · sin cambio de porcentaje</q-badge></div>
+              <div class="row items-center q-gutter-xs q-mt-sm">
+                <q-badge v-if="a.visible_cliente && a.progreso!==null && Number(a.progreso)>0" outline color="primary">{{a.progreso}}% acumulado · visible al cliente</q-badge>
+                <q-badge v-else outline color="grey-5">Nota interna · sin cambio de porcentaje</q-badge>
+                <q-btn outline dense no-caps size="sm" color="light-blue-3" icon="add_photo_alternate" label="Añadir fotos" @click="openEvidencePicker(a)"/>
+              </div>
               <div v-if="a.archivos?.length" class="q-mt-sm advance-attachments">
                 <div class="attachments-summary">
                   <div><q-icon name="photo_library"/> <b>{{a.archivos.length}} foto{{a.archivos.length===1?'':'s'}}</b> disponible{{a.archivos.length===1?'':'s'}} en este avance</div>
@@ -323,6 +419,49 @@ onUnmounted(()=>{ clearAdvanceFiles(); closeGallery() })
       </div>
     </div>
   </template>
+
+  <q-dialog v-model="evidenceDialog" @hide="resetEvidenceFiles">
+    <q-card style="width:740px;max-width:94vw">
+      <q-card-section>
+        <div class="section-label">EVIDENCIAS FOTOGRÁFICAS</div>
+        <div class="text-h6 text-weight-bold">Añadir fotos al avance existente</div>
+        <div class="text-caption text-grey-5 q-mt-xs">{{evidenceTarget?.titulo}}</div>
+        <div class="text-caption q-mt-xs">{{evidenceTarget?.visible_cliente?'Estas fotos serán visibles en el portal del cliente cuando se guarden.':'Estas fotos permanecerán privadas dentro de VITI.'}}</div>
+      </q-card-section>
+      <q-card-section>
+        <input ref="evidenceInput" class="native-file-input" type="file" accept="image/png,image/jpeg,image/webp" multiple @change="onEvidenceSelected">
+        <div class="advance-upload-box" :class="{'has-files':evidenceFiles.length}" role="button" tabindex="0" @click="chooseEvidenceFiles" @keydown.enter="chooseEvidenceFiles" @keydown.space.prevent="chooseEvidenceFiles">
+          <div class="upload-box-icon"><q-icon name="add_photo_alternate"/></div>
+          <div class="upload-box-copy">
+            <div class="upload-title">Seleccionar fotografías o capturas</div>
+            <div class="upload-subtitle">Puedes elegir varias imágenes a la vez · JPG, PNG o WEBP · máximo 10 MB cada una</div>
+          </div>
+          <q-badge v-if="evidenceFiles.length" class="upload-count">{{evidenceFiles.length}} seleccionada{{evidenceFiles.length===1?'':'s'}}</q-badge>
+        </div>
+        <div v-if="evidenceFiles.length" class="selected-files">
+          <div class="selected-files-head">
+            <div><b>Vista previa de las evidencias</b><span>{{evidenceFiles.length}} imagen{{evidenceFiles.length===1?'':'es'}} lista{{evidenceFiles.length===1?'':'s'}} para subir</span></div>
+            <q-btn flat dense no-caps color="grey-5" label="Quitar todas" :disable="evidenceUploading" @click="resetEvidenceFiles"/>
+          </div>
+          <div class="photo-grid">
+            <div v-for="(entry,index) in evidenceFiles" :key="`${entry.file.name}-${entry.file.lastModified}`" class="photo-item">
+              <img :src="entry.preview" :alt="entry.file.name"/>
+              <div class="photo-meta"><span class="photo-name">{{entry.file.name}}</span><small>{{formatFileSize(entry.file.size)}}</small></div>
+              <q-btn round dense flat icon="close" class="photo-remove" :disable="evidenceUploading" @click="removeEvidenceFile(index)"/>
+            </div>
+          </div>
+        </div>
+        <div v-if="evidenceUploading" class="upload-progress">
+          <div class="row items-center justify-between q-mb-xs"><span>Subiendo las fotografías</span><b>{{evidenceStatus.uploaded}} / {{evidenceStatus.total}}</b></div>
+          <q-linear-progress rounded size="7px" :value="evidenceStatus.total?evidenceStatus.uploaded/evidenceStatus.total:0" color="primary"/>
+        </div>
+      </q-card-section>
+      <q-card-actions align="right">
+        <q-btn flat no-caps label="Cancelar" :disable="evidenceUploading" v-close-popup/>
+        <q-btn color="primary" unelevated no-caps icon="cloud_upload" label="Guardar evidencias" :disable="!evidenceFiles.length" :loading="evidenceUploading" @click="saveEvidencePhotos"/>
+      </q-card-actions>
+    </q-card>
+  </q-dialog>
 
   <q-dialog v-model="advanceDialog">
     <q-card style="width:680px;max-width:94vw">
@@ -526,6 +665,7 @@ onUnmounted(()=>{ clearAdvanceFiles(); closeGallery() })
 @media(max-width:600px){.photo-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.upload-count{display:none}}
 
 
+.evidence-overview{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:9px}.evidence-overview-item{display:flex;align-items:center;gap:10px;min-width:0;text-align:left;border:1px solid rgba(89,122,152,.24);background:rgba(12,34,57,.55);color:#dce8f3;padding:11px;border-radius:12px;cursor:pointer}.evidence-overview-item:hover{border-color:rgba(128,180,233,.55)}.evidence-overview-item>span{min-width:0;flex:1}.evidence-overview-item b,.evidence-overview-item small{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.evidence-overview-item b{font-size:12px}.evidence-overview-item small{font-size:10px;color:#95acc2;margin-top:3px}
 .advance-attachments{padding:12px;border:1px solid rgba(89,122,152,.2);border-radius:14px;background:rgba(8,26,44,.45)}
 .attachments-summary{display:flex;align-items:center;justify-content:space-between;gap:12px;color:#a9bdcb;font-size:12px}.attachments-summary>div{display:flex;align-items:center;gap:7px}.attachments-summary .q-icon{color:#73aaf0;font-size:18px}
 .attachment-file-list{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:7px;margin-top:10px}.attachment-file{display:flex;align-items:center;gap:8px;min-width:0;padding:9px 10px;border:1px solid rgba(91,130,166,.18);border-radius:10px;background:rgba(255,255,255,.02);color:#9fb7cb;cursor:pointer;text-align:left;transition:.2s ease}.attachment-file:hover{border-color:rgba(83,147,225,.4);background:rgba(52,112,184,.08);color:#dce9f5}.attachment-file span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.attachment-file>.q-icon:first-child{color:#76aef0}.attachment-open{margin-left:auto;color:#607e99}
