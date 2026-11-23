@@ -233,7 +233,9 @@ onUnmounted(()=>{ clearAdvanceFiles(); closeGallery() })
         <div class="col-12 col-md-auto row q-gutter-sm">
           <q-btn outline no-caps icon="upload_file" label="Subir entregables" :to="`/archivos?proyecto=${item.id}`"/>
           <q-btn v-if="auth.user?.rol === 'superadmin'" outline no-caps icon="qr_code_2" label="Pagos del proyecto" :to="`/pagos?proyecto=${item.id}`"/>
-          <q-btn outline no-caps icon="devices" label="Sistemas" to="/sistemas"/>
+          <q-btn v-if="item?.aplicacion?.url" outline no-caps icon="open_in_new" label="Abrir FitFamily" :href="item.aplicacion.url" target="_blank" rel="noopener noreferrer"/>
+          <q-btn v-if="item?.aplicacion?.id" outline no-caps icon="devices" label="Ficha del sistema" :to="`/sistemas/${item.aplicacion.id}`"/>
+          <q-btn v-else outline no-caps icon="devices" label="Sistemas" to="/sistemas"/>
         </div>
       </q-card-section>
       <q-banner v-if="item.progreso >= 100 && item.estado === 'activo'" rounded class="q-mx-md q-mb-md bg-blue-10 text-white">
