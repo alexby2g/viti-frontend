@@ -26,6 +26,18 @@ const galleryUrl=ref('')
 const galleryLoading=ref(false)
 const galleryError=ref(false)
 const activeGalleryFile=computed(()=>galleryFiles.value[galleryIndex.value]||null)
+const historyMode=ref('hitos')
+const expandedHistoryIds=ref(new Set())
+const historyEntries=computed(()=>{
+  const entries=Array.isArray(item.value?.avances)?item.value.avances:[]
+  if(historyMode.value==='hitos') return entries.filter(a=>a.visible_cliente && Number(a.progreso)>0).sort((a,b)=>Number(b.progreso)-Number(a.progreso)||Number(b.id)-Number(a.id))
+  return entries.filter(a=>!a.visible_cliente || !(Number(a.progreso)>0)).sort((a,b)=>Number(b.id)-Number(a.id))
+})
+const historyMilestonesCount=computed(()=>Array.isArray(item.value?.avances)?item.value.avances.filter(a=>a.visible_cliente && Number(a.progreso)>0).length:0)
+const historyNotesCount=computed(()=>Array.isArray(item.value?.avances)?item.value.avances.length-historyMilestonesCount.value:0)
+function historyExpanded(id){return expandedHistoryIds.value.has(id)}
+function toggleHistory(id){const next=new Set(expandedHistoryIds.value);if(next.has(id))next.delete(id);else next.add(id);expandedHistoryIds.value=next}
+function historyExcerpt(description,id){const text=String(description||'');return historyExpanded(id)||text.length<=240?text:text.slice(0,240).trimEnd()+'…'}
 
 function releaseGalleryUrl(){
   if(galleryUrl.value){ URL.revokeObjectURL(galleryUrl.value); galleryUrl.value='' }
@@ -265,12 +277,18 @@ onUnmounted(()=>{ clearAdvanceFiles(); closeGallery() })
         <ProyectoDeliveryPanel :proyecto="item" />
 
         <q-card flat class="viti-card q-mt-lg">
-          <q-card-section><div class="text-h6 text-weight-bold">Historial de avances</div></q-card-section>
+          <q-card-section class="row items-center q-gutter-sm">
+            <div class="col"><div class="text-h6 text-weight-bold">Historial de avances</div><div class="text-caption text-grey-5">Hitos documentados y notas de seguimiento, organizados por separado.</div></div>
+            <q-btn-toggle v-model="historyMode" unelevated no-caps rounded toggle-color="primary" color="blue-grey-10" text-color="grey-4" :options="[{label:`Hitos (${historyMilestonesCount})`,value:'hitos'},{label:`Notas internas (${historyNotesCount})`,value:'internos'}]"/>
+          </q-card-section>
           <q-separator/>
           <q-timeline color="primary" layout="comfortable" class="q-pa-lg">
-            <q-timeline-entry v-for="a in item.avances" :key="a.id" :title="a.titulo" :subtitle="`${a.fase} · ${a.area||'general'} · ${formatDateTime(a.created_at)}`" :icon="a.visible_cliente?'visibility':'visibility_off'">
-              <div style="white-space:pre-wrap">{{a.descripcion}}</div>
-              <q-badge v-if="a.progreso!==null" outline color="primary" class="q-mt-sm">{{a.progreso}}%</q-badge>
+            <div v-if="historyMode==='hitos'" class="text-caption text-grey-5 q-mb-md">Los porcentajes representan avances acumulados estimados. Registro elaborado el 23/11/2026 sobre el trabajo iniciado el 25/08/2026; entrega prevista para el 25/09/2026, aún sin certificación final.</div>
+            <div v-else class="text-caption text-grey-5 q-mb-md">Las notas internas sirven para auditoría y seguimiento; no representan un avance adicional ni cambian el porcentaje del proyecto.</div>
+            <q-timeline-entry v-for="a in historyEntries" :key="a.id" :title="a.titulo" :subtitle="`${a.fase} · ${a.area||'general'} · Registrado ${formatDateTime(a.created_at)}`" :icon="a.visible_cliente?'visibility':'visibility_off'">
+              <div style="white-space:pre-wrap">{{historyExcerpt(a.descripcion,a.id)}}</div>
+              <q-btn v-if="a.descripcion?.length>240" flat dense no-caps size="sm" class="q-mt-xs" color="light-blue-3" :icon-right="historyExpanded(a.id)?'expand_less':'expand_more'" :label="historyExpanded(a.id)?'Mostrar menos':'Leer detalles'" @click="toggleHistory(a.id)"/>
+              <div class="q-mt-sm"><q-badge v-if="a.visible_cliente && a.progreso!==null && Number(a.progreso)>0" outline color="primary">{{a.progreso}}% acumulado · visible al cliente</q-badge><q-badge v-else outline color="grey-5">Nota interna · sin cambio de porcentaje</q-badge></div>
               <div v-if="a.archivos?.length" class="q-mt-sm advance-attachments">
                 <div class="attachments-summary">
                   <div><q-icon name="photo_library"/> <b>{{a.archivos.length}} foto{{a.archivos.length===1?'':'s'}}</b> disponible{{a.archivos.length===1?'':'s'}} en este avance</div>
@@ -285,7 +303,7 @@ onUnmounted(()=>{ clearAdvanceFiles(); closeGallery() })
                 </div>
               </div>
             </q-timeline-entry>
-            <div v-if="!item.avances?.length" class="empty-state">No hay avances adicionales.</div>
+            <div v-if="!historyEntries.length" class="empty-state">{{historyMode==='hitos'?'Todavía no se registraron hitos públicos.':'No hay notas internas.'}}</div>
           </q-timeline>
         </q-card>
       </div>
@@ -295,9 +313,9 @@ onUnmounted(()=>{ clearAdvanceFiles(); closeGallery() })
           <q-list>
             <q-item><q-item-section><q-item-label caption>Fecha de inicio</q-item-label><q-item-label>{{formatDate(item.fecha_inicio)}}</q-item-label></q-item-section></q-item>
             <q-separator/>
-            <q-item><q-item-section><q-item-label caption>Fecha beta</q-item-label><q-item-label>{{formatDate(item.fecha_beta)}}</q-item-label></q-item-section></q-item>
+            <q-item><q-item-section><q-item-label caption>Beta prevista</q-item-label><q-item-label>{{formatDate(item.fecha_beta)}}</q-item-label></q-item-section></q-item>
             <q-separator/>
-            <q-item><q-item-section><q-item-label caption>Entrega final</q-item-label><q-item-label>{{formatDate(item.fecha_entrega)}}</q-item-label></q-item-section></q-item>
+            <q-item><q-item-section><q-item-label caption>Entrega prevista (no confirmada)</q-item-label><q-item-label>{{formatDate(item.fecha_entrega)}}</q-item-label></q-item-section></q-item>
             <q-separator/>
             <q-item v-if="item.produccion_url" clickable tag="a" :href="item.produccion_url" target="_blank"><q-item-section avatar><q-icon name="public"/></q-item-section><q-item-section>Ver producción</q-item-section></q-item>
           </q-list>
