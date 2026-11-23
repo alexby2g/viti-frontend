@@ -10,6 +10,7 @@ const saving = ref(false)
 const dialog = ref(false)
 const editingId = ref(null)
 const tasks = ref([])
+const expandedTaskIds = ref(new Set())
 const summary = ref({})
 const error = ref('')
 const statuses = [
@@ -122,6 +123,13 @@ async function move(task, newStatus) {
   }
 }
 function columnTasks(status) { return tasks.value.filter(t => t.estado === status) }
+function isTaskExpanded(id) { return expandedTaskIds.value.has(id) }
+function toggleTaskExpanded(id) {
+  const next = new Set(expandedTaskIds.value)
+  if (next.has(id)) next.delete(id)
+  else next.add(id)
+  expandedTaskIds.value = next
+}
 function priorityColor(p) { return { baja: 'grey-5', media: 'blue-4', alta: 'warning', critica: 'negative' }[p] || 'grey-5' }
 function formatDue(d) {
   if (!d) return ''
@@ -171,7 +179,8 @@ watch(() => props.proyecto?.id, load)
                 <q-btn v-if="canEdit" flat dense round size="xs" color="grey-4" icon="edit" :aria-label="'Editar tarea '+task.titulo" @click="openEdit(task)"/>
               </div>
               <strong class="task-title">{{ task.titulo }}</strong>
-              <p v-if="task.descripcion" class="task-description">{{ task.descripcion }}</p>
+              <p v-if="task.descripcion" class="task-description" :class="{ 'task-description-expanded': isTaskExpanded(task.id) }">{{ task.descripcion }}</p>
+              <q-btn v-if="task.descripcion && task.descripcion.length > 140" flat dense no-caps size="sm" color="light-blue-3" class="task-toggle-details" :icon-right="isTaskExpanded(task.id) ? 'expand_less' : 'expand_more'" :label="isTaskExpanded(task.id) ? 'Ocultar detalles' : 'Ver detalles'" :aria-expanded="isTaskExpanded(task.id)" @click="toggleTaskExpanded(task.id)"/>
               <small class="task-meta"><q-icon name="layers"/>{{ task.area }}</small>
               <small v-if="task.responsable" class="task-meta"><q-icon name="person"/>{{ task.responsable.nombre }} {{ task.responsable.apellido || '' }}</small>
               <small v-if="task.fecha_limite" class="task-meta"><q-icon name="event"/>{{ formatDue(task.fecha_limite) }}</small>
@@ -218,16 +227,21 @@ watch(() => props.proyecto?.id, load)
 </template>
 
 <style scoped>
-.project-task-board{overflow:hidden}
+.project-task-board{overflow:hidden;container-type:inline-size}
 .task-scroll{max-width:100%;overflow-x:auto;padding-bottom:6px}
-.task-columns{min-width:1070px;display:grid;grid-template-columns:repeat(5,minmax(204px,1fr));gap:12px}
+.task-columns{min-width:0;display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:12px}
 .task-column{border:1px solid var(--viti-border,rgba(118,170,203,.2));background:rgba(5,24,45,.52);border-radius:12px;min-height:210px;padding:10px;display:flex;flex-direction:column;gap:9px}
 .task-column-header{display:flex;align-items:center;gap:5px;padding:3px 2px 9px;border-bottom:1px solid rgba(140,170,205,.16);font-size:12px}
 .task-item{display:grid;gap:6px;background:rgba(22,51,77,.8);border:1px solid rgba(120,169,205,.22);border-radius:9px;padding:10px;overflow-wrap:anywhere}
 .task-title{font-size:13px;line-height:1.4}
-.task-description{font-size:12px;line-height:1.5;color:#bdccdd;margin:0;white-space:pre-line}
+.task-description{font-size:12px;line-height:1.5;color:#bdccdd;margin:0;white-space:pre-line;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:4;line-clamp:4;overflow:hidden}
+.task-description-expanded{display:block;-webkit-line-clamp:unset;line-clamp:unset;overflow-wrap:anywhere}
+.task-toggle-details{justify-self:start;padding:0;min-height:25px}
 .task-meta{display:flex;gap:5px;align-items:center;font-size:11px;color:#aabdd1}
 .task-empty{display:grid;justify-items:center;gap:8px;padding:23px 8px;color:#92a8ba;text-align:center;font-size:13px}
 .task-empty-col{padding:12px 0;text-align:center;color:#8b9fb0;font-size:12px}
 .task-dialog{width:680px;max-width:96vw;max-height:90vh;overflow:auto}
+@container (max-width:1100px){.task-columns{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@container (max-width:780px){.task-columns{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@container (max-width:490px){.task-columns{grid-template-columns:minmax(0,1fr)}}
 </style>
