@@ -19,8 +19,8 @@ const form=reactive({monto:0,metodo:'qr',fecha_pago:'',referencia:'',observacion
 const money=value=>`${Number(value||0).toFixed(2)} Bs`
 const pretty=value=>String(value||'').replaceAll('_',' ').replace(/\b\w/g,c=>c.toUpperCase())
 const today=()=>new Date().toISOString().slice(0,10)
-const statusColor=value=>({pagado:'positive',pendiente_saldo:'orange',pendiente_anticipo:'negative',activa:'positive',al_dia:'positive',por_vencer:'amber-9',gracia:'orange',suspendida:'negative',cancelada:'grey',prueba:'positive',pendiente_revision:'orange',confirmado:'positive',rechazado:'negative'}[value]||'grey')
-const reviewLabel=value=>({pendiente_revision:'Pendiente de revisión',confirmado:'Confirmado',rechazado:'Rechazado'}[value]||pretty(value||'confirmado'))
+const statusColor=value=>({pagado:'positive',pendiente_saldo:'orange',pendiente_anticipo:'negative',activa:'positive',al_dia:'positive',por_vencer:'amber-9',gracia:'orange',suspendida:'negative',cancelada:'grey',prueba:'positive',pendiente_revision:'orange',confirmado:'positive',rechazado:'negative',anulado:'blue-grey-7'}[value]||'grey')
+const reviewLabel=value=>({pendiente_revision:'Pendiente de revisión',confirmado:'Confirmado',rechazado:'Rechazado',anulado:'Rectificado · no contabilizado'}[value]||pretty(value||'confirmado'))
 const billingStatus=project=>project.estado_pago==='sin_acuerdo'&&project.acuerdo_comercial?.aceptado?'Acuerdo aceptado · cuotas por configurar':pretty(project.estado_pago)
 const billingStatusColor=project=>project.estado_pago==='sin_acuerdo'&&project.acuerdo_comercial?.aceptado?'blue-grey-7':statusColor(project.estado_pago)
 const displayImplementation=project=>project.precio_acordado??project.acuerdo_comercial?.precio_implementacion
