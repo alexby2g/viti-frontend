@@ -129,7 +129,7 @@
             <div class="track"><span>Audio original</span><div class="track-lane"><div v-if="!silent" class="track-audio" :style="{width:'100%'}">Audio · {{Math.round(volume*100)}}%</div></div></div>
             <div class="track"><span>Música</span><div class="track-lane"><div v-if="musicFile" class="track-music" :style="{width:'100%'}">Música · {{Math.round(musicVolume*100)}}%</div></div></div>
             <div class="track"><span>Textos</span><div class="track-lane"><div v-if="overlayTitle||logoFile" class="track-text" :style="{width:'100%'}">{{overlayTitle?'Título':''}}{{overlayTitle&&logoFile?' + ':''}}{{logoFile?'Marca':''}}</div></div></div>
-            <div v-for="(layer,i) in layers" :key="layer.id" class="track"><span :title="layer.name">Capa {{i+1}}</span><div class="track-lane"><button v-if="layer.start<totalDuration" class="track-overlay" :class="{selected:selectedLayerId===layer.id}" :style="{left:(layer.start/totalDuration*100)+'%',width:((Math.min(layer.end,totalDuration)-layer.start)/totalDuration*100)+'%'}" :title="layer.name" :disabled="working" @click="selectLayer(layer.id);seekLayer(layer)">{{layer.name}}</button></div></div>
+            <div v-for="(layer,i) in layers" :key="layer.id" class="track"><span :title="layer.name">Capa {{i+1}}</span><div class="track-lane"><button v-if="layer.start<totalDuration" class="track-overlay" :class="{selected:selectedLayerId===layer.id}" :style="{left:(layer.start/totalDuration*100)+'%',width:((Math.min(layer.end,totalDuration)-layer.start)/totalDuration*100)+'%'}" :title="layer.name" :disabled="working" @click="selectLayer(layer.id);seekLayer(layer)">{{layer.name}}</button><span v-for="key in (layer.keyframes||[]).filter(k=>k.time<=totalDuration)" :key="key.time" class="track-key" :style="{left:(key.time/totalDuration*100)+'%'}" :title="'Fotograma '+format(key.time)">◆</span></div></div>
             <div class="track"><span>Subtítulos</span><div class="track-lane caption-lane"><div v-for="(cue,i) in trackCues" :key="i" class="track-caption" :style="{left:(cue.start/totalDuration*100)+'%',width:((cue.end-cue.start)/totalDuration*100)+'%'}" :title="cue.text">{{i+1}}</div><div v-if="!captions&&subtitle" class="track-caption" style="width:100%">Fijo</div></div></div>
             <p class="note">Representación de las pistas de salida. Edita sus ajustes en los controles correspondientes.</p>
           </div>
@@ -169,7 +169,7 @@ function seekOutput(t){
   const sequence=clips.value.length?clips.value:[{start:start.value,end:end.value}]
   let remaining=Math.max(0,Math.min(totalDuration.value,t))*speed.value
   for(let i=0;i<sequence.length;i++){const clip=sequence[i],len=clip.end-clip.start
-    if(remaining<len||i===sequence.length-1){stopSelection();seekSource(clip.start+Math.min(len,remaining));return}
+    if(remaining<len||i===sequence.length-1){stopSelection();seekSource(clip.start+Math.min(len,remaining));clipHint=i;return}
     remaining-=len
   }
 }
@@ -179,7 +179,7 @@ function ensureKey(l,t){
   if(existing){activeKeyTime.value=time;return existing}
   if(l.keyframes.length>=24){error.value='Máximo 24 fotogramas clave por capa.';return null}
   const pose=layerTransform(l,time)
-  if(!l.keyframes.length&&time>l.start+.001)l.keyframes.push({time:keyTime(l.start),...pose})
+  if(!l.keyframes.length&&time>keyTime(l.start)+.001)l.keyframes.push({time:keyTime(l.start),...pose})
   if(l.keyframes.length>=24)return null
   l.keyframes.push({time,...pose});l.keyframes.sort((a,b)=>a.time-b.time);activeKeyTime.value=time
   return l.keyframes.find(k=>k.time===time)
@@ -216,7 +216,7 @@ const anchorFields=[{label:'Título X',value:titleX,min:0,max:1},{label:'Título
 const layerFields=[{key:'x',label:'Posición X',min:0,max:1,step:.01,display:100,unit:'%'},{key:'y',label:'Posición Y',min:0,max:1,step:.01,display:100,unit:'%'},{key:'size',label:'Tamaño',min:.02,max:1,step:.01,display:100,unit:'%'},{key:'rotation',label:'Rotación',min:-180,max:180,step:1,display:1,unit:'°'},{key:'opacity',label:'Opacidad',min:0,max:1,step:.01,display:100,unit:'%'}]
 const layerId=()=>crypto.randomUUID()
 function selectLayer(id){if(selectedLayerId.value!==id)activeKeyTime.value=null;selectedLayerId.value=id;anchorMode.value=null;activeTool.value='layers';showOriginal.value=false;renderMonitor()}
-function seekLayer(layer){if(!layer||layer.start>=totalDuration.value)return;const sequence=clips.value.length?clips.value:[{start:start.value,end:end.value}];let t=Math.min(layer.start+.05,(layer.start+Math.min(layer.end,totalDuration.value))/2)*speed.value;for(const clip of sequence){const length=clip.end-clip.start;if(t<length){stopSelection();seekSource(clip.start+t);return}t-=length}}
+function seekLayer(layer){if(!layer||layer.start>=totalDuration.value)return;seekOutput(Math.min(layer.start+.05,(layer.start+Math.min(layer.end,totalDuration.value))/2))}
 function selectAnchor(mode){anchorMode.value=mode;selectedLayerId.value=null;showOriginal.value=false;renderMonitor()}
 function baseLayer(type,name){return {id:layerId(),type,name,x:.5,y:.5,size:type==='image'?.25:.08,rotation:0,opacity:1,start:0,end:Math.max(.01,Math.min(300,totalDuration.value)),enter:'none',exit:'none',animationSeconds:.5,keyframes:[]}}
 function addTextLayer(text){if(working.value||layers.value.length>=12)return;const layer={...baseLayer('text','Texto libre'),text,color:'#ffffff',font:'sans-serif',background:false,bold:true,outline:true};layers.value.push(layer);selectLayer(layer.id)}
@@ -243,7 +243,7 @@ async function addImageLayer(file){
 }
 function moveLayer(delta){if(working.value)return;const i=layers.value.findIndex(l=>l.id===selectedLayerId.value),j=i+delta;if(i<0||j<0||j>=layers.value.length)return;const next=[...layers.value];[next[i],next[j]]=[next[j],next[i]];layers.value=next}
 function removeLayer(){if(working.value||!selectedLayer.value)return;const id=selectedLayerId.value,bitmap=layerImages.get(id);layers.value=layers.value.filter(l=>l.id!==id);layerImages.delete(id);if(bitmap&&![...layerImages.values()].includes(bitmap))bitmap.close();selectedLayerId.value=null;activeKeyTime.value=null}
-function duplicateLayer(){if(working.value||!selectedLayer.value||layers.value.length>=12||(selectedLayer.value.type==='image'&&imageCount.value>=8))return;const layer={...selectedLayer.value,keyframes:(selectedLayer.value.keyframes||[]).map(k=>({...k})),id:layerId(),name:(selectedLayer.value.name+' copia').slice(0,80),x:Math.min(1,selectedLayer.value.x+.04),y:Math.min(1,selectedLayer.value.y+.04)};if(layer.type==='image')layerImages.set(layer.id,layerImages.get(selectedLayerId.value));layers.value.push(layer);selectLayer(layer.id)}
+function duplicateLayer(){if(working.value||!selectedLayer.value||layers.value.length>=12||(selectedLayer.value.type==='image'&&imageCount.value>=8))return;const layer={...selectedLayer.value,keyframes:(selectedLayer.value.keyframes||[]).map(k=>({...k,x:Math.min(1,k.x+.04),y:Math.min(1,k.y+.04)})),id:layerId(),name:(selectedLayer.value.name+' copia').slice(0,80),x:Math.min(1,selectedLayer.value.x+.04),y:Math.min(1,selectedLayer.value.y+.04)};if(layer.type==='image')layerImages.set(layer.id,layerImages.get(selectedLayerId.value));layers.value.push(layer);selectLayer(layer.id)}
 function setLayerTime(key,value){if(value===''||value===null||!selectedLayer.value)return;const n=Number(value);if(!Number.isFinite(n))return;const l=selectedLayer.value;l[key]=key==='start'?Math.max(0,Math.min(l.end-.01,n)):Math.min(300,Math.max(l.start+.01,n))}
 function clearLayers(){for(const bitmap of new Set(layerImages.values()))bitmap?.close();layerImages.clear();layers.value=[];selectedLayerId.value=null;activeKeyTime.value=null;anchorMode.value=null}
 function layerOptions(){return {titleX:titleX.value,titleY:titleY.value,titleSize:titleSize.value,captionX:captionX.value,captionY:captionY.value,captionSize:captionSize.value,layers:layers.value,layerImages}}
@@ -343,12 +343,12 @@ function download(){if(!result.value)return;const a=document.createElement('a');
 function useResult(){if(result.value)emit('result',result.value)}
 onMounted(()=>{if(props.initialFile)selectLocal(props.initialFile)})
 watch([speed,titleAnimation,captions,height,silent,volume,clips,transition,formatMode,fit,filter,brightness,contrast,saturation,hue,overlayTitle,subtitle,logoFile,logoOpacity,musicFile,musicVolume],clearResult)
-let monitorTime=0,drag=null,monitorFrame=0,monitorLogo=null,logoRevision=0,disposed=false
+let monitorTime=0,clipHint=null,drag=null,monitorFrame=0,monitorLogo=null,logoRevision=0,disposed=false
 function syncAudio(){const v=preview.value;if(v){v.muted=silent.value;v.volume=volume.value;v.playbackRate=speed.value;v.preservesPitch=true}}
-function seekSource(value){if(!preview.value||!Number.isFinite(value))return;selectionPlaying=false;preview.value.currentTime=Math.max(0,Math.min(duration.value,value));current.value=preview.value.currentTime}
+function seekSource(value){if(!preview.value||!Number.isFinite(value))return;clipHint=null;selectionPlaying=false;preview.value.currentTime=Math.max(0,Math.min(duration.value,value));current.value=preview.value.currentTime}
 async function togglePlayback(){const v=preview.value;if(!v)return;if(!v.paused){stopSelection();return}selectionPlaying=false;syncAudio();try{await v.play()}catch{error.value='No se pudo iniciar la reproducción.'}}
 function seekTimeline(event){if(working.value)return;const rect=event.currentTarget.getBoundingClientRect();seekSource((event.clientX-rect.left)/rect.width*duration.value)}
-function jumpClip(index){const clip=(clips.value.length?clips.value:[{start:start.value,end:end.value}])[index];if(clip){stopSelection();seekSource(clip.start)}}
+function jumpClip(index){const clip=(clips.value.length?clips.value:[{start:start.value,end:end.value}])[index];if(clip){stopSelection();seekSource(clip.start);clipHint=index}}
 watch(activeTool,()=>nextTick(()=>{if(inspector.value)inspector.value.scrollTop=0}))
 function fullscreenMonitor(){const node=monitorCanvas.value?.parentElement;if(node?.requestFullscreen)node.requestFullscreen().catch(()=>{error.value='No se pudo ampliar el monitor.'})}
 function renderMonitor(){
@@ -361,8 +361,9 @@ function renderMonitor(){
   if(showOriginal.value){drawComposition(ctx,v,{fit:'contain'});return}
   const sequence=clips.value.length?clips.value:[{start:start.value,end:end.value}]
   let offset=0,at=Math.max(0,(v.currentTime-start.value)/speed.value),fade=0
-  for(const clip of sequence){
-    if(v.currentTime>=clip.start&&v.currentTime<=clip.end){
+  const hinted=clipHint!==null&&sequence[clipHint]&&v.currentTime>=sequence[clipHint].start&&v.currentTime<=sequence[clipHint].end?clipHint:null
+  for(const [index,clip] of sequence.entries()){
+    if((hinted===null||hinted===index)&&v.currentTime>=clip.start&&v.currentTime<=clip.end){
       const delta=v.currentTime-clip.start,length=clip.end-clip.start,edge=Math.min(.5,length/3)
       at=(offset+delta)/speed.value
       if(transition.value==='fade'&&edge>0)fade=1-Math.max(0,Math.min(1,delta/edge,(clip.end-v.currentTime)/edge))
@@ -412,4 +413,5 @@ onBeforeUnmount(()=>{disposed=true;++logoRevision;cancelAnimationFrame(monitorFr
 .timeline-dock .timeline{cursor:pointer}.track-video{border:0;cursor:pointer}.track-video:hover{background:#d3612e}.track-video:focus-visible,.tool-tabs button:focus-visible{outline:2px solid #ffb38b;outline-offset:-2px}
 .track-overlay{position:absolute;height:100%;background:#8453a0;color:white;border:0;border-radius:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer;font-size:10px}.track-overlay.selected{outline:2px solid #ff985c;outline-offset:-2px}.layer-list{display:grid;gap:5px}.layer-list button{display:flex;gap:8px;align-items:center;padding:10px;border:1px solid #ffffff16;border-radius:6px;background:#25252c;color:#eee;cursor:pointer;text-align:left}.layer-list button span{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.layer-list button.chosen{border-color:#ff681e;background:#ff681e20}.color-pick{display:flex;align-items:center;justify-content:space-between;color:#ddd}.monitor-stage canvas.draggable{touch-action:none;cursor:move}
 .motion-panel{display:grid;gap:9px;background:#24242b;border-radius:8px;padding:10px}.motion-panel h4{font-size:13px;color:#ffb38b;margin:0;font-weight:700}.resource-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:5px;padding:8px 0}.resource-grid button,.key-list button{border:1px solid #ffffff20;background:#292930;color:#ff9b68;border-radius:6px;padding:8px;cursor:pointer}.resource-grid button{display:grid;justify-items:center;gap:5px;font-size:10px}.resource-grid button:disabled,.key-list button:disabled{opacity:.4;cursor:default}.key-list{display:grid;gap:4px;max-height:170px;overflow:auto}.key-list button{display:flex;justify-content:space-between}.key-list button.chosen{border-color:#ff681e;background:#ff681e22}
+.track-key{position:absolute;top:50%;transform:translate(-50%,-50%);color:#ffd59b;font-size:10px;pointer-events:none;text-shadow:0 1px 2px #000}
 </style>
