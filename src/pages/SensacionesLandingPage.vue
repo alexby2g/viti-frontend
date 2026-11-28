@@ -1,6 +1,6 @@
 <template>
   <main class="sensaciones">
-    <nav><router-link to="/sensaciones" class="brand">SENSACIONES <small>AUDIOVISUALES DIGITAL</small></router-link><div><router-link to="/sensaciones/studio">Studio</router-link> · <router-link to="/viti">Viti</router-link></div></nav>
+    <nav><router-link to="/sensaciones" class="brand">SENSACIONES <small>AUDIOVISUALES DIGITAL</small></router-link><div><router-link to="/sensaciones/portafolio">Proyectos y álbumes</router-link> · <router-link to="/sensaciones/studio">Studio</router-link> · <router-link to="/viti">Viti</router-link></div></nav>
     <section class="hero"><span>ARTE / CREATIVIDAD / PRODUCCIÓN</span><h1>Historias que merecen ser vistas.</h1><p>Fotografía, video y creatividad con una mirada propia.</p><q-btn color="deep-orange" unelevated label="Explorar trabajos" @click="gallery?.scrollIntoView({behavior:'smooth'})"/></section>
     <section ref="gallery" class="catalog"><h2>Portafolio oficial</h2>
       <q-banner v-if="error" class="bg-negative text-white">{{error}} <q-btn flat label="Reintentar" @click="load"/></q-banner>
