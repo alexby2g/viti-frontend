@@ -185,7 +185,7 @@ onBeforeUnmount(() => {
       </q-toolbar>
     </q-header>
 
-    <q-drawer v-model="drawer" show-if-above :breakpoint="900" :overlay="$q.screen.lt.md" :width="272" class="viti-drawer" :style="{ background: branding.drawer_color }">
+    <q-drawer v-model="drawer" show-if-above :breakpoint="900" :overlay="$q.screen.lt.md" :width="272" class="viti-drawer" :style="{ background: '#18181d' }">
       <div class="column fit no-wrap">
         <div class="q-pa-lg"><AppBrand /></div>
         <div v-if="!isClient" class="q-px-md q-pb-md">
