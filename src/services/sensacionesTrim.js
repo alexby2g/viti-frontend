@@ -1,6 +1,6 @@
 // Browser-local editing. The original is never modified.
 import {outputSize,normalizeSegments,drawComposition,syncSecondary,secondaryTime} from './sensacionesComposition'
-import {speedValues} from './sensacionesProject'
+import {speedValues,normalizeMontage} from './sensacionesProject'
 const choices=['video/mp4;codecs=avc1.42001f,mp4a.40.2','video/mp4','video/webm;codecs=vp8,opus','video/webm']
 export function canTrim(){
   return typeof MediaRecorder!=='undefined' && !!HTMLCanvasElement.prototype.captureStream && choices.some(t=>MediaRecorder.isTypeSupported(t))
@@ -16,12 +16,14 @@ function waitEvent(node,event,action,signal){
     try{action()}catch(e){finish(e)}
   })
 }
-export async function renderTrim({source,start,end,segments,speed=1,options={},secondaryFile=null,musicFile=null,musicVolume=.25,logoFile=null,maxHeight=720,silent=false,volume=1,maxBytes=262144000,signal,onProgress=()=>{}}){
+export async function renderTrim({source,start,end,segments,montage=null,speed=1,options={},secondaryFile=null,musicFile=null,musicVolume=.25,logoFile=null,maxHeight=720,silent=false,volume=1,maxBytes=262144000,signal,onProgress=()=>{}}){
   if(!canTrim())throw new Error('Usa Chrome, Edge o Brave de escritorio actualizado.')
+  const assembly=montage?normalizeMontage(montage):null
+  if(assembly)source=assembly[0].file
   if(!source)throw new Error('Selecciona un archivo de video.')
   if(!speedValues.includes(speed))throw new Error('Velocidad no compatible.')
   const video=document.createElement('video'),canvas=document.createElement('canvas')
-  const url=URL.createObjectURL(source)
+  let url=URL.createObjectURL(source),activeSource=source
   video.preload='auto';video.playsInline=true;video.muted=silent&&!musicFile
   let audio,stream,recorder,raf,interval,visibility,abort,logo,music,musicUrl,secondary,secondaryUrl
   try{
@@ -41,13 +43,22 @@ export async function renderTrim({source,start,end,segments,speed=1,options={},s
     }
     await waitEvent(video,'loadeddata',()=>{video.src=url},signal)
     if(!video.videoWidth)throw new Error('Video no compatible.')
-    const clips=normalizeSegments(segments||[{start,end}],video.duration),total=clips.reduce((sum,c)=>sum+c.end-c.start,0)
+    const clips=assembly||normalizeSegments(segments||[{start,end}],video.duration),total=clips.reduce((sum,c)=>sum+c.end-c.start,0)
     const seek=async time=>{if(Math.abs(video.currentTime-time)>.005)await waitEvent(video,'seeked',()=>{video.currentTime=time},signal)}
     const outputDuration=total/speed
     if(outputDuration>300||outputDuration<.5)throw new Error('La duración final debe estar entre 0,5 segundos y 5 minutos.')
     if(options.cues?.some(c=>c.end>outputDuration+.02))throw new Error('Hay subtítulos fuera de la duración final.')
     video.playbackRate=speed;video.preservesPitch=true
-    await seek(clips[0].start)
+    async function loadClip(clip){
+      if(clip.file&&clip.file!==activeSource){
+        const previous=url;url=URL.createObjectURL(clip.file);activeSource=clip.file
+        try{await waitEvent(video,'loadeddata',()=>{video.src=url;video.load()},signal)}finally{URL.revokeObjectURL(previous)}
+        video.playbackRate=speed;video.preservesPitch=true
+      }
+      if(!video.videoWidth||!Number.isFinite(video.duration)||clip.end>video.duration+.02)throw new Error('La duración real de un clip no coincide con el recorte.')
+      await seek(clip.start)
+    }
+    await loadClip(clips[0])
     if(options.effects?.pip?.enabled){
       if(!secondaryFile)throw new Error('Adjunta el segundo video antes de exportar.')
       secondary=document.createElement('video');secondary.muted=true;secondary.playsInline=true;secondary.preload='auto';secondaryUrl=URL.createObjectURL(secondaryFile)
@@ -95,7 +106,7 @@ export async function renderTrim({source,start,end,segments,speed=1,options={},s
         try{
           await waitEvent(recorder,'pause',()=>recorder.pause(),signal)
           elapsed+=clips[index].end-clips[index].start;index++
-          await seek(clips[index].start)
+          await loadClip(clips[index])
           if(finished)return
           const target=secondaryTime(secondary,options.effects?.pip,elapsed/speed)
           if(target!==null&&Math.abs(secondary.currentTime-target)>.025)await waitEvent(secondary,'seeked',()=>{secondary.currentTime=target},signal)
