@@ -8,7 +8,7 @@ const route = useRoute()
 const assistantEnabled = ref(localStorage.getItem(STORAGE_KEY) !== '0')
 const publicPresentation = computed(() => {
   const path = String(route.path || '')
-  return path === '/viti' || path.startsWith('/viti/') || path === '/solicitud' || path.startsWith('/solicitud/') || path === '/registro' || path === '/login' || path === '/demo'
+  return path === '/' || path === '/sensaciones' || path.startsWith('/sensaciones/') || path === '/viti' || path.startsWith('/viti/') || path === '/solicitud' || path.startsWith('/solicitud/') || path === '/registro' || path === '/login' || path === '/demo'
 })
 const showAssistant = computed(() => assistantEnabled.value && !publicPresentation.value)
 
