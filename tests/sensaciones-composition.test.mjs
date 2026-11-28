@@ -7,7 +7,7 @@ const projectUrl='data:text/javascript;base64,'+Buffer.from(projectSource).toStr
 const {parseSrt,captionAt,titleAlpha,projectSettings}=await import(projectUrl)
 let source=await readFile(new URL('../src/services/sensacionesComposition.js',import.meta.url),'utf8')
 source=source.replace("'./sensacionesProject'",JSON.stringify(projectUrl))
-const {outputSize,normalizeSegments}=await import('data:text/javascript;base64,'+Buffer.from(source).toString('base64'))
+const {outputSize,normalizeSegments,drawComposition}=await import('data:text/javascript;base64,'+Buffer.from(source).toString('base64'))
 test('formats are bounded, even and preserve orientation',()=>{
   assert.deepEqual(outputSize(1920,1080,720,'wide'),[1280,720])
   assert.deepEqual(outputSize(1920,1080,720,'vertical'),[406,720])
@@ -45,4 +45,24 @@ test('portable projects accept only supported options and validated ranges',()=>
   assert.deepEqual(s.clips,[{start:2,end:4}])
   p.settings.clips=[{start:2,end:8}]
   assert.throws(()=>projectSettings(p))
+})
+
+test('monitor and export compositor applies live hue and other color settings',()=>{
+  const calls=[]
+  const ctx={canvas:{width:640,height:360},save(){},restore(){},fillRect(){},drawImage(){calls.push(this.filter)},filter:'none'}
+  const video={videoWidth:640,videoHeight:360}
+  drawComposition(ctx,video,{brightness:1.2,contrast:.9,saturation:1.4,hue:75,filter:'warm'})
+  assert.match(calls[0],/brightness\(1.2\).*contrast\(0.9\).*saturate\(1.4\).*hue-rotate\(75deg\).*sepia/)
+  drawComposition(ctx,video,{hue:999})
+  assert.match(calls[1],/hue-rotate\(180deg\)/)
+  drawComposition(ctx,video,{})
+  assert.match(calls[2],/hue-rotate\(0deg\)/)
+})
+test('saved projects keep hue and old projects default to neutral hue',()=>{
+  const p={format:'sensaciones-video-lab-v1',source:{name:'demo.mp4',size:1024,duration:6},settings:{selection:{start:0,end:4},clips:[],captions:''}}
+  assert.equal(projectSettings(p).hue,0)
+  p.settings.hue=-70
+  assert.equal(projectSettings(p).hue,-70)
+  p.settings.hue=999
+  assert.equal(projectSettings(p).hue,180)
 })
