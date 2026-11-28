@@ -108,7 +108,7 @@ export default [
   { path:'/apps/servicio-tecnico', component:SoporteVitalLayout, meta:{requiresAuth:true,adminOnly:true,appShell:'servicio-tecnico'}, children:supportChildren(false) },
   {
     path: '/', component: MainLayout, meta: { requiresAuth: true }, children: [
-      { path: '', name: 'dashboard', component: () => import('../pages/DashboardPage.vue'), meta:{adminOnly:true} },
+      { path: 'panel', name: 'dashboard', component: () => import('../pages/DashboardPage.vue'), meta:{adminOnly:true} },
       { path: 'monitor', name: 'monitor', component: () => import('../pages/MonitorPage.vue'), meta:{adminOnly:true} },
       { path: 'mi-cuenta', name: 'client-portal', component: () => import('../pages/ClientPortalPage.vue'), meta:{clientOnly:true} },
       { path: 'mi-negocio', name: 'client-business', component: () => import('../pages/ClientBusinessPage.vue'), meta:{clientOnly:true} },

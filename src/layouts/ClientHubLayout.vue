@@ -18,7 +18,7 @@ const nav = [
   { label: 'Atención', icon: 'support_agent', to: '/mi-buzon' },
 ]
 
-const initials = computed(() => `${auth.user?.nombre?.[0] || ''}${auth.user?.apellido?.[0] || ''}`.toUpperCase() || 'V')
+const initials = computed(() => `${auth.user?.nombre?.[0] || ''}${auth.user?.apellido?.[0] || ''}`.toUpperCase() || 'S')
 const active = computed(() => route.path)
 
 function go(path) {
@@ -71,7 +71,7 @@ onMounted(() => { auth.initialize().catch(() => {}) })
       <div class="hub-shell">
         <aside class="hub-sidebar">
           <div class="hub-welcome">
-            <div class="hub-kicker">Espacio VITI</div>
+            <div class="hub-kicker">Espacio Sensaciones</div>
             <div class="hub-title">{{ auth.user?.nombre || 'Tu espacio' }}</div>
             <div class="hub-subtitle">Solicitudes, avances, entregas y atención en un solo lugar.</div>
           </div>
@@ -92,7 +92,7 @@ onMounted(() => { auth.initialize().catch(() => {}) })
 
           <div class="hub-sidebar-bottom">
             <q-btn outline color="primary" no-caps icon="add" class="full-width" label="Nueva solicitud" :loading="creating" @click="newRequest" />
-            <div class="hub-trust"><q-icon name="verified_user" /> Plataforma VITI · por AGR Studio</div>
+            <div class="hub-trust"><q-icon name="verified_user" /> Sensaciones Audiovisuales Digital</div>
           </div>
         </aside>
 

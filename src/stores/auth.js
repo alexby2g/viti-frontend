@@ -52,7 +52,7 @@ export const useAuthStore = defineStore('auth', {
     },
     async login(payload) {
       this.loading = true
-      this.loginStage = 'Conectando con VITI...'
+      this.loginStage = 'Conectando con Sensaciones...'
       try {
         await warmBackend()
         this.loginStage = 'Preparando sesión segura...'

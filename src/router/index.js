@@ -8,9 +8,9 @@ export default defineRouter(({ store }) => {
   const offlinePreview = import.meta.env.VITE_SENSACIONES_OFFLINE_PREVIEW === '1'
   const publicRoutes = [
     { path:'/sensaciones/portafolio', name:'sensaciones-collections', component:()=>import('../pages/SensacionesCollectionsPage.vue'), meta:{publicLanding:true} },
-    { path:'/sensaciones', name:'sensaciones-landing', component:()=>import('../pages/SensacionesLandingPage.vue'), meta:{publicLanding:true} },
-    { path:'/viti', name:'viti-landing', component:() => import('../pages/VitiLandingPage.vue'), meta:{publicLanding:true} },
-    { path:'/viti/planes', name:'viti-plans', component:() => import('../pages/VitiPlansPage.vue'), meta:{publicLanding:true} },
+    { path:'/', alias:'/sensaciones', name:'sensaciones-landing', component:()=>import('../pages/SensacionesLandingPage.vue'), meta:{publicLanding:true} },
+    { path:'/viti', name:'viti-landing', redirect:'/' },
+    { path:'/viti/planes', name:'viti-plans', redirect:{path:'/',hash:'#servicios'} },
     { path:'/planes', redirect:'/viti/planes', meta:{publicLanding:true} },
     { path:'/presentacion', redirect:'/viti', meta:{publicLanding:true} },
     { path:'/demo', component:() => import('../layouts/AuthLayout.vue'), meta:{publicLanding:true}, children:[{ path:'', name:'viti-demo', component:() => import('../pages/GuestDemoPage.vue'), meta:{publicLanding:true} }] },
@@ -65,6 +65,7 @@ export default defineRouter(({ store }) => {
     if (user?.rol === 'cliente_negocio') return { name:'electro-customer-home' }
     if (user?.rol === 'cliente') return { name:'client-portal' }
     if (user?.rol === 'soporte') return { name:'support-internal-home' }
+    if (user?.rol === 'superadmin') return { name:'sensaciones-studio' }
     return { name:'dashboard' }
   }
 
