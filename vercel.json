@@ -1,33 +1,22 @@
 {
-  "buildCommand": "node scripts/build-sensaciones-preview.mjs",
+  "buildCommand": "npm run build",
   "outputDirectory": "dist/spa",
-  "headers": [
-    {
-      "source": "/(.*)",
-      "headers": [
-        {
-          "key": "X-Robots-Tag",
-          "value": "noindex, nofollow"
-        }
-      ]
-    }
-  ],
   "rewrites": [
     {
       "source": "/api/:path*",
-      "destination": "/sensaciones-qa-unavailable.json"
-    },
-    {
-      "source": "/sanctum/:path*",
-      "destination": "/sensaciones-qa-unavailable.json"
+      "destination": "https://viti-core-api-alexby2g.onrender.com/api/:path*"
     },
     {
       "source": "/auth/google/:path*",
-      "destination": "/sensaciones-qa-unavailable.json"
+      "destination": "https://viti-core-api-alexby2g.onrender.com/auth/google/:path*"
+    },
+    {
+      "source": "/sanctum/:path*",
+      "destination": "https://viti-core-api-alexby2g.onrender.com/sanctum/:path*"
     },
     {
       "source": "/storage/:path*",
-      "destination": "/sensaciones-qa-unavailable.json"
+      "destination": "https://viti-core-api-alexby2g.onrender.com/storage/:path*"
     },
     {
       "source": "/(.*)",
