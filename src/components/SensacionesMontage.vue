@@ -16,7 +16,7 @@
         <q-input dark outlined type="number" label="Final (segundos)" :model-value="selected.end" :min="selected.start+.5" :max="selected.duration" step=".1" :disable="busy" @change="v=>trim('end',v)"/>
         <div class="actions"><q-btn flat color="deep-orange" icon="content_cut" label="Dividir aquí" no-caps :disable="busy||clips.length>=12||clock-selected.start<.5||selected.end-clock<.5" @click="split"/><q-btn flat color="negative" icon="delete_outline" label="Quitar clip" no-caps :disable="busy" @click="remove"/></div>
       </template>
-      <div class="section-label">AJUSTES DE SALIDA</div><h3>Formato y calidad</h3>
+      <div class="section-label">PROYECTO LOCAL</div><div class="actions"><q-btn outline dense color="deep-orange" icon="save" label="Guardar proyecto" no-caps :disable="busy||!clips.length||total>300" @click="saveMontageProject"/></div><q-file dark dense outlined :model-value="null" label="Abrir proyecto JSON" accept=".json" :max-file-size="65536" :disable="busy||!clips.length" @update:model-value="openMontageProject"/><p>Para recuperar un proyecto otro día, importa primero los mismos videos y después su archivo JSON.</p><div class="section-label">AJUSTES DE SALIDA</div><h3>Formato y calidad</h3>
       <q-select dark outlined v-model="formatMode" :options="formats" emit-value map-options label="Formato" :disable="busy"/>
       <q-select dark outlined v-model="quality" :options="[{label:'HD 720p',value:720},{label:'Full HD 1080p',value:1080}]" emit-value map-options label="Resolución" :disable="busy"/>
       <q-select dark outlined v-model="transition" :options="[{label:'Corte directo',value:'cut'},{label:'Fundido a negro',value:'fade'}]" emit-value map-options label="Transición" :disable="busy"/>
@@ -43,7 +43,7 @@
 </template>
 <script setup>
 import {ref,computed,onBeforeUnmount,onMounted,nextTick,watch} from 'vue'
-import {normalizeMontage,moveMontage,resizeMontageClip} from '../services/sensacionesProject'
+import {normalizeMontage,moveMontage,resizeMontageClip,montageProject,restoreMontageProject} from '../services/sensacionesProject'
 import {renderTrim} from '../services/sensacionesTrim'
 const props=defineProps({initialFile:Object,active:{type:Boolean,default:true},maxBytes:{type:Number,default:262144000}})
 const emit=defineEmits(['close','edit','edit-clip','result','session'])
@@ -104,6 +104,13 @@ async function exportMontage(){if(busy.value)return;pause();clearResult();error.
 }
 function cancel(){controller?.abort()}
 function download(){const a=document.createElement('a');a.href=resultUrl.value;a.download='sensaciones-montaje.'+(result.value.type==='video/mp4'?'mp4':'webm');a.click()}
+function saveMontageProject(){
+  try{const raw=montageProject(clips.value,{quality:quality.value,formatMode:formatMode.value,transition:transition.value,silent:silent.value});const url=URL.createObjectURL(new Blob([JSON.stringify(raw,null,2)],{type:'application/json'}));const a=document.createElement('a');a.href=url;a.download='sensaciones-montaje.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);error.value=''}catch(e){error.value=e.message}
+}
+async function openMontageProject(file){
+  if(!file||busy.value)return;busy.value=true;stage.value='Abriendo proyecto';progress.value=0
+  try{if(file.size>65536)throw new Error('Proyecto demasiado grande.');const restored=restoreMontageProject(JSON.parse(await file.text()),clips.value);if(!window.confirm('¿Restaurar la secuencia del proyecto? Puedes deshacer el cambio.'))return;commit(restored.clips.map(c=>({...c,id:crypto.randomUUID()})));quality.value=restored.settings.quality;formatMode.value=restored.settings.formatMode;transition.value=restored.settings.transition;silent.value=restored.settings.silent;error.value=''}catch(e){error.value=e.message||'No se pudo abrir el proyecto.'}finally{busy.value=false}
+}
 function close(){if(busy.value)return;pause();emit('close')}
 function editSelected(){if(busy.value||!selected.value)return;pause();emit('edit-clip',{id:selected.value.id,file:selected.value.file,start:selected.value.start,end:selected.value.end})}
 async function replaceClip(id,file){if(busy.value||!clips.value.some(c=>c.id===id))throw new Error('El clip ya no está disponible en el montaje.');pause();busy.value=true;stage.value='Preparando clip editado';controller=new AbortController();let objectUrl='';try{const duration=await probe(file,controller.signal);if(disposed||controller.signal.aborted)throw new Error('Operación cancelada.');objectUrl=URL.createObjectURL(file);urls.add(objectUrl);commit(clips.value.map(c=>c.id===id?{...c,file,url:objectUrl,duration,start:0,end:duration}:c));selectedId.value=id;error.value='';return true}catch(e){if(objectUrl){URL.revokeObjectURL(objectUrl);urls.delete(objectUrl)}throw e}finally{busy.value=false;controller=null}}
