@@ -1,26 +1,83 @@
 {
-  "buildCommand": "npm run build",
+  "buildCommand": "node scripts/build-sensaciones-preview.mjs",
   "outputDirectory": "dist/spa",
   "rewrites": [
     {
       "source": "/api/:path*",
-      "destination": "https://viti-core-api-alexby2g.onrender.com/api/:path*"
+      "destination": "https://viti-core-api-alexby2g.onrender.com/api/:path*",
+      "has": [
+        {
+          "type": "host",
+          "value": "viti-frontend.vercel.app"
+        }
+      ]
     },
     {
       "source": "/auth/google/:path*",
-      "destination": "https://viti-core-api-alexby2g.onrender.com/auth/google/:path*"
+      "destination": "https://viti-core-api-alexby2g.onrender.com/auth/google/:path*",
+      "has": [
+        {
+          "type": "host",
+          "value": "viti-frontend.vercel.app"
+        }
+      ]
     },
     {
       "source": "/sanctum/:path*",
-      "destination": "https://viti-core-api-alexby2g.onrender.com/sanctum/:path*"
+      "destination": "https://viti-core-api-alexby2g.onrender.com/sanctum/:path*",
+      "has": [
+        {
+          "type": "host",
+          "value": "viti-frontend.vercel.app"
+        }
+      ]
     },
     {
       "source": "/storage/:path*",
-      "destination": "https://viti-core-api-alexby2g.onrender.com/storage/:path*"
+      "destination": "https://viti-core-api-alexby2g.onrender.com/storage/:path*",
+      "has": [
+        {
+          "type": "host",
+          "value": "viti-frontend.vercel.app"
+        }
+      ]
+    },
+    {
+      "source": "/api/:path*",
+      "destination": "/sensaciones-qa-unavailable.json"
+    },
+    {
+      "source": "/auth/google/:path*",
+      "destination": "/sensaciones-qa-unavailable.json"
+    },
+    {
+      "source": "/sanctum/:path*",
+      "destination": "/sensaciones-qa-unavailable.json"
+    },
+    {
+      "source": "/storage/:path*",
+      "destination": "/sensaciones-qa-unavailable.json"
     },
     {
       "source": "/(.*)",
       "destination": "/index.html"
+    }
+  ],
+  "headers": [
+    {
+      "source": "/(.*)",
+      "missing": [
+        {
+          "type": "host",
+          "value": "viti-frontend.vercel.app"
+        }
+      ],
+      "headers": [
+        {
+          "key": "X-Robots-Tag",
+          "value": "noindex, nofollow"
+        }
+      ]
     }
   ]
 }
