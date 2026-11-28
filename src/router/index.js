@@ -6,6 +6,7 @@ import { useTenantStore } from '../stores/tenant'
 
 export default defineRouter(({ store }) => {
   const publicRoutes = [
+    { path:'/sensaciones/portafolio', name:'sensaciones-collections', component:()=>import('../pages/SensacionesCollectionsPage.vue'), meta:{publicLanding:true} },
     { path:'/sensaciones', name:'sensaciones-landing', component:()=>import('../pages/SensacionesLandingPage.vue'), meta:{publicLanding:true} },
     { path:'/viti', name:'viti-landing', component:() => import('../pages/VitiLandingPage.vue'), meta:{publicLanding:true} },
     { path:'/viti/planes', name:'viti-plans', component:() => import('../pages/VitiPlansPage.vue'), meta:{publicLanding:true} },
@@ -15,7 +16,7 @@ export default defineRouter(({ store }) => {
   ]
   const router = createRouter({
     history: createWebHistory(),
-    routes:[...publicRoutes, { path:'/sensaciones/studio', name:'sensaciones-studio', component:()=>import('../pages/SensacionesStudioPage.vue'), meta:{requiresAuth:true,superAdminOnly:true,adminOnly:true} }, ...routes],
+    routes:[...publicRoutes, { path:'/sensaciones/studio/colecciones', name:'sensaciones-collections-studio', component:()=>import('../pages/SensacionesCollectionsStudioPage.vue'), meta:{requiresAuth:true,superAdminOnly:true,adminOnly:true} }, { path:'/sensaciones/studio', name:'sensaciones-studio', component:()=>import('../pages/SensacionesStudioPage.vue'), meta:{requiresAuth:true,superAdminOnly:true,adminOnly:true} }, ...routes],
     scrollBehavior(to, from, savedPosition) {
       if (to.hash) return { el:to.hash, behavior:'smooth' }
       const alwaysTop = to.meta.publicLanding || ['public-application','client-register','login','viti-demo'].includes(to.name)
