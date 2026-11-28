@@ -5,6 +5,7 @@ import { useAuthStore } from '../stores/auth'
 import { useTenantStore } from '../stores/tenant'
 
 export default defineRouter(({ store }) => {
+  const offlinePreview = import.meta.env.VITE_SENSACIONES_OFFLINE_PREVIEW === '1'
   const publicRoutes = [
     { path:'/sensaciones/portafolio', name:'sensaciones-collections', component:()=>import('../pages/SensacionesCollectionsPage.vue'), meta:{publicLanding:true} },
     { path:'/sensaciones', name:'sensaciones-landing', component:()=>import('../pages/SensacionesLandingPage.vue'), meta:{publicLanding:true} },
@@ -68,6 +69,7 @@ export default defineRouter(({ store }) => {
   }
 
   router.beforeEach(async (to, from) => {
+    if (offlinePreview && !['sensaciones-landing','sensaciones-collections'].includes(to.name)) return { name:'sensaciones-landing' }
     if (to.meta.publicLanding || to.name === 'viti-landing' || to.name === 'viti-plans') return true
 
     const auth = useAuthStore(store)
