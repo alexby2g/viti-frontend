@@ -2,6 +2,7 @@
 import { computed, onMounted, onBeforeUnmount, ref } from 'vue'
 import Agr006FloatingAssistant from './components/agr/Agr006FloatingAssistantV2.vue'
 import { useRoute } from 'vue-router'
+import SensacionesPublicHeader from './components/SensacionesPublicHeader.vue'
 
 const STORAGE_KEY = 'viti006.enabled'
 const route = useRoute()
@@ -42,7 +43,8 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <router-view />
+  <SensacionesPublicHeader v-if="route.meta.sensacionesPublic" />
+  <router-view v-slot="{ Component }"><component :is="Component" :key="route.meta.sensacionesPublic ? route.path : undefined" /></router-view>
 
   <Agr006FloatingAssistant v-if="showAssistant" />
 
