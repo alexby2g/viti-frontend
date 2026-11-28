@@ -32,13 +32,13 @@ export const useBrandingStore = defineStore('branding', {
     },
     apply() {
       const root = document.documentElement
-      root.style.setProperty('--q-primary', this.primary_color)
+      root.style.setProperty('--q-primary', '#E95E20')
       root.style.setProperty('--q-secondary', this.secondary_color)
       root.style.setProperty('--q-accent', this.accent_color)
       root.style.setProperty('--q-dark', this.dark_color)
-      root.style.setProperty('--viti-drawer-live', this.drawer_color)
+      root.style.setProperty('--viti-drawer-live', '#18181d')
       root.style.setProperty('--viti-primary-live', this.primary_color)
-      document.title = `${this.product_name} · Plataforma de sistemas`
+      document.title = 'Sensaciones Digital · Gestión'
     },
     async load(force = false) {
       if (this.loaded && !force) return
