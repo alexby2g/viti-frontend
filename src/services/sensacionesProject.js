@@ -135,3 +135,23 @@ export function keyPixels(data,key,threshold=.3,softness=.15){
   }
   return data
 }
+
+export function normalizeMontage(input){
+  if(!Array.isArray(input)||!input.length||input.length>12)throw new Error('Selecciona entre 1 y 12 clips.')
+  const clips=input.map(c=>{
+    if(!c||!c.file||!Number.isFinite(c.file.size)||c.file.size<=0||c.file.size>262144000||!['video/mp4','video/webm'].includes(c.file.type))throw new Error('Cada archivo debe ser MP4 o WebM y pesar hasta 250 MiB.')
+    if(!Number.isFinite(c.duration)||!Number.isFinite(c.start)||!Number.isFinite(c.end)||c.start<0||c.end>c.duration+.02||c.end-c.start<.5)throw new Error('Recorte de clip inválido.')
+    return {file:c.file,duration:c.duration,start:c.start,end:Math.min(c.duration,c.end)}
+  })
+  const total=clips.reduce((n,c)=>n+c.end-c.start,0)
+  if(total>300.001)throw new Error('El montaje no puede superar cinco minutos.')
+  return clips
+}
+export function moveMontage(clips,from,to){
+  if(!Number.isInteger(from)||!Number.isInteger(to)||from<0||to<0||from>=clips.length||to>=clips.length)return clips
+  const next=[...clips];const [clip]=next.splice(from,1);next.splice(to,0,clip);return next
+}
+export function resizeMontageClip(clip,key,value){
+  if(!['start','end'].includes(key)||!Number.isFinite(value))return clip
+  return {...clip,[key]:key==='start'?Math.max(0,Math.min(clip.end-.5,value)):Math.min(clip.duration,Math.max(clip.start+.5,value))}
+}

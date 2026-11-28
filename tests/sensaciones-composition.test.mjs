@@ -4,7 +4,7 @@ import { readFile } from 'node:fs/promises'
 // Load the pure ESM helper even if the root package is CommonJS.
 const projectSource=await readFile(new URL('../src/services/sensacionesProject.js',import.meta.url),'utf8')
 const projectUrl='data:text/javascript;base64,'+Buffer.from(projectSource).toString('base64')
-const {parseSrt,captionAt,titleAlpha,projectSettings,cleanLayers,layerTransform,animatedLayer,snapPosition,cleanEffects,effectActive,keyPixels}=await import(projectUrl)
+const {parseSrt,captionAt,titleAlpha,projectSettings,cleanLayers,layerTransform,animatedLayer,snapPosition,cleanEffects,effectActive,keyPixels,normalizeMontage,moveMontage,resizeMontageClip}=await import(projectUrl)
 let source=await readFile(new URL('../src/services/sensacionesComposition.js',import.meta.url),'utf8')
 source=source.replace("'./sensacionesProject'",JSON.stringify(projectUrl))
 const {outputSize,normalizeSegments,drawComposition,drawLayers,hitLayer,layerActive,secondaryTime}=await import('data:text/javascript;base64,'+Buffer.from(source).toString('base64'))
@@ -145,4 +145,31 @@ test('chroma edge softness preserves partially transparent pixels',()=>{
   const pixels=new Uint8ClampedArray([0,96,0,255])
   keyPixels(pixels,'green',.3,.15)
   assert.ok(pixels[3]>0&&pixels[3]<255);assert.ok(pixels[1]<96)
+})
+
+test('multi-file montage preserves order, file identity and independent trim ranges',()=>{
+  const a={name:'a.mp4',size:1000,type:'video/mp4'},b={name:'b.webm',size:1000,type:'video/webm'}
+  const clips=[{file:a,duration:5,start:1,end:3},{file:b,duration:10,start:4,end:7}]
+  const valid=normalizeMontage(clips)
+  assert.equal(valid[0].file,a);assert.equal(valid[1].file,b)
+  assert.deepEqual(valid.map(c=>c.end-c.start),[2,3])
+  assert.equal(moveMontage(valid,0,1)[0].file,b)
+  assert.equal(valid[0].file,a)
+})
+test('montage rejects unsupported files, invalid trims and duration overflow',()=>{
+  const file={size:1024,type:'video/mp4'},clip={file,duration:400,start:0,end:200}
+  assert.throws(()=>normalizeMontage([clip,clip]))
+  assert.throws(()=>normalizeMontage([{...clip,end:.2}]))
+  assert.throws(()=>normalizeMontage([{...clip,end:401}]))
+  assert.throws(()=>normalizeMontage([{...clip,file:{size:1024,type:'image/png'}}]))
+  assert.throws(()=>normalizeMontage([{...clip,file:{size:262144001,type:'video/mp4'}}]))
+  assert.throws(()=>normalizeMontage([]))
+})
+test('direct trim handles cannot reverse a clip or extend beyond source',()=>{
+  const c={duration:10,start:2,end:6}
+  assert.equal(resizeMontageClip(c,'start',99).start,5.5)
+  assert.equal(resizeMontageClip(c,'start',-2).start,0)
+  assert.equal(resizeMontageClip(c,'end',-2).end,2.5)
+  assert.equal(resizeMontageClip(c,'end',99).end,10)
+  assert.equal(c.start,2);assert.equal(c.end,6)
 })
