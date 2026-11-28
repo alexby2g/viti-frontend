@@ -44,7 +44,7 @@ export function projectSettings(raw){
   const total=clips.length?clips.reduce((n,c)=>n+c.end-c.start,0):selection.end-selection.start
   if(clips.length&&total>300)throw new Error('Secuencia demasiado larga.')
   const captions=cleanText(s.captions,65536);parseSrt(captions)
-  return {selection,clips,speed,captions,height:choice(s.height,[720,1080],720),silent:s.silent===true,volume:clamp(s.volume,0,1,1),transition:choice(s.transition,['cut','fade'],'cut'),formatMode:choice(s.formatMode,['original','wide','vertical','square'],'original'),fit:choice(s.fit,['contain','cover'],'contain'),filter:choice(s.filter,['normal','cinema','warm','mono','vivid'],'normal'),brightness:clamp(s.brightness,.5,1.5,1),contrast:clamp(s.contrast,.5,1.5,1),saturation:clamp(s.saturation,0,2,1),hue:clamp(s.hue,-180,180,0),overlayTitle:cleanText(s.overlayTitle),subtitle:cleanText(s.subtitle),titleAnimation:choice(s.titleAnimation,['none','fade','slide'],'none'),logoOpacity:clamp(s.logoOpacity,.1,1,.8),musicVolume:clamp(s.musicVolume,0,1,.25),titleX:clamp(s.titleX,0,1,.5),titleY:clamp(s.titleY,0,1,.16),titleSize:clamp(s.titleSize,.02,.3,.05),captionX:clamp(s.captionX,0,1,.5),captionY:clamp(s.captionY,0,1,.84),captionSize:clamp(s.captionSize,.02,.3,.04),layers:cleanLayers(s.layers)}
+  return {selection,clips,speed,captions,height:choice(s.height,[720,1080],720),silent:s.silent===true,volume:clamp(s.volume,0,1,1),transition:choice(s.transition,['cut','fade'],'cut'),formatMode:choice(s.formatMode,['original','wide','vertical','square'],'original'),fit:choice(s.fit,['contain','cover'],'contain'),filter:choice(s.filter,['normal','cinema','warm','mono','vivid'],'normal'),brightness:clamp(s.brightness,.5,1.5,1),contrast:clamp(s.contrast,.5,1.5,1),saturation:clamp(s.saturation,0,2,1),hue:clamp(s.hue,-180,180,0),overlayTitle:cleanText(s.overlayTitle),subtitle:cleanText(s.subtitle),titleAnimation:choice(s.titleAnimation,['none','fade','slide'],'none'),logoOpacity:clamp(s.logoOpacity,.1,1,.8),musicVolume:clamp(s.musicVolume,0,1,.25),titleX:clamp(s.titleX,0,1,.5),titleY:clamp(s.titleY,0,1,.16),titleSize:clamp(s.titleSize,.02,.3,.05),captionX:clamp(s.captionX,0,1,.5),captionY:clamp(s.captionY,0,1,.84),captionSize:clamp(s.captionSize,.02,.3,.04),layers:cleanLayers(s.layers),effects:cleanEffects(s.effects)}
 }
 
 export const layerLimit=12
@@ -117,4 +117,21 @@ export function snapPosition(value,enabled=true){
   if(!enabled)return {value,guide:null}
   const targets=[.05,.5,.95],target=targets.find(t=>Math.abs(value-t)<=.015)
   return target===undefined?{value,guide:null}:{value:target,guide:target}
+}
+
+export function cleanEffects(raw={}){
+  const p=raw?.pip||{},b=raw?.blur||{}
+  return {pip:{enabled:p.enabled===true,x:clamp(p.x,0,1,.78),y:clamp(p.y,0,1,.25),size:clamp(p.size,.1,1,.35),opacity:clamp(p.opacity,0,1,1),start:clamp(p.start,0,300,0),end:clamp(p.end,0,300,300),mask:choice(p.mask,['rectangle','circle'],'rectangle'),key:choice(p.key,['none','green','blue'],'none'),threshold:clamp(p.threshold,0,1,.3),softness:clamp(p.softness,.02,.5,.15)},blur:{enabled:b.enabled===true,x:clamp(b.x,0,1,.5),y:clamp(b.y,0,1,.5),width:clamp(b.width,.05,1,.25),height:clamp(b.height,.05,1,.25),strength:clamp(b.strength,2,40,15),mask:choice(b.mask,['rectangle','circle'],'rectangle'),start:clamp(b.start,0,300,0),end:clamp(b.end,0,300,300)}}
+}
+export function effectActive(effect,time){return !!effect?.enabled&&time>=effect.start&&time<effect.end}
+export function keyPixels(data,key,threshold=.3,softness=.15){
+  if(key!=='green'&&key!=='blue')return data
+  for(let i=0;i<data.length;i+=4){
+    const r=data[i],g=data[i+1],b=data[i+2],dominant=key==='green'?g:b,other=key==='green'?b:g
+    const score=(dominant-Math.max(r,other))/255
+    const alpha=1-Math.max(0,Math.min(1,(score-threshold)/Math.max(.02,softness)))
+    data[i+3]=Math.round(data[i+3]*alpha)
+    if(alpha<1){if(key==='green')data[i+1]=Math.round(g*alpha+Math.max(r,b)*(1-alpha));else data[i+2]=Math.round(b*alpha+Math.max(r,g)*(1-alpha))}
+  }
+  return data
 }
