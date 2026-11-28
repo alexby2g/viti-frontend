@@ -4,10 +4,10 @@ import { readFile } from 'node:fs/promises'
 // Load the pure ESM helper even if the root package is CommonJS.
 const projectSource=await readFile(new URL('../src/services/sensacionesProject.js',import.meta.url),'utf8')
 const projectUrl='data:text/javascript;base64,'+Buffer.from(projectSource).toString('base64')
-const {parseSrt,captionAt,titleAlpha,projectSettings,cleanLayers,layerTransform,animatedLayer,snapPosition}=await import(projectUrl)
+const {parseSrt,captionAt,titleAlpha,projectSettings,cleanLayers,layerTransform,animatedLayer,snapPosition,cleanEffects,effectActive,keyPixels}=await import(projectUrl)
 let source=await readFile(new URL('../src/services/sensacionesComposition.js',import.meta.url),'utf8')
 source=source.replace("'./sensacionesProject'",JSON.stringify(projectUrl))
-const {outputSize,normalizeSegments,drawComposition,drawLayers,hitLayer,layerActive}=await import('data:text/javascript;base64,'+Buffer.from(source).toString('base64'))
+const {outputSize,normalizeSegments,drawComposition,drawLayers,hitLayer,layerActive,secondaryTime}=await import('data:text/javascript;base64,'+Buffer.from(source).toString('base64'))
 test('formats are bounded, even and preserve orientation',()=>{
   assert.deepEqual(outputSize(1920,1080,720,'wide'),[1280,720])
   assert.deepEqual(outputSize(1920,1080,720,'vertical'),[406,720])
@@ -125,4 +125,24 @@ test('keyframes reject duplicates and invalid times',()=>{
   assert.throws(()=>cleanLayers([{...l,keyframes:[{time:301}]}]))
   assert.deepEqual(snapPosition(.493),{value:.5,guide:.5})
   assert.deepEqual(snapPosition(.493,false),{value:.493,guide:null})
+})
+
+test('composition settings remain bounded and old projects keep effects disabled',()=>{
+  const base=cleanEffects()
+  assert.equal(base.pip.enabled,false);assert.equal(base.blur.enabled,false)
+  const e=cleanEffects({pip:{enabled:true,x:2,y:-2,key:'green',start:2,end:5,mask:'circle'},blur:{enabled:true,strength:100}})
+  assert.equal(e.pip.x,1);assert.equal(e.pip.y,0);assert.equal(e.pip.mask,'circle');assert.equal(e.blur.strength,40)
+  assert.equal(effectActive(e.pip,1),false);assert.equal(effectActive(e.pip,2),true);assert.equal(effectActive(e.pip,5),false)
+  assert.equal(secondaryTime({duration:2},e.pip,3),1);assert.equal(secondaryTime({duration:2},e.pip,4),null)
+})
+test('chroma removes the dominant key color while preserving neutral and opposite colors',()=>{
+  const input=new Uint8ClampedArray([0,255,0,255,255,0,0,255,128,128,128,255,0,0,255,128])
+  keyPixels(input,'green',.3,.15)
+  assert.equal(input[3],0);assert.equal(input[7],255);assert.equal(input[11],255);assert.equal(input[15],128)
+  keyPixels(input,'blue',.3,.15);assert.equal(input[15],0)
+})
+test('chroma edge softness preserves partially transparent pixels',()=>{
+  const pixels=new Uint8ClampedArray([0,96,0,255])
+  keyPixels(pixels,'green',.3,.15)
+  assert.ok(pixels[3]>0&&pixels[3]<255);assert.ok(pixels[1]<96)
 })
