@@ -60,6 +60,10 @@ export function cleanLayers(input){
     const start=clamp(l.start,0,300,0),end=clamp(l.end,0,300,300)
     if(end<=start)throw new Error('El final de una capa debe ser posterior al inicio.')
     const result={id:l.id,type:l.type,name:cleanText(l.name,80)||'Capa',x:clamp(l.x,0,1,.5),y:clamp(l.y,0,1,.5),size:clamp(l.size,.02,1,l.type==='image'?.25:.07),rotation:clamp(l.rotation,-180,180,0),opacity:clamp(l.opacity,0,1,1),start,end}
+    result.enter=choice(l.enter,['none','fade','slide','zoom'],'none')
+    result.exit=choice(l.exit,['none','fade','slide','zoom'],'none')
+    result.animationSeconds=clamp(l.animationSeconds,.1,3,.5)
+    result.keyframes=cleanKeyframes(l.keyframes,result)
     if(l.type==='image'){
       if(++images>imageLayerLimit||typeof l.data!=='string'||l.data.length>1398200||!/^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/]+={0,2}$/.test(l.data))throw new Error('Imagen de capa inválida o demasiado grande.')
       result.data=l.data
@@ -73,4 +77,44 @@ export function cleanLayers(input){
     }
     return result
   })
+}
+
+export const transformKeys=['x','y','size','rotation','opacity']
+export function cleanKeyframes(input,base){
+  if(input==null)return []
+  if(!Array.isArray(input)||input.length>24)throw new Error('Máximo 24 fotogramas clave por capa.')
+  const seen=new Set()
+  return input.map(k=>{
+    if(!k||typeof k.time!=='number'||!Number.isFinite(k.time)||k.time<0||k.time>300)throw new Error('Tiempo de fotograma clave inválido.')
+    const time=Math.round(k.time*1000)/1000
+    if(seen.has(time))throw new Error('Fotogramas clave duplicados.')
+    seen.add(time)
+    return {time,x:clamp(k.x,0,1,base.x),y:clamp(k.y,0,1,base.y),size:clamp(k.size,.02,1,base.size),rotation:clamp(k.rotation,-180,180,base.rotation),opacity:clamp(k.opacity,0,1,base.opacity)}
+  }).sort((a,b)=>a.time-b.time)
+}
+export function layerTransform(layer,time){
+  const keys=layer.keyframes||[]
+  if(!keys.length)return Object.fromEntries(transformKeys.map(k=>[k,layer[k]]))
+  if(time<=keys[0].time)return Object.fromEntries(transformKeys.map(k=>[k,keys[0][k]]))
+  if(time>=keys[keys.length-1].time)return Object.fromEntries(transformKeys.map(k=>[k,keys[keys.length-1][k]]))
+  const i=keys.findIndex(k=>k.time>=time),a=keys[i-1],b=keys[i],t=(time-a.time)/(b.time-a.time)
+  return Object.fromEntries(transformKeys.map(k=>[k,a[k]+(b[k]-a[k])*t]))
+}
+export function animatedLayer(layer,time){
+  const pose={...layer,...layerTransform(layer,time)}
+  const edge=Math.min(layer.animationSeconds||.5,(layer.end-layer.start)/2)
+  if(edge<=0)return pose
+  const apply=(mode,f)=>{
+    const t=Math.min(1,Math.max(0,f)),e=t*t*(3-2*t)
+    if(mode==='fade')pose.opacity*=e
+    if(mode==='slide'){pose.x-=(1-e)*.22;pose.opacity*=e}
+    if(mode==='zoom'){pose.size*=.15+.85*e;pose.opacity*=e}
+  }
+  apply(layer.enter,(time-layer.start)/edge);apply(layer.exit,(layer.end-time)/edge)
+  return pose
+}
+export function snapPosition(value,enabled=true){
+  if(!enabled)return {value,guide:null}
+  const targets=[.05,.5,.95],target=targets.find(t=>Math.abs(value-t)<=.015)
+  return target===undefined?{value,guide:null}:{value:target,guide:target}
 }

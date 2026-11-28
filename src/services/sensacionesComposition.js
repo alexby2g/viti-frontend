@@ -1,4 +1,4 @@
-import {captionAt,titleAlpha} from './sensacionesProject'
+import {captionAt,titleAlpha,animatedLayer} from './sensacionesProject'
 // Shared canvas compositor. All inputs are local files; no remote fonts or assets.
 export function outputSize(width,height,quality,format){
   const limit=quality===1080?1080:720
@@ -71,8 +71,10 @@ export function layerBox(ctx,layer,image){
   return {width,height:lineHeight*lines.length+base*.025,lines,lineHeight}
 }
 export function hitLayer(ctx,layers,images,time,x,y){
-  for(const layer of [...(layers||[])].reverse()){
-    if(!layerActive(layer,time)||layer.opacity===0)continue
+  for(const source of [...(layers||[])].reverse()){
+    if(!layerActive(source,time))continue
+    const layer=animatedLayer(source,time)
+    if(layer.opacity===0)continue
     const box=layerBox(ctx,layer,images?.get(layer.id));if(!box)continue
     const dx=x-layer.x*ctx.canvas.width,dy=y-layer.y*ctx.canvas.height,a=layer.rotation*Math.PI/180
     const localX=dx*Math.cos(a)+dy*Math.sin(a),localY=-dx*Math.sin(a)+dy*Math.cos(a)
@@ -81,8 +83,10 @@ export function hitLayer(ctx,layers,images,time,x,y){
   return null
 }
 export function drawLayers(ctx,layers=[],images,time){
-  for(const layer of layers||[]){
-    if(!layerActive(layer,time)||layer.opacity<=0)continue
+  for(const source of layers||[]){
+    if(!layerActive(source,time))continue
+    const layer=animatedLayer(source,time)
+    if(layer.opacity<=0)continue
     const image=images?.get(layer.id),box=layerBox(ctx,layer,image)
     if(!box)continue
     const base=Math.min(ctx.canvas.width,ctx.canvas.height)
