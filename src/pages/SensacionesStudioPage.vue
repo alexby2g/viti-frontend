@@ -33,6 +33,8 @@
           <q-input dark outlined v-model="title" label="Título" maxlength="150" :rules="[v=>!!v?.trim()||'Escribe un título']"/>
           <q-input dark outlined v-model="description" label="Descripción" type="textarea" maxlength="2000"/>
           <q-file dark outlined v-model="file" :label="fileLabel" accept=".jpg,.jpeg,.png,.webp,.mp4,.webm" :max-file-size="overview?.max_video_bytes||3145728" @rejected="error='Archivo no admitido o demasiado grande.'"/>
+          <q-file v-if="file?.type?.startsWith('video/')" dark outlined v-model="posterFile" label="Portada personalizada (opcional, hasta 1 MiB)" accept=".jpg,.jpeg,.png,.webp" :max-file-size="1048576" clearable @rejected="error='Portada no admitida o mayor a 1 MiB.'"/>
+          <p v-if="file?.type?.startsWith('video/')">Si no eliges una portada, se intentará capturar un fotograma automáticamente.</p>
           <q-btn color="deep-orange" type="submit" label="Guardar borrador" no-caps :loading="busy" :disable="!overview?.uploads_available||!file||!title.trim()"/>
         </q-form>
         <q-linear-progress v-if="busy" :value="progress" color="deep-orange" class="q-my-md"/>
@@ -49,26 +51,30 @@
         <p v-else-if="overview?.ready&&!items.length">No hay publicaciones que coincidan. Crea tu primer trabajo.</p>
         <div class="media-grid">
           <article v-for="item in items" :key="item.id" class="media">
-            <button class="thumbnail" @click="openPreview(item)" :aria-label="'Ver '+item.title"><q-icon :name="item.kind==='video'?'play_circle':'image'" size="46px"/><span>Vista previa</span></button>
-            <div class="media-copy"><span class="state" :class="{live:item.published}">{{item.published?'Publicado':'Borrador'}}</span><h3>{{item.title}}</h3><p>{{item.description||'Sin descripción'}}</p><div class="media-actions"><q-btn flat dense color="deep-orange" icon="edit" label="Editar" no-caps @click="openEdit(item)"/><q-btn outline dense color="deep-orange" :label="item.published?'Retirar':'Publicar'" no-caps :disable="busy" @click="publish(item)"/></div></div>
+            <button class="thumbnail" @click="openPreview(item)" :aria-label="'Ver '+item.title"><img v-if="item.poster_url||item.kind==='photo'" :src="mediaUrl(item.poster_url||item.url)" alt="" loading="lazy"/><q-icon :name="item.kind==='video'?'play_circle':'image'" size="38px"/><span>Vista previa</span></button>
+            <div class="media-copy"><span class="state" :class="{live:item.published}">{{item.published?'Publicado':'Borrador'}}</span><h3>{{item.title}}</h3><p>{{item.description||'Sin descripción'}}</p><div class="media-actions"><q-btn flat dense color="deep-orange" icon="edit" label="Editar" no-caps @click="openEdit(item)"/><q-btn v-if="item.kind==='video'" flat dense color="deep-orange" icon="image" label="Portada" no-caps @click="openPoster(item)"/><q-btn outline dense color="deep-orange" :label="item.published?'Retirar':'Publicar'" no-caps :disable="busy" @click="publish(item)"/></div></div>
           </article>
         </div>
         <q-pagination v-if="last>1" v-model="page" :max="last" color="deep-orange" @update:model-value="load"/>
       </section>
       <q-dialog v-model="editing"><q-card dark class="dialog"><q-card-section><h2>Editar publicación</h2></q-card-section><q-form @submit="saveEdit"><q-card-section class="form"><q-input dark outlined v-model="editTitle" label="Título" maxlength="150" :rules="[v=>!!v?.trim()||'Escribe un título']"/><q-input dark outlined v-model="editDescription" label="Descripción" type="textarea" maxlength="2000"/></q-card-section><q-card-actions align="right"><q-btn flat label="Cancelar" v-close-popup/><q-btn color="deep-orange" label="Guardar" type="submit" :loading="busy"/></q-card-actions></q-form></q-card></q-dialog>
-      <q-dialog :model-value="!!preview" @update:model-value="v=>{if(!v)preview=null}" maximized><div class="preview"><q-btn flat color="white" label="Cerrar" @click="preview=null"/><video v-if="preview?.kind==='video'" :src="mediaUrl(preview.url)" controls playsinline preload="metadata"/><img v-else-if="preview" :src="mediaUrl(preview.url)" :alt="preview.title"/><p v-if="preview">{{preview.title}}</p></div></q-dialog>
+      <q-dialog v-model="posterDialog"><q-card dark class="dialog"><q-card-section><h2>Portada del video</h2><p>Sube una imagen o selecciona el archivo original para capturar un fotograma.</p></q-card-section><q-card-section class="form"><q-file dark outlined v-model="replacementPoster" label="Imagen (hasta 1 MiB)" accept=".jpg,.jpeg,.png,.webp" :max-file-size="1048576" clearable/><q-file dark outlined v-model="originalVideo" label="Video original (captura local)" accept=".mp4,.webm" clearable/><p v-if="posterError">{{posterError}}</p></q-card-section><q-card-actions align="right"><q-btn flat label="Cancelar" v-close-popup :disable="busy"/><q-btn color="deep-orange" label="Guardar portada" :disable="!replacementPoster&&!originalVideo" :loading="busy" @click="replacePoster"/></q-card-actions></q-card></q-dialog>
+      <q-dialog :model-value="!!preview" @update:model-value="v=>{if(!v)preview=null}" maximized><div class="preview"><q-btn flat color="white" label="Cerrar" @click="preview=null"/><video v-if="preview?.kind==='video'" :src="mediaUrl(preview.url)" :poster="mediaUrl(preview.poster_url)" controls playsinline preload="metadata"/><img v-else-if="preview" :src="mediaUrl(preview.url)" :alt="preview.title"/><p v-if="preview">{{preview.title}}</p></div></q-dialog>
     </div>
   </main>
 </template>
 <script setup>
-import {ref,computed,onMounted} from 'vue'
+import {ref,computed,onMounted,watch} from 'vue'
 import {useRouter} from 'vue-router'
 import {useAuthStore} from '../stores/auth'
 import axios from 'axios'
 import {api,initCsrf} from '../boot/axios'
 import {mediaUrl} from '../services/sensacionesMedia'
+import {capturePoster} from '../services/sensacionesPoster'
 const router=useRouter(),auth=useAuthStore()
 const overview=ref(null),title=ref(''),description=ref(''),file=ref(null),items=ref([]),error=ref(''),notice=ref(''),busy=ref(false),loading=ref(false),page=ref(1),last=ref(1),progress=ref(0)
+const posterFile=ref(null),posterDialog=ref(false),replacementPoster=ref(null),originalVideo=ref(null),posterTarget=ref(null),posterError=ref('')
+watch(file,()=>{posterFile.value=null})
 const search=ref(''),kind=ref(''),status=ref(''),editing=ref(false),editId=ref(null),editTitle=ref(''),editDescription=ref(''),preview=ref(null)
 const kinds=[{label:'Todos',value:''},{label:'Fotografías',value:'photo'},{label:'Videos',value:'video'}]
 const statuses=[{label:'Todos',value:''},{label:'Publicados',value:'published'},{label:'Borradores',value:'draft'}]
@@ -97,20 +103,29 @@ async function upload(){
     const max=selected.type.startsWith('image/')?overview.value.max_photo_bytes:overview.value.max_video_bytes
     if(selected.size>max)throw new Error('El archivo supera el límite permitido.')
     await initCsrf()
+    let id,poster=null,posterWarning=''
+    if(selected.type.startsWith('video/')){
+      poster=posterFile.value
+      if(!poster)try{poster=await capturePoster(selected)}catch{posterWarning='No se pudo capturar la portada automáticamente. Puedes añadirla desde Biblioteca.'}
+    }
     if(selected.size>3145728){
       const {data}=await api.post('/sensaciones/studio/uploads',{title:title.value,description:description.value,mime:selected.type,bytes:selected.size})
-      await axios.put(data.url,selected,{headers:data.headers,withCredentials:false,withXSRFToken:false,timeout:0,onUploadProgress:e=>{progress.value=e.total?e.loaded/e.total:0}})
-      await api.post('/sensaciones/studio/uploads/'+data.id+'/finish')
+      try{await axios.put(data.url,selected,{headers:data.headers,withCredentials:false,withXSRFToken:false,timeout:0,onUploadProgress:e=>{progress.value=e.total?e.loaded/e.total:0}})}catch{throw new Error('R2 rechazó la carga directa o el navegador bloqueó la conexión (CORS). No se publicó el video.')}
+      id=(await api.post('/sensaciones/studio/uploads/'+data.id+'/finish')).data.id
     }else{
       const form=new FormData();form.append('title',title.value);form.append('description',description.value);form.append('file',selected)
-      await api.post('/sensaciones/studio/media',form,{onUploadProgress:e=>{progress.value=e.total?e.loaded/e.total:0}})
+      id=(await api.post('/sensaciones/studio/media',form,{onUploadProgress:e=>{progress.value=e.total?e.loaded/e.total:0}})).data.id
     }
-    title.value='';description.value='';file.value=null;page.value=1;notice.value='Borrador guardado.';await refresh()
+    if(poster&&id)try{await savePoster(id,poster)}catch{posterWarning='Video guardado; no se pudo guardar la portada. Añádela desde Biblioteca.'}
+    title.value='';description.value='';file.value=null;posterFile.value=null;page.value=1;notice.value='Borrador guardado. '+posterWarning;await refresh()
   }catch(e){error.value=e.response?.data?.message||e.message||'No se pudo cargar.'}finally{busy.value=false}
 }
 async function publish(item){if(busy.value)return;busy.value=true;error.value='';notice.value='';try{await initCsrf();await api.patch('/sensaciones/studio/media/'+item.id,{published:!item.published});notice.value=item.published?'Publicación retirada.':'Publicación visible.';await refresh()}catch(e){fail(e)}finally{busy.value=false}}
 function openEdit(item){editId.value=item.id;editTitle.value=item.title;editDescription.value=item.description||'';editing.value=true}
 async function saveEdit(){if(busy.value)return;busy.value=true;error.value='';try{await initCsrf();await api.patch('/sensaciones/studio/media/'+editId.value+'/metadata',{title:editTitle.value,description:editDescription.value});editing.value=false;notice.value='Cambios guardados.';await refresh()}catch(e){fail(e)}finally{busy.value=false}}
+async function savePoster(id,image){const data=new FormData();data.append('poster',image);await api.post('/sensaciones/studio/media/'+id+'/poster',data)}
+function openPoster(item){posterTarget.value=item.id;replacementPoster.value=null;originalVideo.value=null;posterError.value='';posterDialog.value=true}
+async function replacePoster(){if(busy.value)return;busy.value=true;posterError.value='';try{const image=replacementPoster.value||await capturePoster(originalVideo.value);await initCsrf();await savePoster(posterTarget.value,image);posterDialog.value=false;notice.value='Portada guardada.';await refresh()}catch{posterError.value='No se pudo guardar la portada. Prueba una imagen JPG de menos de 1 MiB.'}finally{busy.value=false}}
 function openPreview(item){preview.value=item}
 onMounted(refresh)
 </script>
@@ -119,4 +134,5 @@ onMounted(refresh)
 .rail .legacy-link{border:1px solid #ffffff20;margin-top:4px;align-items:center}.legacy-link span{flex:1}.legacy-link small{display:block;font-size:10px;color:#aaa;margin-top:4px}
 .rail .brand{display:grid!important;gap:6px}.rail .brand img{width:100%;max-width:205px;height:auto}.rail .brand small{letter-spacing:.16em}
 .health-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,220px),1fr));gap:10px}.health-item{display:flex;align-items:flex-start;gap:10px;padding:13px;background:#222229;border-radius:9px}.health-item strong{display:block;font-size:13px}.health-item small{display:block;margin-top:4px;color:#b8b8bd}.table-list{display:grid;gap:7px;padding:12px;color:#ccc;font-size:13px;overflow-wrap:anywhere}.health-note{font-size:12px}
+.studio .media-grid{grid-template-columns:repeat(auto-fill,minmax(min(100%,260px),1fr))}.thumbnail{position:relative;overflow:hidden;isolation:isolate}.thumbnail img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:-2}.thumbnail:has(img)::before{content:'';position:absolute;inset:0;background:#0005;z-index:-1}.thumbnail .q-icon,.thumbnail span{filter:drop-shadow(0 1px 4px #000)}.media-actions{flex-wrap:wrap}
 </style>
