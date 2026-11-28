@@ -4,11 +4,13 @@ import axios from 'axios'
 const isDevelopment = import.meta.env.DEV
 const baseURL = import.meta.env.VITE_API_URL || (isDevelopment ? 'http://localhost:8000/api/v1' : '/api/v1')
 const backendRoot = baseURL.replace(/\/api\/v1\/?$/, '')
+const offlinePreview = import.meta.env.VITE_SENSACIONES_OFFLINE_PREVIEW === '1'
+const previewError = () => new axios.CanceledError('Vista previa sin backend de pruebas configurado.')
 const authRequestTimeout = 30000
 const backendWakeTimeout = 75000
 
 export const api = axios.create({ baseURL, withCredentials: true, withXSRFToken: true })
-export const initCsrf = () => axios.get(`${backendRoot}/sanctum/csrf-cookie`, {
+export const initCsrf = () => offlinePreview ? Promise.reject(previewError()) : axios.get(`${backendRoot}/sanctum/csrf-cookie`, {
   withCredentials: true,
   timeout: authRequestTimeout,
 })
@@ -46,6 +48,7 @@ function rememberTrace(trace, failed = false) {
 }
 
 export const warmBackend = () => {
+  if (offlinePreview) return Promise.reject(previewError())
   if (Date.now() - lastHealthyAt < 60000) return Promise.resolve(true)
   if (backendWakePromise) return backendWakePromise
 
@@ -63,6 +66,7 @@ export const warmBackend = () => {
 }
 
 api.interceptors.request.use(config => {
+  if (offlinePreview) throw previewError()
   const empresaId = localStorage.getItem('viti-empresa-id')
   if (empresaId) config.headers['X-VITI-Empresa'] = empresaId
 
@@ -127,7 +131,7 @@ api.interceptors.response.use(
       if (!message.includes(trace.requestId)) error.response.data.message = `${message} Código: ${trace.requestId}`
     }
 
-    if (!config || config.__vitiWakeRetry || !safeRead || !online || (!retryableStatus && !retryableNetwork)) {
+    if (offlinePreview || !config || config.__vitiWakeRetry || !safeRead || !online || (!retryableStatus && !retryableNetwork)) {
       return Promise.reject(error)
     }
 
