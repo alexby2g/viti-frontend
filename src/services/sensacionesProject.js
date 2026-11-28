@@ -44,7 +44,7 @@ export function projectSettings(raw){
   const total=clips.length?clips.reduce((n,c)=>n+c.end-c.start,0):selection.end-selection.start
   if(clips.length&&total>300)throw new Error('Secuencia demasiado larga.')
   const captions=cleanText(s.captions,65536);parseSrt(captions)
-  return {selection,clips,speed,captions,height:choice(s.height,[720,1080],720),silent:s.silent===true,volume:clamp(s.volume,0,1,1),transition:choice(s.transition,['cut','fade'],'cut'),formatMode:choice(s.formatMode,['original','wide','vertical','square'],'original'),fit:choice(s.fit,['contain','cover'],'contain'),filter:choice(s.filter,['normal','cinema','warm','mono','vivid'],'normal'),brightness:clamp(s.brightness,.5,1.5,1),contrast:clamp(s.contrast,.5,1.5,1),saturation:clamp(s.saturation,0,2,1),hue:clamp(s.hue,-180,180,0),overlayTitle:cleanText(s.overlayTitle),subtitle:cleanText(s.subtitle),titleAnimation:choice(s.titleAnimation,['none','fade','slide'],'none'),logoOpacity:clamp(s.logoOpacity,.1,1,.8),musicVolume:clamp(s.musicVolume,0,1,.25),titleX:clamp(s.titleX,0,1,.5),titleY:clamp(s.titleY,0,1,.16),titleSize:clamp(s.titleSize,.02,.3,.05),captionX:clamp(s.captionX,0,1,.5),captionY:clamp(s.captionY,0,1,.84),captionSize:clamp(s.captionSize,.02,.3,.04),layers:cleanLayers(s.layers),effects:cleanEffects(s.effects)}
+  return {selection,clips,speed,captions,height:choice(s.height,[720,1080],720),silent:s.silent===true,volume:clamp(s.volume,0,1,1),transition:choice(s.transition,['cut','fade'],'cut'),formatMode:choice(s.formatMode,['original','wide','vertical','square'],'original'),fit:choice(s.fit,['contain','cover'],'contain'),filter:choice(s.filter,['normal','cinema','warm','mono','vivid'],'normal'),brightness:clamp(s.brightness,.5,1.5,1),contrast:clamp(s.contrast,.5,1.5,1),saturation:clamp(s.saturation,0,2,1),hue:clamp(s.hue,-180,180,0),cameraZoom:clamp(s.cameraZoom,1,3,1),cameraX:clamp(s.cameraX,-1,1,0),cameraY:clamp(s.cameraY,-1,1,0),overlayTitle:cleanText(s.overlayTitle),subtitle:cleanText(s.subtitle),titleAnimation:choice(s.titleAnimation,['none','fade','slide'],'none'),logoOpacity:clamp(s.logoOpacity,.1,1,.8),musicVolume:clamp(s.musicVolume,0,1,.25),titleX:clamp(s.titleX,0,1,.5),titleY:clamp(s.titleY,0,1,.16),titleSize:clamp(s.titleSize,.02,.3,.05),captionX:clamp(s.captionX,0,1,.5),captionY:clamp(s.captionY,0,1,.84),captionSize:clamp(s.captionSize,.02,.3,.04),layers:cleanLayers(s.layers),effects:cleanEffects(s.effects)}
 }
 
 export const layerLimit=12
@@ -154,4 +154,20 @@ export function moveMontage(clips,from,to){
 export function resizeMontageClip(clip,key,value){
   if(!['start','end'].includes(key)||!Number.isFinite(value))return clip
   return {...clip,[key]:key==='start'?Math.max(0,Math.min(clip.end-.5,value)):Math.min(clip.duration,Math.max(clip.start+.5,value))}
+}
+
+export function montageProject(clips,settings={}){
+  const valid=normalizeMontage(clips)
+  return {format:'sensaciones-montage-v1',clips:valid.map(c=>({name:c.file.name,size:c.file.size,type:c.file.type,duration:c.duration,start:c.start,end:c.end})),settings:{quality:choice(settings.quality,[720,1080],720),formatMode:choice(settings.formatMode,['wide','vertical','square','original'],'wide'),transition:choice(settings.transition,['cut','fade'],'cut'),silent:settings.silent===true}}
+}
+export function restoreMontageProject(raw,available){
+  if(raw?.format!=='sensaciones-montage-v1'||!Array.isArray(raw.clips)||!raw.clips.length||raw.clips.length>12)throw new Error('Proyecto de montaje inválido.')
+  const clips=raw.clips.map(c=>{
+    if(!c||typeof c.name!=='string'||!Number.isFinite(c.duration))throw new Error('Referencia de archivo inválida.')
+    const match=available.find(a=>a.file.name===c.name&&a.file.size===c.size&&a.file.type===c.type&&Math.abs(a.duration-c.duration)<.1)
+    if(!match)throw new Error('Importa primero el archivo original: '+c.name.slice(0,150))
+    return {...match,start:c.start,end:c.end}
+  })
+  normalizeMontage(clips)
+  return {clips,settings:montageProject(clips,raw.settings||{}).settings}
 }

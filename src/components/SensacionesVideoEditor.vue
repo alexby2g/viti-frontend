@@ -1,10 +1,10 @@
 <template>
-  <q-card dark class="editor pro-workspace">
+  <q-card dark class="editor pro-workspace workflow-editor">
     <header class="editor-header">
       <div class="editor-brand"><div class="eyebrow">SENSACIONES / VIDEO LAB</div><h2>Editor de video</h2></div>
-      <div class="head-actions"><span v-if="duration" class="head-time">{{format(totalDuration)}} de salida</span><q-btn flat color="grey-4" icon="save" label="Proyecto" no-caps :disable="!duration||working" @click="activeTool='project'"/><q-btn unelevated color="deep-orange" icon="movie" label="Exportar" no-caps :disable="working||!supported||!duration||totalDuration<.5||totalDuration>300" @click="generate"/><q-btn flat round icon="close" aria-label="Cerrar editor" :disable="working" @click="$emit('close')"/></div>
+      <div class="head-actions"><q-btn v-if="montageCount" flat color="deep-orange" icon="arrow_back" :label="'Volver al montaje ( '+montageCount+' )'" no-caps :disable="working" @click="openMontage"/><span v-if="duration" class="head-time">{{format(totalDuration)}} de salida</span><q-btn flat color="grey-4" icon="save" label="Proyecto" no-caps :disable="!duration||working" @click="activeTool='project'"/><q-btn unelevated color="deep-orange" icon="movie" label="Exportar" no-caps :disable="working||!supported||!duration||totalDuration<.5||totalDuration>300" @click="generate"/><q-btn flat round icon="close" aria-label="Cerrar editor" :disable="working" @click="$emit('close')"/></div>
     </header>
-    <nav class="tool-tabs" aria-label="Herramientas de edición"><button v-for="tool in tools" :key="tool.id" :class="{active:activeTool===tool.id}" :aria-pressed="activeTool===tool.id" @click="activeTool=tool.id"><q-icon :name="tool.icon" size="20px"/>{{tool.label}}</button><button :disabled="working" @click="openMontage"><q-icon name="video_library" size="20px"/>Montaje múltiple</button></nav>
+    <div v-if="editingClipId||montageCount" class="workflow-strip"><q-icon name="video_library"/><span>{{editingClipId?'Editando un clip del montaje · exporta y aplica los cambios para sustituir su copia':'Montaje disponible · vuelve a la secuencia en cualquier momento'}}</span><q-btn v-if="editingClipId&&result" flat dense color="deep-orange" icon="check" label="Aplicar al clip" no-caps :disable="working" @click="applyClipResult"/></div><nav class="tool-tabs" aria-label="Herramientas de edición"><button v-for="tool in tools" :key="tool.id" :class="{active:activeTool===tool.id}" :aria-pressed="activeTool===tool.id" @click="activeTool=tool.id"><q-icon :name="tool.icon" size="20px"/>{{tool.label}}</button><button :disabled="working" @click="openMontage"><q-icon name="video_library" size="20px"/>Montaje múltiple</button></nav>
     <q-banner v-if="error" dense class="bg-negative text-white editor-error">{{error}}<template #action><q-btn flat round dense icon="close" aria-label="Cerrar aviso" @click="error=''"/></template></q-banner>
     <div class="work-grid">
       <aside ref="inspector" class="inspector">
@@ -34,7 +34,7 @@
         </section>
 </div>
         <div v-if="duration>0" v-show="activeTool==='color'" class="tool-panel">        <section class="lab-panel">
-          <h3>Formato y color</h3>
+          <h3>Formato y color</h3><div class="camera-panel"><h4>Encuadre y cámara</h4><div class="volume"><span>Zoom: {{Math.round(cameraZoom*100)}}%</span><q-slider dark v-model="cameraZoom" :min="1" :max="3" :step=".01" color="deep-orange" :disable="working"/></div><div class="volume"><span>Horizontal: {{Math.round(cameraX*100)}}%</span><q-slider dark v-model="cameraX" :min="-1" :max="1" :step=".01" color="deep-orange" :disable="working"/></div><div class="volume"><span>Vertical: {{Math.round(cameraY*100)}}%</span><q-slider dark v-model="cameraY" :min="-1" :max="1" :step=".01" color="deep-orange" :disable="working"/></div><q-btn flat dense color="deep-orange" label="Restablecer encuadre" no-caps :disable="working" @click="cameraZoom=1;cameraX=0;cameraY=0"/><p class="note">Amplía la imagen y desplaza el área visible sin mover textos ni stickers.</p></div>
           <div class="controls">
             <q-select dark outlined v-model="formatMode" :options="[{label:'Original',value:'original'},{label:'Horizontal 16:9',value:'wide'},{label:'Vertical 9:16 · Reels y Shorts',value:'vertical'},{label:'Cuadrado 1:1',value:'square'}]" emit-value map-options label="Formato" :disable="working"/>
             <q-select dark outlined v-model="fit" :options="[{label:'Encajar sin recortar',value:'contain'},{label:'Llenar · recorte centrado',value:'cover'}]" emit-value map-options label="Encuadre" :disable="working"/>
@@ -170,9 +170,9 @@
 </div>
     </section>
     <div v-if="working||result" class="export-tray">      <div v-if="working" class="progress"><q-linear-progress :value="progress" color="deep-orange" :indeterminate="stage==='Descargando original'"/><div class="progress-label"><span>{{stage}} · {{Math.round(progress*100)}}%</span><q-btn flat color="deep-orange" label="Cancelar" no-caps @click="cancel"/></div></div>
-      <div v-if="result" class="result"><div class="timeline-head"><h3>Resultado de la edición</h3><q-btn flat round dense icon="close" aria-label="Cerrar resultado" @click="clearResult"/></div><video :src="resultUrl" controls playsinline preload="metadata"/><p>{{result.type}} · {{(result.size/1048576).toFixed(2)}} MiB. Revisa la reproducción y el audio antes de guardar.</p><div class="options"><q-btn outline color="deep-orange" icon="download" label="Descargar copia" no-caps :disable="working" @click="download"/><q-btn unelevated color="deep-orange" icon="save" label="Usar como nuevo borrador" no-caps :disable="working" @click="useResult"/></div><p class="note">El resultado se enviará al formulario de nueva publicación. No se subirá hasta que pulses Guardar borrador.</p></div>
+      <div v-if="result" class="result"><div class="timeline-head"><h3>Resultado de la edición</h3><q-btn flat round dense icon="close" aria-label="Cerrar resultado" @click="clearResult"/></div><video :src="resultUrl" controls playsinline preload="metadata"/><p>{{result.type}} · {{(result.size/1048576).toFixed(2)}} MiB. Revisa la reproducción y el audio antes de guardar.</p><div class="options"><q-btn outline color="deep-orange" icon="download" label="Descargar copia" no-caps :disable="working" @click="download"/><q-btn v-if="editingClipId" unelevated color="deep-orange" icon="check" label="Aplicar y volver al montaje" no-caps :disable="working" @click="applyClipResult"/><q-btn unelevated color="deep-orange" icon="save" label="Usar como nuevo borrador" no-caps :disable="working" @click="useResult"/></div><p class="note">El resultado se enviará al formulario de nueva publicación. No se subirá hasta que pulses Guardar borrador.</p></div>
 </div>
-    <q-dialog v-model="montageOpen" maximized persistent><SensacionesMontage v-if="montageOpen" :initial-file="source" :max-bytes="maxBytes" @close="montageOpen=false" @edit="editMontage" @result="saveMontageResult"/></q-dialog>
+    <SensacionesMontage v-if="montageInitialized" v-show="montageOpen" ref="montageRef" :active="montageOpen" :initial-file="montageInitialFile" :max-bytes="maxBytes" @session="updateMontageCount" @close="montageOpen=false" @edit="editMontage" @edit-clip="editSelectedClip" @result="saveMontageResult"/>
   </q-card>
 </template>
 <script setup>
@@ -184,15 +184,27 @@ import {canTrim,renderTrim} from '../services/sensacionesTrim'
 import {speedValues,parseSrt,projectSettings,cleanLayers,projectFileLimit,layerTransform,animatedLayer,snapPosition,cleanEffects} from '../services/sensacionesProject'
 const props=defineProps({item:Object,initialFile:Object,maxBytes:{type:Number,default:262144000}})
 const emit=defineEmits(['close','result'])
-const supported=canTrim(),montageOpen=ref(false)
-function openMontage(){if(working.value)return;stopSelection();secondaryNode?.pause();montageOpen.value=true}
-function editMontage(file){if(!file||working.value)return;if(source.value&&!window.confirm('¿Usar el montaje generado como nuevo video de origen? Se reemplazarán el origen y los recortes actuales; los demás ajustes se conservarán.'))return;montageOpen.value=false;selectLocal(file)}
+const supported=canTrim(),montageOpen=ref(false),montageInitialized=ref(false),montageRef=ref(null),montageCount=ref(0),montageInitialFile=ref(null),editingClipId=ref(null)
+let pendingClipRange=null
+function openMontage(){if(working.value)return;stopSelection();secondaryNode?.pause();if(!montageInitialized.value){montageInitialFile.value=source.value;montageInitialized.value=true}montageOpen.value=true}
+function updateMontageCount(n){montageCount.value=n;if(editingClipId.value&&!montageRef.value?.hasClip(editingClipId.value))editingClipId.value=null}
+function editMontage(file){if(!file||working.value)return;if(source.value&&!window.confirm('¿Usar el montaje generado como nuevo video de origen? Se reemplazarán el origen y los recortes actuales; los demás ajustes se conservarán. La secuencia seguirá disponible.'))return;montageOpen.value=false;selectLocal(file)}
+function editSelectedClip(clip){
+  if(!clip?.file||working.value)return
+  if(editingClipId.value===clip.id&&source.value===clip.file){montageOpen.value=false;activeTool.value='color';return}
+  if(source.value&&!window.confirm('¿Editar este clip? El editor cambiará de archivo y recorte; los efectos actuales se conservan. Tu montaje y originales no se modificarán.'))return
+  montageOpen.value=false;selectLocal(clip.file);editingClipId.value=clip.id;pendingClipRange={start:clip.start,end:clip.end}
+  if(duration.value>0&&source.value===clip.file){applyPendingRange();activeTool.value='color'}
+}
+function applyPendingRange(){if(!pendingClipRange||!duration.value)return;const range=pendingClipRange;pendingClipRange=null;start.value=Math.max(0,Math.min(duration.value-.5,range.start));end.value=Math.min(duration.value,Math.max(start.value+.5,range.end));nextTick(()=>seekSource(start.value))}
+async function applyClipResult(){if(!result.value||!editingClipId.value||working.value)return;const id=editingClipId.value,file=result.value;if(!window.confirm('¿Sustituir este clip en la secuencia por la copia editada? Puedes deshacer el cambio desde Montaje.'))return;working.value=true;stage.value='Aplicando clip';progress.value=0;try{await montageRef.value.replaceClip(id,file);editingClipId.value=null;clearResult();montageOpen.value=true}catch(e){error.value=e.message||'No se pudo aplicar el clip.'}finally{working.value=false}}
 function saveMontageResult(file){if(!file||working.value)return;emit('result',file)}
 const localFile=ref(null),source=ref(null),url=ref(''),preview=ref(null),duration=ref(0),start=ref(0),end=ref(0),current=ref(0),height=ref(720),silent=ref(false),volume=ref(1)
 const working=ref(false),progress=ref(0),stage=ref(''),error=ref(''),result=ref(null),resultUrl=ref('')
 const inspector=ref(null),activeTool=ref('media'),showOriginal=ref(false),monitorCanvas=ref(null),playing=ref(false),hue=ref(0)
 const tools=[{id:'media',label:'Archivos',icon:'folder_open'},{id:'trim',label:'Recortar',icon:'content_cut'},{id:'color',label:'Color y formato',icon:'palette'},{id:'text',label:'Textos y marca',icon:'title'},{id:'layers',label:'Stickers y capas',icon:'layers'},{id:'effects',label:'Composición',icon:'auto_fix_high'},{id:'audio',label:'Audio',icon:'graphic_eq'},{id:'project',label:'Proyecto',icon:'settings'}]
 const clips=ref([]),transition=ref('cut'),formatMode=ref('original'),fit=ref('contain'),filter=ref('normal'),brightness=ref(1),contrast=ref(1),saturation=ref(1)
+const cameraZoom=ref(1),cameraX=ref(0),cameraY=ref(0)
 const overlayTitle=ref(''),subtitle=ref(''),logoFile=ref(null),logoOpacity=ref(.8),musicFile=ref(null),musicVolume=ref(.25)
 const movingEffect=ref('pip'),effects=ref(cleanEffects()),secondaryFile=ref(null),secondaryReady=ref(false),secondaryDuration=ref(0),secondaryName=ref('')
 let secondaryNode=null,secondaryUrl='',secondaryRevision=0
@@ -337,7 +349,7 @@ function parseCues(){try{const cues=parseSrt(captions.value);if(cues.some(c=>c.e
 const trackClips=computed(()=>(clips.value.length?clips.value:[{start:start.value,end:end.value}]).map(c=>({length:(c.end-c.start)/speed.value})))
 const trackCues=computed(()=>{try{return parseSrt(captions.value).filter(c=>c.end<=totalDuration.value+.02)}catch{return []}})
 watch([captions,totalDuration],()=>{captionsChecked.value=''})
-const projectRefs={speed,captions,height,silent,volume,transition,formatMode,fit,filter,brightness,contrast,saturation,hue,overlayTitle,subtitle,titleAnimation,logoOpacity,musicVolume,titleX,titleY,titleSize,captionX,captionY,captionSize}
+const projectRefs={speed,captions,height,silent,volume,transition,formatMode,fit,filter,brightness,contrast,saturation,hue,cameraZoom,cameraX,cameraY,overlayTitle,subtitle,titleAnimation,logoOpacity,musicVolume,titleX,titleY,titleSize,captionX,captionY,captionSize}
 function saveProject(){
   try{
     const settings={selection:{start:start.value,end:end.value},clips:clips.value,layers:layers.value,effects:effects.value,...Object.fromEntries(Object.entries(projectRefs).map(([k,v])=>[k,v.value]))}
@@ -374,9 +386,9 @@ function removeClip(i){clips.value=clips.value.filter((_,j)=>j!==i)}
 function resetColor(){brightness.value=1;contrast.value=1;saturation.value=1;hue.value=0;filter.value='normal'}
 let controller=null,selectionPlaying=false
 function clearResult(){if(resultUrl.value)URL.revokeObjectURL(resultUrl.value);resultUrl.value='';result.value=null}
-function setSource(file){selectionPlaying=false;preview.value?.pause();if(url.value)URL.revokeObjectURL(url.value);clearResult();source.value=file;clips.value=[];duration.value=0;start.value=0;end.value=0;current.value=0;playing.value=false;url.value=file?URL.createObjectURL(file):''}
-function selectLocal(file){error.value='';localFile.value=file;setSource(file)}
-function metadata(){const d=preview.value?.duration;if(!Number.isFinite(d)||d<=0){error.value='No se pudo determinar la duración del video. Prueba el archivo original.';return}duration.value=d;start.value=0;end.value=d;current.value=0;activeTool.value='trim';nextTick(()=>{syncAudio();renderMonitor()})}
+function setSource(file){editingClipId.value=null;pendingClipRange=null;selectionPlaying=false;preview.value?.pause();if(url.value)URL.revokeObjectURL(url.value);clearResult();source.value=file;clips.value=[];duration.value=0;start.value=0;end.value=0;current.value=0;playing.value=false;url.value=file?URL.createObjectURL(file):''}
+function selectLocal(file){editingClipId.value=null;pendingClipRange=null;error.value='';localFile.value=file;setSource(file)}
+function metadata(){const d=preview.value?.duration;if(!Number.isFinite(d)||d<=0){error.value='No se pudo determinar la duración del video. Prueba el archivo original.';return}duration.value=d;start.value=0;end.value=d;current.value=0;activeTool.value=pendingClipRange?'color':'trim';applyPendingRange();nextTick(()=>{syncAudio();renderMonitor()})}
 function format(n){const s=Math.round(Math.max(0,n)*10)/10;return Math.floor(s/60)+':'+(s%60).toFixed(1).padStart(4,'0')}
 function stopSelection(){selectionPlaying=false;preview.value?.pause()}
 function setStart(n){if(!Number.isFinite(n))return;stopSelection();start.value=Math.min(Math.max(0,n),Math.max(0,end.value-.5));if(preview.value)preview.value.currentTime=start.value;clearResult()}
@@ -414,7 +426,7 @@ async function generate(){
   if(working.value||!source.value)return
   const cues=parseCues();if(!cues)return
   stopSelection();clearResult();error.value='';working.value=true;progress.value=0;stage.value='Exportando edición';controller=new AbortController()
-  try{const output=await renderTrim({source:source.value,start:start.value,end:end.value,segments:clips.value.length?clips.value:undefined,speed:speed.value,options:{...layerOptions(),effects:cleanEffects(effects.value),secondaryVideo:null,layers:cleanLayers(layers.value),cues,titleAnimation:titleAnimation.value,format:formatMode.value,fit:fit.value,filter:filter.value,brightness:brightness.value,contrast:contrast.value,saturation:saturation.value,hue:hue.value,title:overlayTitle.value,subtitle:subtitle.value,logoOpacity:logoOpacity.value,transition:transition.value},secondaryFile:effects.value.pip.enabled?secondaryFile.value:null,logoFile:logoFile.value,musicFile:musicFile.value,musicVolume:musicVolume.value,maxHeight:height.value,silent:silent.value,volume:volume.value,maxBytes:props.maxBytes,signal:controller.signal,onProgress:v=>progress.value=v});result.value=output;resultUrl.value=URL.createObjectURL(output)}
+  try{const output=await renderTrim({source:source.value,start:start.value,end:end.value,segments:clips.value.length?clips.value:undefined,speed:speed.value,options:{...layerOptions(),effects:cleanEffects(effects.value),secondaryVideo:null,layers:cleanLayers(layers.value),cues,titleAnimation:titleAnimation.value,format:formatMode.value,fit:fit.value,filter:filter.value,brightness:brightness.value,contrast:contrast.value,saturation:saturation.value,hue:hue.value,cameraZoom:cameraZoom.value,cameraX:cameraX.value,cameraY:cameraY.value,title:overlayTitle.value,subtitle:subtitle.value,logoOpacity:logoOpacity.value,transition:transition.value},secondaryFile:effects.value.pip.enabled?secondaryFile.value:null,logoFile:logoFile.value,musicFile:musicFile.value,musicVolume:musicVolume.value,maxHeight:height.value,silent:silent.value,volume:volume.value,maxBytes:props.maxBytes,signal:controller.signal,onProgress:v=>progress.value=v});result.value=output;resultUrl.value=URL.createObjectURL(output)}
   catch(e){error.value=e.message||'No se pudo exportar el video.'}
   finally{working.value=false;controller=null}
 }
@@ -452,7 +464,7 @@ function renderMonitor(){
   }
   monitorTime=Math.min(totalDuration.value,at);outputClock.value=monitorTime
   syncSecondary(secondaryNode,effects.value.pip,monitorTime,playing.value&&!working.value,()=>{error.value='No se pudo reproducir el segundo video.'})
-  drawComposition(ctx,v,{...layerOptions(),fit:fit.value,filter:filter.value,brightness:brightness.value,contrast:contrast.value,saturation:saturation.value,hue:hue.value,title:overlayTitle.value,subtitle:subtitle.value,cues:trackCues.value,titleAnimation:titleAnimation.value,logoOpacity:logoOpacity.value},monitorLogo,fade,monitorTime,totalDuration.value)
+  drawComposition(ctx,v,{...layerOptions(),fit:fit.value,filter:filter.value,brightness:brightness.value,contrast:contrast.value,saturation:saturation.value,hue:hue.value,cameraZoom:cameraZoom.value,cameraX:cameraX.value,cameraY:cameraY.value,title:overlayTitle.value,subtitle:subtitle.value,cues:trackCues.value,titleAnimation:titleAnimation.value,logoOpacity:logoOpacity.value},monitorLogo,fade,monitorTime,totalDuration.value)
   if(!working.value&&activeTool.value==='layers'&&selectedLayer.value&&layerActive(selectedLayer.value,monitorTime))drawLayerSelection(ctx,animatedLayer(selectedLayer.value,monitorTime),layerImages.get(selectedLayerId.value))
   if(activeTool.value==='effects'&&!working.value){const e=effects.value[movingEffect.value];if(e.enabled){ctx.save();ctx.strokeStyle='#ff985c';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(e.x*w-10,e.y*h);ctx.lineTo(e.x*w+10,e.y*h);ctx.moveTo(e.x*w,e.y*h-10);ctx.lineTo(e.x*w,e.y*h+10);ctx.stroke();ctx.restore()}}
   if(drag&&snapEnabled.value&&!working.value){ctx.save();ctx.strokeStyle='#40d6e6';ctx.lineWidth=1.5;ctx.setLineDash([5,4]);ctx.beginPath();if(guides.value.x!==null){ctx.moveTo(guides.value.x*w,0);ctx.lineTo(guides.value.x*w,h)}if(guides.value.y!==null){ctx.moveTo(0,guides.value.y*h);ctx.lineTo(w,guides.value.y*h)}ctx.stroke();ctx.restore()}
@@ -500,4 +512,6 @@ onBeforeUnmount(()=>{disposed=true;++logoRevision;cancelAnimationFrame(monitorFr
 .track-overlay{position:absolute;height:100%;background:#8453a0;color:white;border:0;border-radius:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer;font-size:10px}.track-overlay.selected{outline:2px solid #ff985c;outline-offset:-2px}.layer-list{display:grid;gap:5px}.layer-list button{display:flex;gap:8px;align-items:center;padding:10px;border:1px solid #ffffff16;border-radius:6px;background:#25252c;color:#eee;cursor:pointer;text-align:left}.layer-list button span{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.layer-list button.chosen{border-color:#ff681e;background:#ff681e20}.color-pick{display:flex;align-items:center;justify-content:space-between;color:#ddd}.monitor-stage canvas.draggable{touch-action:none;cursor:move}
 .motion-panel{display:grid;gap:9px;background:#24242b;border-radius:8px;padding:10px}.motion-panel h4{font-size:13px;color:#ffb38b;margin:0;font-weight:700}.resource-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:5px;padding:8px 0}.resource-grid button,.key-list button{border:1px solid #ffffff20;background:#292930;color:#ff9b68;border-radius:6px;padding:8px;cursor:pointer}.resource-grid button{display:grid;justify-items:center;gap:5px;font-size:10px}.resource-grid button:disabled,.key-list button:disabled{opacity:.4;cursor:default}.key-list{display:grid;gap:4px;max-height:170px;overflow:auto}.key-list button{display:flex;justify-content:space-between}.key-list button.chosen{border-color:#ff681e;background:#ff681e22}
 .track-key{position:absolute;top:50%;transform:translate(-50%,-50%);color:#ffd59b;font-size:10px;pointer-events:none;text-shadow:0 1px 2px #000}
+.workflow-editor{position:relative}.workflow-strip{display:flex;align-items:center;gap:8px;padding:6px 18px;background:#25231f;border-bottom:1px solid #ff681e22;color:#efb58e;font-size:12px;flex-shrink:0}.workflow-strip span{flex:1}.workflow-editor .tool-tabs{background:#1b1b22;padding:8px 14px;gap:5px}.workflow-editor .tool-tabs button{border:1px solid transparent}.workflow-editor .tool-tabs button.active{border-color:#ff681e44}.workflow-editor .inspector{scrollbar-width:thin}.workflow-editor .monitor-stage{box-shadow:inset 0 0 0 1px #ffffff08}.workflow-editor .editor-header{min-height:57px}@media(max-width:760px){.workflow-strip{padding:5px 8px;font-size:10px}}
+.camera-panel{display:grid;gap:6px;padding:12px;background:#25252d;border:1px solid #ffffff14;border-radius:8px}.camera-panel h4{font-size:13px;margin:0;color:#ffb38b}
 </style>

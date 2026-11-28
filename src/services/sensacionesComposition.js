@@ -25,10 +25,9 @@ export function drawComposition(ctx,video,options={},logo=null,fade=0,time=0,dur
   ctx.fillStyle='#000';ctx.fillRect(0,0,w,h)
   const vw=video.videoWidth,vh=video.videoHeight
   if(vw&&vh){
-    const scale=options.fit==='cover'?Math.max(w/vw,h/vh):Math.min(w/vw,h/vh)
-    const dw=vw*scale,dh=vh*scale
+    const [dx,dy,dw,dh]=cameraGeometry(w,h,vw,vh,options)
     ctx.filter='brightness('+bound(options.brightness,0.5,1.5,1)+') contrast('+bound(options.contrast,.5,1.5,1)+') saturate('+bound(options.saturation,0,2,1)+') hue-rotate('+bound(options.hue,-180,180,0)+'deg)'+(presets[options.filter]||'')
-    ctx.drawImage(video,(w-dw)/2,(h-dh)/2,dw,dh)
+    ctx.drawImage(video,dx,dy,dw,dh)
     ctx.filter='none'
   }
   drawVideoEffects(ctx,options.effects,options.secondaryVideo,time)
@@ -164,4 +163,13 @@ export function drawVideoEffects(ctx,effects,video,time){
     const pixels=sc.getImageData(0,0,kw,kh);keyPixels(pixels.data,p.key,p.threshold,p.softness);sc.putImageData(pixels,0,0);image=c
   }
   ctx.save();maskPath(ctx,p.mask,x,y,dw,dh);ctx.globalAlpha=p.opacity;ctx.drawImage(image,x,y,dw,dh);ctx.restore()
+}
+
+export function cameraGeometry(w,h,vw,vh,options={}){
+  const zoom=bound(options.cameraZoom,1,3,1)
+  const scale=(options.fit==='cover'?Math.max(w/vw,h/vh):Math.min(w/vw,h/vh))*zoom
+  const dw=vw*scale,dh=vh*scale
+  const dx=(w-dw)/2+bound(options.cameraX,-1,1,0)*Math.max(0,(dw-w)/2)
+  const dy=(h-dh)/2+bound(options.cameraY,-1,1,0)*Math.max(0,(dh-h)/2)
+  return [dx,dy,dw,dh]
 }
