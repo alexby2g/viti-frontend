@@ -30,10 +30,10 @@
   </q-card>
 </template>
 <script setup>
-import {ref,onBeforeUnmount} from 'vue'
+import {ref,onMounted,onBeforeUnmount,watch} from 'vue'
 import {mediaUrl} from '../services/sensacionesMedia'
 import {canTrim,renderTrim} from '../services/sensacionesTrim'
-const props=defineProps({item:Object,maxBytes:{type:Number,default:262144000}})
+const props=defineProps({item:Object,initialFile:Object,maxBytes:{type:Number,default:262144000}})
 const emit=defineEmits(['close','result'])
 const supported=canTrim()
 const localFile=ref(null),source=ref(null),url=ref(''),preview=ref(null),duration=ref(0),start=ref(0),end=ref(0),current=ref(0),height=ref(720),silent=ref(false),volume=ref(1)
@@ -83,6 +83,8 @@ async function generate(){
 }
 function download(){if(!result.value)return;const a=document.createElement('a');a.href=resultUrl.value;a.download=result.value.name;a.click()}
 function useResult(){if(result.value)emit('result',result.value)}
+onMounted(()=>{if(props.initialFile)selectLocal(props.initialFile)})
+watch([height,silent,volume],clearResult)
 onBeforeUnmount(()=>{cancel();stopSelection();if(url.value)URL.revokeObjectURL(url.value);clearResult()})
 </script>
 <style scoped>
