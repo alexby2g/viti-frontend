@@ -1,5 +1,6 @@
 // Browser-local editing. The original is never modified.
 import {outputSize,normalizeSegments,drawComposition} from './sensacionesComposition'
+import {speedValues} from './sensacionesProject'
 const choices=['video/mp4;codecs=avc1.42001f,mp4a.40.2','video/mp4','video/webm;codecs=vp8,opus','video/webm']
 export function canTrim(){
   return typeof MediaRecorder!=='undefined' && !!HTMLCanvasElement.prototype.captureStream && choices.some(t=>MediaRecorder.isTypeSupported(t))
@@ -15,9 +16,10 @@ function waitEvent(node,event,action,signal){
     try{action()}catch(e){finish(e)}
   })
 }
-export async function renderTrim({source,start,end,segments,options={},musicFile=null,musicVolume=.25,logoFile=null,maxHeight=720,silent=false,volume=1,maxBytes=262144000,signal,onProgress=()=>{}}){
+export async function renderTrim({source,start,end,segments,speed=1,options={},musicFile=null,musicVolume=.25,logoFile=null,maxHeight=720,silent=false,volume=1,maxBytes=262144000,signal,onProgress=()=>{}}){
   if(!canTrim())throw new Error('Usa Chrome, Edge o Brave de escritorio actualizado.')
   if(!source)throw new Error('Selecciona un archivo de video.')
+  if(!speedValues.includes(speed))throw new Error('Velocidad no compatible.')
   const video=document.createElement('video'),canvas=document.createElement('canvas')
   const url=URL.createObjectURL(source)
   video.preload='auto';video.playsInline=true;video.muted=silent&&!musicFile
@@ -41,11 +43,15 @@ export async function renderTrim({source,start,end,segments,options={},musicFile
     if(!video.videoWidth)throw new Error('Video no compatible.')
     const clips=normalizeSegments(segments||[{start,end}],video.duration),total=clips.reduce((sum,c)=>sum+c.end-c.start,0)
     const seek=async time=>{if(Math.abs(video.currentTime-time)>.005)await waitEvent(video,'seeked',()=>{video.currentTime=time},signal)}
+    const outputDuration=total/speed
+    if(outputDuration>300||outputDuration<.5)throw new Error('La duración final debe estar entre 0,5 segundos y 5 minutos.')
+    if(options.cues?.some(c=>c.end>outputDuration+.02))throw new Error('Hay subtítulos fuera de la duración final.')
+    video.playbackRate=speed;video.preservesPitch=true
     await seek(clips[0].start)
     if(logoFile){logo=await createImageBitmap(logoFile);if(!logo.width||!logo.height||logo.width*logo.height>16000000)throw new Error('Logotipo demasiado grande.')}
     if(music)await waitEvent(music,'loadeddata',()=>{music.src=musicUrl},signal)
     ;[canvas.width,canvas.height]=outputSize(video.videoWidth,video.videoHeight,maxHeight,options.format)
-    const ctx=canvas.getContext('2d',{alpha:false});drawComposition(ctx,video,options,logo,options.transition==='fade'?1:0)
+    const ctx=canvas.getContext('2d',{alpha:false});drawComposition(ctx,video,options,logo,options.transition==='fade'?1:0,0,outputDuration)
     const visual=canvas.captureStream(30)
     if(stream)visual.getAudioTracks().forEach(t=>t.stop())
     const combined=new MediaStream([...visual.getVideoTracks(),...(stream?.getAudioTracks()||[])])
@@ -73,7 +79,7 @@ export async function renderTrim({source,start,end,segments,options={},musicFile
       }
       const draw=()=>{if(finished)return
         if(!seeking){const clip=clips[index],length=clip.end-clip.start,edge=Math.min(.5,length/3),fade=options.transition==='fade'?1-Math.max(0,Math.min(1,(video.currentTime-clip.start)/edge,(clip.end-video.currentTime)/edge)):0
-          drawComposition(ctx,video,options,logo,fade)}
+          drawComposition(ctx,video,options,logo,fade,(elapsed+Math.max(0,video.currentTime-clip.start))/speed,outputDuration)}
         raf=requestAnimationFrame(draw)
       }
       async function advance(){
@@ -85,6 +91,7 @@ export async function renderTrim({source,start,end,segments,options={},musicFile
           if(finished)return
           drawComposition(ctx,video,options,logo,options.transition==='fade'?1:0)
           lastTime=video.currentTime;lastAdvance=performance.now()
+          drawComposition(ctx,video,options,logo,options.transition==='fade'?1:0,elapsed/speed,outputDuration)
           await waitEvent(recorder,'resume',()=>recorder.resume(),signal)
           if(finished)return
           await video.play();if(music)await music.play()
