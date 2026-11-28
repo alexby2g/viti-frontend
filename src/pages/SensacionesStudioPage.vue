@@ -6,6 +6,7 @@
       <button @click="goSection('estado')"><q-icon name="monitor_heart"/> Estado del estudio</button>
       <button class="nav-active" @click="goSection('biblioteca')"><q-icon name="movie"/> Biblioteca multimedia</button>
       <button @click="goSection('publicar')"><q-icon name="cloud_upload"/> Nueva publicación</button>
+      <button :disabled="busy" @click="openVideoEditor()"><q-icon name="content_cut"/> Editor de video</button>
       <router-link to="/sensaciones/studio/colecciones"><q-icon name="collections"/> Álbumes y proyectos</router-link>
       <router-link to="/sensaciones/studio/marca"><q-icon name="palette"/> Marca y servicios</router-link>
       <div class="nav-label">OTROS ESPACIOS</div>
@@ -33,6 +34,7 @@
           <q-input dark outlined v-model="title" label="Título" maxlength="150" :rules="[v=>!!v?.trim()||'Escribe un título']"/>
           <q-input dark outlined v-model="description" label="Descripción" type="textarea" maxlength="2000"/>
           <q-file dark outlined v-model="file" :label="fileLabel" accept=".jpg,.jpeg,.png,.webp,.mp4,.webm" :max-file-size="overview?.max_video_bytes||3145728" @rejected="error='Archivo no admitido o demasiado grande.'"/>
+          <q-btn v-if="file?.type?.startsWith('video/')" outline color="deep-orange" icon="content_cut" label="Recortar o editar video" no-caps :disable="busy" @click="openVideoEditor(null,file)"/>
           <q-file v-if="file?.type?.startsWith('video/')" dark outlined v-model="posterFile" label="Portada personalizada (opcional, hasta 1 MiB)" accept=".jpg,.jpeg,.png,.webp" :max-file-size="1048576" clearable @rejected="error='Portada no admitida o mayor a 1 MiB.'"/>
           <p v-if="file?.type?.startsWith('video/')">Si no eliges una portada, se intentará capturar un fotograma automáticamente.</p>
           <q-btn color="deep-orange" type="submit" label="Guardar borrador" no-caps :loading="busy" :disable="!overview?.uploads_available||!file||!title.trim()"/>
@@ -52,11 +54,12 @@
         <div class="media-grid">
           <article v-for="item in items" :key="item.id" class="media">
             <button class="thumbnail" @click="openPreview(item)" :aria-label="'Ver '+item.title"><img v-if="item.poster_url||item.kind==='photo'" :src="mediaUrl(item.poster_url||item.url)" alt="" loading="lazy"/><q-icon :name="item.kind==='video'?'play_circle':'image'" size="38px"/><span>Vista previa</span></button>
-            <div class="media-copy"><span class="state" :class="{live:item.published}">{{item.published?'Publicado':'Borrador'}}</span><h3>{{item.title}}</h3><p>{{item.description||'Sin descripción'}}</p><div class="media-actions"><q-btn flat dense color="deep-orange" icon="edit" label="Editar" no-caps @click="openEdit(item)"/><q-btn v-if="item.kind==='video'" flat dense color="deep-orange" icon="image" label="Portada" no-caps @click="openPoster(item)"/><q-btn outline dense color="deep-orange" :label="item.published?'Retirar':'Publicar'" no-caps :disable="busy" @click="publish(item)"/></div></div>
+            <div class="media-copy"><span class="state" :class="{live:item.published}">{{item.published?'Publicado':'Borrador'}}</span><h3>{{item.title}}</h3><p>{{item.description||'Sin descripción'}}</p><div class="media-actions"><q-btn flat dense color="deep-orange" icon="edit" label="Editar" no-caps @click="openEdit(item)"/><q-btn v-if="item.kind==='video'" flat dense color="deep-orange" icon="content_cut" label="Recortar" no-caps :disable="busy" @click="openVideoEditor(item)"/><q-btn v-if="item.kind==='video'" flat dense color="deep-orange" icon="image" label="Portada" no-caps @click="openPoster(item)"/><q-btn outline dense color="deep-orange" :label="item.published?'Retirar':'Publicar'" no-caps :disable="busy" @click="publish(item)"/></div></div>
           </article>
         </div>
         <q-pagination v-if="last>1" v-model="page" :max="last" color="deep-orange" @update:model-value="load"/>
       </section>
+      <q-dialog v-model="videoEditor" persistent maximized><SensacionesVideoEditor v-if="videoEditor" :item="editorItem" :initial-file="editorFile" :max-bytes="overview?.max_video_bytes||3145728" @close="videoEditor=false" @result="acceptVideoEdit"/></q-dialog>
       <q-dialog v-model="editing"><q-card dark class="dialog"><q-card-section><h2>Editar publicación</h2></q-card-section><q-form @submit="saveEdit"><q-card-section class="form"><q-input dark outlined v-model="editTitle" label="Título" maxlength="150" :rules="[v=>!!v?.trim()||'Escribe un título']"/><q-input dark outlined v-model="editDescription" label="Descripción" type="textarea" maxlength="2000"/></q-card-section><q-card-actions align="right"><q-btn flat label="Cancelar" v-close-popup/><q-btn color="deep-orange" label="Guardar" type="submit" :loading="busy"/></q-card-actions></q-form></q-card></q-dialog>
       <q-dialog v-model="posterDialog"><q-card dark class="dialog"><q-card-section><h2>Portada del video</h2><p>Sube una imagen o selecciona el archivo original para capturar un fotograma.</p></q-card-section><q-card-section class="form"><q-file dark outlined v-model="replacementPoster" label="Imagen (hasta 1 MiB)" accept=".jpg,.jpeg,.png,.webp" :max-file-size="1048576" clearable/><q-file dark outlined v-model="originalVideo" label="Video original (captura local)" accept=".mp4,.webm" clearable/><p v-if="posterError">{{posterError}}</p></q-card-section><q-card-actions align="right"><q-btn flat label="Cancelar" v-close-popup :disable="busy"/><q-btn color="deep-orange" label="Guardar portada" :disable="!replacementPoster&&!originalVideo" :loading="busy" @click="replacePoster"/></q-card-actions></q-card></q-dialog>
       <q-dialog :model-value="!!preview" @update:model-value="v=>{if(!v)preview=null}" maximized><div class="preview"><q-btn flat color="white" label="Cerrar" @click="preview=null"/><video v-if="preview?.kind==='video'" :src="mediaUrl(preview.url)" :poster="mediaUrl(preview.poster_url)" controls playsinline preload="metadata"/><img v-else-if="preview" :src="mediaUrl(preview.url)" :alt="preview.title"/><p v-if="preview">{{preview.title}}</p></div></q-dialog>
@@ -71,8 +74,10 @@ import axios from 'axios'
 import {api,initCsrf} from '../boot/axios'
 import {mediaUrl} from '../services/sensacionesMedia'
 import {capturePoster} from '../services/sensacionesPoster'
+import SensacionesVideoEditor from '../components/SensacionesVideoEditor.vue'
 const router=useRouter(),auth=useAuthStore()
 const overview=ref(null),title=ref(''),description=ref(''),file=ref(null),items=ref([]),error=ref(''),notice=ref(''),busy=ref(false),loading=ref(false),page=ref(1),last=ref(1),progress=ref(0)
+const videoEditor=ref(false),editorItem=ref(null),editorFile=ref(null)
 const posterFile=ref(null),posterDialog=ref(false),replacementPoster=ref(null),originalVideo=ref(null),posterTarget=ref(null),posterError=ref('')
 watch(file,()=>{posterFile.value=null})
 const search=ref(''),kind=ref(''),status=ref(''),editing=ref(false),editId=ref(null),editTitle=ref(''),editDescription=ref(''),preview=ref(null)
@@ -126,6 +131,21 @@ async function saveEdit(){if(busy.value)return;busy.value=true;error.value='';tr
 async function savePoster(id,image){const data=new FormData();data.append('poster',image);await api.post('/sensaciones/studio/media/'+id+'/poster',data)}
 function openPoster(item){posterTarget.value=item.id;replacementPoster.value=null;originalVideo.value=null;posterError.value='';posterDialog.value=true}
 async function replacePoster(){if(busy.value)return;busy.value=true;posterError.value='';try{const image=replacementPoster.value||await capturePoster(originalVideo.value);await initCsrf();await savePoster(posterTarget.value,image);posterDialog.value=false;notice.value='Portada guardada.';await refresh()}catch{posterError.value='No se pudo guardar la portada. Prueba una imagen JPG de menos de 1 MiB.'}finally{busy.value=false}}
+function openVideoEditor(item=null,initial=null){
+  if(busy.value)return
+  editorItem.value=item;editorFile.value=initial;videoEditor.value=true
+}
+function acceptVideoEdit(output){
+  if(busy.value)return
+  if(editorItem.value){
+    if((file.value||title.value.trim()||description.value.trim())&&!window.confirm('¿Usar la edición en el formulario? Se sustituirán los campos aún no guardados.'))return
+    title.value=(editorItem.value.title+' · Edición').slice(0,150)
+    description.value=editorItem.value.description||''
+  }else if(!title.value.trim()){title.value='Video editado'}
+  file.value=output;videoEditor.value=false;editorItem.value=null;editorFile.value=null
+  notice.value='Edición preparada. Revisa el formulario y pulsa Guardar borrador para subir la nueva copia.'
+  goSection('publicar')
+}
 function openPreview(item){preview.value=item}
 onMounted(refresh)
 </script>
