@@ -88,6 +88,38 @@
             <div class="options"><q-btn flat dense color="deep-orange" icon="arrow_upward" label="Adelante" no-caps :disable="working" @click="moveLayer(1)"/><q-btn flat dense color="deep-orange" icon="arrow_downward" label="Atrás" no-caps :disable="working" @click="moveLayer(-1)"/><q-btn flat dense color="deep-orange" icon="content_copy" label="Duplicar" no-caps :disable="working||layers.length>=12||(selectedLayer.type==='image'&&imageCount>=8)" @click="duplicateLayer"/><q-btn flat dense color="negative" icon="delete_outline" label="Quitar capa" no-caps :disable="working" @click="removeLayer"/></div>
           </template>
         </div>
+        <div v-if="duration>0" v-show="activeTool==='effects'" class="tool-panel">
+          <h3>Composición de video</h3><q-btn-toggle dense unelevated no-caps color="grey-9" toggle-color="deep-orange" v-model="movingEffect" :options="[{label:'Mover video 2',value:'pip'},{label:'Mover desenfoque',value:'blur'}]" :disable="working"/><p class="note">Elige el elemento y arrástralo en el monitor.</p>
+          <section class="lab-panel"><h3>Video sobre video (PiP)</h3>
+            <q-file dark outlined :model-value="secondaryFile" label="Segundo video MP4 / WebM" accept=".mp4,.webm" :max-file-size="262144000" clearable :disable="working" @update:model-value="loadSecondary" @rejected="error='Segundo video no admitido o mayor de 250 MiB.'"/>
+            <p v-if="secondaryName&&!secondaryReady" class="note">Archivo requerido o cargando: {{secondaryName}}.</p>
+            <p v-if="secondaryReady" class="note">Duración: {{format(secondaryDuration)}}. Pista visual sin audio, a velocidad normal.</p>
+            <q-toggle dark v-model="effects.pip.enabled" label="Mostrar segundo video" :disable="working"/>
+            <template v-if="effects.pip.enabled">
+              <div v-for="field in pipFields" :key="field.key" class="volume"><span>{{field.label}}: {{Math.round(effects.pip[field.key]*100)}}%</span><q-slider dark v-model="effects.pip[field.key]" :min="field.min" :max="field.max" :step="field.step" color="deep-orange" :disable="working"/></div>
+              <q-select dark outlined v-model="effects.pip.mask" :options="maskOptions" emit-value map-options label="Máscara" :disable="working"/>
+              <q-select dark outlined v-model="effects.pip.key" :options="keyOptions" emit-value map-options label="Chroma Key" :disable="working"/>
+              <template v-if="effects.pip.key!=='none'">
+                <div class="volume"><span>Umbral: {{Math.round(effects.pip.threshold*100)}}%</span><q-slider dark v-model="effects.pip.threshold" :min="0" :max="1" :step=".01" color="deep-orange" :disable="working"/></div>
+                <div class="volume"><span>Suavidad: {{Math.round(effects.pip.softness*100)}}%</span><q-slider dark v-model="effects.pip.softness" :min=".02" :max=".5" :step=".01" color="deep-orange" :disable="working"/></div>
+                <p class="note">Elimina el fondo verde o azul del segundo video para revelar el principal. El procesamiento del recorte de color usa hasta 640 px para reducir carga.</p>
+              </template>
+              <div class="controls"><q-input dark outlined type="number" label="Inicio (s)" :model-value="effects.pip.start" :disable="working" @update:model-value="v=>effectTime('pip','start',v)"/><q-input dark outlined type="number" label="Final (s)" :model-value="effects.pip.end" :disable="working" @update:model-value="v=>effectTime('pip','end',v)"/></div>
+              <q-btn flat color="deep-orange" icon="visibility" label="Ir al inicio de la pista" no-caps :disable="working||effects.pip.start>=totalDuration" @click="seekOutput(effects.pip.start+.03)"/>
+              <p class="note">Se reproduce desde el comienzo del segundo archivo y desaparece al terminar su duración o al alcanzar el final definido.</p>
+            </template>
+          </section>
+          <section class="lab-panel"><h3>Desenfoque localizado</h3><q-toggle dark v-model="effects.blur.enabled" label="Activar zona de desenfoque" :disable="working"/>
+            <template v-if="effects.blur.enabled">
+              <q-select dark outlined v-model="effects.blur.mask" :options="maskOptions" emit-value map-options label="Forma de la zona" :disable="working"/>
+              <div v-for="field in blurFields" :key="field.key" class="volume"><span>{{field.label}}: {{Math.round(effects.blur[field.key]*100)}}%</span><q-slider dark v-model="effects.blur[field.key]" :min="field.min" :max="field.max" :step="field.step" color="deep-orange" :disable="working"/></div>
+              <div class="volume"><span>Intensidad: {{effects.blur.strength}}</span><q-slider dark v-model="effects.blur.strength" :min="2" :max="40" :step="1" color="deep-orange" :disable="working"/></div>
+              <div class="controls"><q-input dark outlined type="number" label="Inicio (s)" :model-value="effects.blur.start" :disable="working" @update:model-value="v=>effectTime('blur','start',v)"/><q-input dark outlined type="number" label="Final (s)" :model-value="effects.blur.end" :disable="working" @update:model-value="v=>effectTime('blur','end',v)"/></div>
+              <p class="note">Zona fija sobre el video principal, sin seguimiento automático. Revisa el resultado si necesitas ocultar información sensible.</p>
+            </template>
+          </section>
+          <q-btn flat color="deep-orange" label="Restablecer composición" no-caps :disable="working" @click="resetEffects"/>
+        </div>
         <div v-if="duration>0" v-show="activeTool==='audio'" class="tool-panel"><h3>Audio original</h3><q-toggle dark v-model="silent" label="Silenciar audio original" :disable="working"/>        <div v-if="!silent" class="volume"><span>Volumen de salida: {{Math.round(volume*100)}}%</span><q-slider dark v-model="volume" :min="0" :max="1" :step=".05" color="deep-orange" :disable="working"/></div>
         <section class="lab-panel">
           <h3>Música de fondo</h3>
@@ -110,7 +142,7 @@
         <div class="monitor-head"><strong>Monitor de edición</strong><q-btn-toggle dense unelevated no-caps color="grey-9" toggle-color="deep-orange" v-model="showOriginal" :options="[{label:'Original',value:true},{label:'Editado',value:false}]"/></div>
         <div class="monitor-stage">
           <video v-if="url" ref="preview" :src="url" class="source-video" playsinline preload="auto" @loadedmetadata="metadata" @loadeddata="renderMonitor" @seeked="renderMonitor" @timeupdate="updateTime" @play="playing=true" @pause="playing=false" @ended="playing=false" @error="error='No se pudo abrir el video. Prueba otro archivo.'"/>
-          <canvas v-show="duration>0" ref="monitorCanvas" :class="{draggable:!showOriginal&&!working&&(activeTool==='layers'||!!anchorMode)}" aria-label="Vista previa del video editado" @pointerdown="pointerDown" @pointermove="pointerMove" @pointerup="pointerEnd" @pointercancel="pointerEnd" @lostpointercapture="pointerEnd"/>
+          <canvas v-show="duration>0" ref="monitorCanvas" :class="{draggable:!showOriginal&&!working&&(activeTool==='layers'||activeTool==='effects'||!!anchorMode)}" aria-label="Vista previa del video editado" @pointerdown="pointerDown" @pointermove="pointerMove" @pointerup="pointerEnd" @pointercancel="pointerEnd" @lostpointercapture="pointerEnd"/>
           <div v-if="!duration" class="empty-monitor"><q-icon name="movie_creation" size="64px"/><p>Importa un video para comenzar</p><q-btn outline color="deep-orange" label="Elegir archivo" no-caps @click="activeTool='media'"/></div>
         </div>
         <div v-if="duration" class="monitor-controls"><q-btn flat round :icon="playing?'pause':'play_arrow'" :aria-label="playing?'Pausar':'Reproducir'" :disable="working" @click="togglePlayback"/><span>{{format(current)}} / {{format(duration)}}</span><q-slider dark :model-value="current" :min="0" :max="duration" :step=".01" color="deep-orange" :disable="working" @update:model-value="seekSource"/><q-btn flat round icon="fullscreen" aria-label="Ampliar monitor" @click="fullscreenMonitor"/></div>
@@ -130,6 +162,8 @@
             <div class="track"><span>Música</span><div class="track-lane"><div v-if="musicFile" class="track-music" :style="{width:'100%'}">Música · {{Math.round(musicVolume*100)}}%</div></div></div>
             <div class="track"><span>Textos</span><div class="track-lane"><div v-if="overlayTitle||logoFile" class="track-text" :style="{width:'100%'}">{{overlayTitle?'Título':''}}{{overlayTitle&&logoFile?' + ':''}}{{logoFile?'Marca':''}}</div></div></div>
             <div v-for="(layer,i) in layers" :key="layer.id" class="track"><span :title="layer.name">Capa {{i+1}}</span><div class="track-lane"><button v-if="layer.start<totalDuration" class="track-overlay" :class="{selected:selectedLayerId===layer.id}" :style="{left:(layer.start/totalDuration*100)+'%',width:((Math.min(layer.end,totalDuration)-layer.start)/totalDuration*100)+'%'}" :title="layer.name" :disabled="working" @click="selectLayer(layer.id);seekLayer(layer)">{{layer.name}}</button><span v-for="key in (layer.keyframes||[]).filter(k=>k.time<=totalDuration)" :key="key.time" class="track-key" :style="{left:(key.time/totalDuration*100)+'%'}" :title="'Fotograma '+format(key.time)">◆</span></div></div>
+            <div v-if="effects.pip.enabled" class="track"><span>Video 2</span><div class="track-lane"><button v-if="effects.pip.start<totalDuration" class="track-overlay" :style="{left:(effects.pip.start/totalDuration*100)+'%',width:(Math.max(0,Math.min(effects.pip.end,effects.pip.start+(secondaryDuration||300),totalDuration)-effects.pip.start)/totalDuration*100)+'%',background:'#496693'}" :disabled="working" @click="activeTool='effects';seekOutput(effects.pip.start+.03)">{{secondaryName||'Video superpuesto'}}</button></div></div>
+            <div v-if="effects.blur.enabled" class="track"><span>Desenfoque</span><div class="track-lane"><button v-if="effects.blur.start<totalDuration" class="track-overlay" :style="{left:(effects.blur.start/totalDuration*100)+'%',width:(Math.max(0,Math.min(effects.blur.end,totalDuration)-effects.blur.start)/totalDuration*100)+'%',background:'#575a68'}" :disabled="working" @click="activeTool='effects';seekOutput(effects.blur.start+.03)">Zona</button></div></div>
             <div class="track"><span>Subtítulos</span><div class="track-lane caption-lane"><div v-for="(cue,i) in trackCues" :key="i" class="track-caption" :style="{left:(cue.start/totalDuration*100)+'%',width:((cue.end-cue.start)/totalDuration*100)+'%'}" :title="cue.text">{{i+1}}</div><div v-if="!captions&&subtitle" class="track-caption" style="width:100%">Fijo</div></div></div>
             <p class="note">Representación de las pistas de salida. Edita sus ajustes en los controles correspondientes.</p>
           </div>
@@ -142,19 +176,57 @@
 </template>
 <script setup>
 import {ref,computed,onMounted,onBeforeUnmount,watch,nextTick} from 'vue'
-import {drawComposition,outputSize,hitLayer,drawLayerSelection,layerActive} from '../services/sensacionesComposition'
+import {drawComposition,outputSize,hitLayer,drawLayerSelection,layerActive,syncSecondary} from '../services/sensacionesComposition'
 import {mediaUrl} from '../services/sensacionesMedia'
 import {canTrim,renderTrim} from '../services/sensacionesTrim'
-import {speedValues,parseSrt,projectSettings,cleanLayers,projectFileLimit,layerTransform,animatedLayer,snapPosition} from '../services/sensacionesProject'
+import {speedValues,parseSrt,projectSettings,cleanLayers,projectFileLimit,layerTransform,animatedLayer,snapPosition,cleanEffects} from '../services/sensacionesProject'
 const props=defineProps({item:Object,initialFile:Object,maxBytes:{type:Number,default:262144000}})
 const emit=defineEmits(['close','result'])
 const supported=canTrim()
 const localFile=ref(null),source=ref(null),url=ref(''),preview=ref(null),duration=ref(0),start=ref(0),end=ref(0),current=ref(0),height=ref(720),silent=ref(false),volume=ref(1)
 const working=ref(false),progress=ref(0),stage=ref(''),error=ref(''),result=ref(null),resultUrl=ref('')
 const inspector=ref(null),activeTool=ref('media'),showOriginal=ref(false),monitorCanvas=ref(null),playing=ref(false),hue=ref(0)
-const tools=[{id:'media',label:'Archivos',icon:'folder_open'},{id:'trim',label:'Recortar',icon:'content_cut'},{id:'color',label:'Color y formato',icon:'palette'},{id:'text',label:'Textos y marca',icon:'title'},{id:'layers',label:'Stickers y capas',icon:'layers'},{id:'audio',label:'Audio',icon:'graphic_eq'},{id:'project',label:'Proyecto',icon:'settings'}]
+const tools=[{id:'media',label:'Archivos',icon:'folder_open'},{id:'trim',label:'Recortar',icon:'content_cut'},{id:'color',label:'Color y formato',icon:'palette'},{id:'text',label:'Textos y marca',icon:'title'},{id:'layers',label:'Stickers y capas',icon:'layers'},{id:'effects',label:'Composición',icon:'auto_fix_high'},{id:'audio',label:'Audio',icon:'graphic_eq'},{id:'project',label:'Proyecto',icon:'settings'}]
 const clips=ref([]),transition=ref('cut'),formatMode=ref('original'),fit=ref('contain'),filter=ref('normal'),brightness=ref(1),contrast=ref(1),saturation=ref(1)
 const overlayTitle=ref(''),subtitle=ref(''),logoFile=ref(null),logoOpacity=ref(.8),musicFile=ref(null),musicVolume=ref(.25)
+const movingEffect=ref('pip'),effects=ref(cleanEffects()),secondaryFile=ref(null),secondaryReady=ref(false),secondaryDuration=ref(0),secondaryName=ref('')
+let secondaryNode=null,secondaryUrl='',secondaryRevision=0
+const maskOptions=[{label:'Rectangular',value:'rectangle'},{label:'Circular / ovalada',value:'circle'}]
+const keyOptions=[{label:'Sin recorte de color',value:'none'},{label:'Eliminar verde',value:'green'},{label:'Eliminar azul',value:'blue'}]
+const pipFields=[{key:'x',label:'Posición horizontal',min:0,max:1,step:.01},{key:'y',label:'Posición vertical',min:0,max:1,step:.01},{key:'size',label:'Tamaño',min:.1,max:1,step:.01},{key:'opacity',label:'Opacidad',min:0,max:1,step:.01}]
+const blurFields=[{key:'x',label:'Posición horizontal',min:0,max:1,step:.01},{key:'y',label:'Posición vertical',min:0,max:1,step:.01},{key:'width',label:'Ancho',min:.05,max:1,step:.01},{key:'height',label:'Alto',min:.05,max:1,step:.01}]
+function releaseSecondary(){
+  ++secondaryRevision
+  if(secondaryNode){secondaryNode.pause();secondaryNode.removeAttribute('src');secondaryNode.load();secondaryNode=null}
+  if(secondaryUrl)URL.revokeObjectURL(secondaryUrl)
+  secondaryUrl='';secondaryReady.value=false;secondaryDuration.value=0;secondaryFile.value=null
+}
+function loadSecondary(file){
+  if(working.value)return
+  if(!file){releaseSecondary();effects.value.pip.enabled=false;secondaryName.value='';clearResult();renderMonitor();return}
+  if(file.size>262144000||!['video/mp4','video/webm'].includes(file.type)){error.value='Selecciona un video MP4 o WebM de hasta 250 MiB.';return}
+  if(secondaryName.value&&secondaryName.value!==file.name&&!window.confirm('¿Sustituir el segundo video? Se conservarán los ajustes de la pista.'))return
+  releaseSecondary()
+  const rev=secondaryRevision,v=document.createElement('video');secondaryNode=v
+  secondaryUrl=URL.createObjectURL(file);secondaryFile.value=file;secondaryName.value=file.name
+  v.preload='auto';v.muted=true;v.playsInline=true
+  v.addEventListener('loadeddata',()=>{
+    if(disposed||rev!==secondaryRevision)return
+    if(!Number.isFinite(v.duration)||!v.videoWidth){error.value='No se pudo abrir el segundo video.';return}
+    secondaryReady.value=true;secondaryDuration.value=v.duration;effects.value.pip.enabled=true
+    if(effects.value.pip.end===300)effects.value.pip.end=Math.min(300,Math.max(effects.value.pip.start+.01,Math.min(totalDuration.value,effects.value.pip.start+v.duration)))
+    renderMonitor()
+  })
+  v.addEventListener('seeked',()=>{if(!disposed&&rev===secondaryRevision)renderMonitor()})
+  v.addEventListener('error',()=>{if(!disposed&&rev===secondaryRevision){secondaryReady.value=false;error.value='El navegador no pudo decodificar el segundo video.'}})
+  v.src=secondaryUrl
+}
+function effectTime(type,key,value){
+  if(value===''||value===null)return
+  const n=Number(value),e=effects.value[type];if(!Number.isFinite(n))return
+  e[key]=key==='start'?Math.max(0,Math.min(e.end-.01,n)):Math.min(300,Math.max(e.start+.01,n))
+}
+function resetEffects(){releaseSecondary();secondaryName.value='';effects.value=cleanEffects()}
 const layers=ref([]),selectedLayerId=ref(null),anchorMode=ref(null)
 const activeKeyTime=ref(null),outputClock=ref(0),snapEnabled=ref(true),guides=ref({x:null,y:null})
 const layerImages=new Map()
@@ -246,7 +318,7 @@ function removeLayer(){if(working.value||!selectedLayer.value)return;const id=se
 function duplicateLayer(){if(working.value||!selectedLayer.value||layers.value.length>=12||(selectedLayer.value.type==='image'&&imageCount.value>=8))return;const layer={...selectedLayer.value,keyframes:(selectedLayer.value.keyframes||[]).map(k=>({...k,x:Math.min(1,k.x+.04),y:Math.min(1,k.y+.04)})),id:layerId(),name:(selectedLayer.value.name+' copia').slice(0,80),x:Math.min(1,selectedLayer.value.x+.04),y:Math.min(1,selectedLayer.value.y+.04)};if(layer.type==='image')layerImages.set(layer.id,layerImages.get(selectedLayerId.value));layers.value.push(layer);selectLayer(layer.id)}
 function setLayerTime(key,value){if(value===''||value===null||!selectedLayer.value)return;const n=Number(value);if(!Number.isFinite(n))return;const l=selectedLayer.value;l[key]=key==='start'?Math.max(0,Math.min(l.end-.01,n)):Math.min(300,Math.max(l.start+.01,n))}
 function clearLayers(){for(const bitmap of new Set(layerImages.values()))bitmap?.close();layerImages.clear();layers.value=[];selectedLayerId.value=null;activeKeyTime.value=null;anchorMode.value=null}
-function layerOptions(){return {titleX:titleX.value,titleY:titleY.value,titleSize:titleSize.value,captionX:captionX.value,captionY:captionY.value,captionSize:captionSize.value,layers:layers.value,layerImages}}
+function layerOptions(){return {titleX:titleX.value,titleY:titleY.value,titleSize:titleSize.value,captionX:captionX.value,captionY:captionY.value,captionSize:captionSize.value,layers:layers.value,layerImages,effects:effects.value,secondaryVideo:secondaryReady.value?secondaryNode:null}}
 const colorControls=[{label:'Brillo',value:brightness,min:.5,max:1.5},{label:'Contraste',value:contrast,min:.5,max:1.5},{label:'Saturación',value:saturation,min:0,max:2}]
 const queuedDuration=computed(()=>clips.value.reduce((sum,clip)=>sum+clip.end-clip.start,0))
 const speed=ref(1),titleAnimation=ref('none'),captions=ref('')
@@ -263,8 +335,8 @@ watch([captions,totalDuration],()=>{captionsChecked.value=''})
 const projectRefs={speed,captions,height,silent,volume,transition,formatMode,fit,filter,brightness,contrast,saturation,hue,overlayTitle,subtitle,titleAnimation,logoOpacity,musicVolume,titleX,titleY,titleSize,captionX,captionY,captionSize}
 function saveProject(){
   try{
-    const settings={selection:{start:start.value,end:end.value},clips:clips.value,layers:layers.value,...Object.fromEntries(Object.entries(projectRefs).map(([k,v])=>[k,v.value]))}
-    const project={format:'sensaciones-video-lab-v1',source:{name:source.value.name,size:source.value.size,duration:duration.value},settings,attachments:{music:musicFile.value?.name||null,logo:logoFile.value?.name||null}}
+    const settings={selection:{start:start.value,end:end.value},clips:clips.value,layers:layers.value,effects:effects.value,...Object.fromEntries(Object.entries(projectRefs).map(([k,v])=>[k,v.value]))}
+    const project={format:'sensaciones-video-lab-v1',source:{name:source.value.name,size:source.value.size,duration:duration.value},settings,attachments:{music:musicFile.value?.name||null,logo:logoFile.value?.name||null,secondary:secondaryName.value||null}}
     projectSettings(project)
     const objectUrl=URL.createObjectURL(new Blob([JSON.stringify(project,null,2)],{type:'application/json'})),a=document.createElement('a')
     a.href=objectUrl;a.download='sensaciones-proyecto.json';a.click();setTimeout(()=>URL.revokeObjectURL(objectUrl),1000);error.value=''
@@ -278,15 +350,15 @@ async function openProject(file){
     if(file.size>projectFileLimit)throw new Error('Proyecto demasiado grande.')
     const raw=JSON.parse(await file.text()),s=projectSettings(raw)
     if(!source.value||raw.source.name!==source.value.name||raw.source.size!==source.value.size||Math.abs(raw.source.duration-duration.value)>.1)throw new Error('Selecciona el mismo archivo original antes de abrir este proyecto.')
-    if(!window.confirm('¿Restaurar los ajustes del proyecto? Se sustituirán los ajustes actuales y deberás volver a seleccionar el audio y el logotipo.'))return
+    if(!window.confirm('¿Restaurar los ajustes del proyecto? Se sustituirán los ajustes actuales y deberás volver a seleccionar el audio, el logotipo y el segundo video.'))return
     for(const layer of s.layers)if(layer.type==='image')restored.set(layer.id,await decodeLayer(layer.data))
     if(disposed)return
     clearLayers();for(const [id,bitmap] of restored)layerImages.set(id,bitmap);layers.value=s.layers;adopted=true
     stopSelection();start.value=Math.min(duration.value,s.selection.start);end.value=Math.min(duration.value,s.selection.end);clips.value=s.clips.map(c=>({start:c.start,end:Math.min(duration.value,c.end)}))
     for(const [k,v] of Object.entries(projectRefs))v.value=s[k]
-    musicFile.value=null;logoFile.value=null;clearResult()
+    musicFile.value=null;logoFile.value=null;releaseSecondary();effects.value=s.effects;secondaryName.value=typeof raw.attachments?.secondary==='string'?raw.attachments.secondary.slice(0,255):'';clearResult()
     if(preview.value)preview.value.currentTime=start.value
-    error.value='';if(raw.attachments?.music||raw.attachments?.logo)error.value='Proyecto restaurado. Vuelve a seleccionar los archivos de música y logotipo que usaste.'
+    error.value='';if(raw.attachments?.music||raw.attachments?.logo||raw.attachments?.secondary||s.effects.pip.enabled)error.value='Proyecto restaurado. Vuelve a adjuntar los archivos de música, logotipo y segundo video que utilizaste.'
   }catch(e){error.value=e.message||'No se pudo abrir el proyecto.'}
   finally{if(!adopted)for(const bitmap of restored.values())bitmap.close();working.value=false}
 }
@@ -332,10 +404,12 @@ async function loadRemote(){
   finally{if(reader)await reader.cancel().catch(()=>{});working.value=false;controller=null}
 }
 async function generate(){
+  if(effects.value.pip.enabled&&!secondaryReady.value){error.value='Selecciona un segundo video válido antes de exportar.';activeTool.value='effects';return}
+  secondaryNode?.pause()
   if(working.value||!source.value)return
   const cues=parseCues();if(!cues)return
   stopSelection();clearResult();error.value='';working.value=true;progress.value=0;stage.value='Exportando edición';controller=new AbortController()
-  try{const output=await renderTrim({source:source.value,start:start.value,end:end.value,segments:clips.value.length?clips.value:undefined,speed:speed.value,options:{...layerOptions(),layers:cleanLayers(layers.value),cues,titleAnimation:titleAnimation.value,format:formatMode.value,fit:fit.value,filter:filter.value,brightness:brightness.value,contrast:contrast.value,saturation:saturation.value,hue:hue.value,title:overlayTitle.value,subtitle:subtitle.value,logoOpacity:logoOpacity.value,transition:transition.value},logoFile:logoFile.value,musicFile:musicFile.value,musicVolume:musicVolume.value,maxHeight:height.value,silent:silent.value,volume:volume.value,maxBytes:props.maxBytes,signal:controller.signal,onProgress:v=>progress.value=v});result.value=output;resultUrl.value=URL.createObjectURL(output)}
+  try{const output=await renderTrim({source:source.value,start:start.value,end:end.value,segments:clips.value.length?clips.value:undefined,speed:speed.value,options:{...layerOptions(),effects:cleanEffects(effects.value),secondaryVideo:null,layers:cleanLayers(layers.value),cues,titleAnimation:titleAnimation.value,format:formatMode.value,fit:fit.value,filter:filter.value,brightness:brightness.value,contrast:contrast.value,saturation:saturation.value,hue:hue.value,title:overlayTitle.value,subtitle:subtitle.value,logoOpacity:logoOpacity.value,transition:transition.value},secondaryFile:effects.value.pip.enabled?secondaryFile.value:null,logoFile:logoFile.value,musicFile:musicFile.value,musicVolume:musicVolume.value,maxHeight:height.value,silent:silent.value,volume:volume.value,maxBytes:props.maxBytes,signal:controller.signal,onProgress:v=>progress.value=v});result.value=output;resultUrl.value=URL.createObjectURL(output)}
   catch(e){error.value=e.message||'No se pudo exportar el video.'}
   finally{working.value=false;controller=null}
 }
@@ -358,7 +432,7 @@ function renderMonitor(){
   const scale=Math.min(1,960/Math.max(ow,oh)),w=Math.max(2,Math.round(ow*scale)),h=Math.max(2,Math.round(oh*scale))
   if(c.width!==w||c.height!==h){c.width=w;c.height=h}
   const ctx=c.getContext('2d',{alpha:false});if(!ctx)return
-  if(showOriginal.value){drawComposition(ctx,v,{fit:'contain'});return}
+  if(showOriginal.value){secondaryNode?.pause();drawComposition(ctx,v,{fit:'contain'});return}
   const sequence=clips.value.length?clips.value:[{start:start.value,end:end.value}]
   let offset=0,at=Math.max(0,(v.currentTime-start.value)/speed.value),fade=0
   const hinted=clipHint!==null&&sequence[clipHint]&&v.currentTime>=sequence[clipHint].start&&v.currentTime<=sequence[clipHint].end?clipHint:null
@@ -372,8 +446,10 @@ function renderMonitor(){
     offset+=clip.end-clip.start
   }
   monitorTime=Math.min(totalDuration.value,at);outputClock.value=monitorTime
+  syncSecondary(secondaryNode,effects.value.pip,monitorTime,playing.value&&!working.value,()=>{error.value='No se pudo reproducir el segundo video.'})
   drawComposition(ctx,v,{...layerOptions(),fit:fit.value,filter:filter.value,brightness:brightness.value,contrast:contrast.value,saturation:saturation.value,hue:hue.value,title:overlayTitle.value,subtitle:subtitle.value,cues:trackCues.value,titleAnimation:titleAnimation.value,logoOpacity:logoOpacity.value},monitorLogo,fade,monitorTime,totalDuration.value)
   if(!working.value&&activeTool.value==='layers'&&selectedLayer.value&&layerActive(selectedLayer.value,monitorTime))drawLayerSelection(ctx,animatedLayer(selectedLayer.value,monitorTime),layerImages.get(selectedLayerId.value))
+  if(activeTool.value==='effects'&&!working.value){const e=effects.value[movingEffect.value];if(e.enabled){ctx.save();ctx.strokeStyle='#ff985c';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(e.x*w-10,e.y*h);ctx.lineTo(e.x*w+10,e.y*h);ctx.moveTo(e.x*w,e.y*h-10);ctx.lineTo(e.x*w,e.y*h+10);ctx.stroke();ctx.restore()}}
   if(drag&&snapEnabled.value&&!working.value){ctx.save();ctx.strokeStyle='#40d6e6';ctx.lineWidth=1.5;ctx.setLineDash([5,4]);ctx.beginPath();if(guides.value.x!==null){ctx.moveTo(guides.value.x*w,0);ctx.lineTo(guides.value.x*w,h)}if(guides.value.y!==null){ctx.moveTo(0,guides.value.y*h);ctx.lineTo(w,guides.value.y*h)}ctx.stroke();ctx.restore()}
   if(!working.value&&activeTool.value==='text'&&anchorMode.value){const x=(anchorMode.value==='title'?titleX.value:captionX.value)*w,y=(anchorMode.value==='title'?titleY.value:captionY.value)*h;ctx.save();ctx.strokeStyle='#ff985c';ctx.lineWidth=2;ctx.strokeRect(x-12,y-12,24,24);ctx.restore()}
 }
@@ -382,6 +458,7 @@ function pointerDown(event){
   if(working.value||showOriginal.value||event.button!==0)return
   const canvas=monitorCanvas.value,p=pointerPosition(event)
   if(activeTool.value==='text'&&anchorMode.value){drag={pointer:event.pointerId,anchor:anchorMode.value,dx:0,dy:0};stopSelection();canvas.setPointerCapture(event.pointerId);pointerMove(event);return}
+  if(activeTool.value==='effects'){const type=movingEffect.value,e=effects.value[type];if(!e.enabled)return;stopSelection();drag={pointer:event.pointerId,effect:type,dx:p.x-e.x,dy:p.y-e.y};canvas.setPointerCapture(event.pointerId);return}
   if(activeTool.value!=='layers')return
   const id=hitLayer(canvas.getContext('2d'),layers.value,layerImages,monitorTime,p.x*canvas.width,p.y*canvas.height)
   if(!id){selectedLayerId.value=null;renderMonitor();return}
@@ -390,19 +467,23 @@ function pointerDown(event){
 function pointerMove(event){
   if(!drag||drag.pointer!==event.pointerId||working.value)return
   const p=pointerPosition(event),sx=snapPosition(Math.max(0,Math.min(1,p.x-drag.dx)),snapEnabled.value),sy=snapPosition(Math.max(0,Math.min(1,p.y-drag.dy)),snapEnabled.value),x=sx.value,y=sy.value;guides.value={x:sx.guide,y:sy.guide}
-  if(drag.anchor){if(drag.anchor==='title'){titleX.value=x;titleY.value=y}else{captionX.value=x;captionY.value=y}}
+  if(drag.effect){const e=effects.value[drag.effect];e.x=x;e.y=y}
+  else if(drag.anchor){if(drag.anchor==='title'){titleX.value=x;titleY.value=y}else{captionX.value=x;captionY.value=y}}
   else{const l=layers.value.find(l=>l.id===drag.id);if(l){const target=drag.keyTime===null?l:l.keyframes?.find(k=>k.time===drag.keyTime);if(target){target.x=x;target.y=y}}}
   renderMonitor()
 }
 function pointerEnd(event){if(drag?.pointer===event.pointerId){drag=null;guides.value={x:null,y:null};renderMonitor()}}
 watch([layers,titleX,titleY,titleSize,captionX,captionY,captionSize],()=>{clearResult();nextTick(renderMonitor)},{deep:true})
 watch([selectedLayerId,activeTool,anchorMode,working,activeKeyTime],()=>nextTick(renderMonitor))
+watch(movingEffect,()=>nextTick(renderMonitor))
+watch(effects,()=>{clearResult();nextTick(renderMonitor)},{deep:true})
+watch(playing,value=>{if(!value){secondaryNode?.pause();nextTick(renderMonitor)}})
 function monitorLoop(){if(disposed)return;if(playing.value)renderMonitor();monitorFrame=requestAnimationFrame(monitorLoop)}
 watch([showOriginal,height,formatMode,fit,filter,brightness,contrast,saturation,hue,overlayTitle,subtitle,trackCues,titleAnimation,logoOpacity,transition,speed,clips,start,end],()=>nextTick(renderMonitor))
 watch([speed,silent,volume],syncAudio)
 watch(logoFile,async file=>{const id=++logoRevision;monitorLogo?.close();monitorLogo=null;if(file){try{const bitmap=await createImageBitmap(file);if(disposed||id!==logoRevision){bitmap.close();return}if(bitmap.width*bitmap.height>16000000){bitmap.close();error.value='Logotipo demasiado grande.';return}monitorLogo=bitmap}catch{error.value='No se pudo abrir el logotipo.'}}renderMonitor()})
 onMounted(()=>{monitorFrame=requestAnimationFrame(monitorLoop)})
-onBeforeUnmount(()=>{disposed=true;++logoRevision;cancelAnimationFrame(monitorFrame);monitorLogo?.close();clearLayers();cancel();stopSelection();if(url.value)URL.revokeObjectURL(url.value);clearResult()})
+onBeforeUnmount(()=>{disposed=true;++logoRevision;cancelAnimationFrame(monitorFrame);monitorLogo?.close();releaseSecondary();clearLayers();cancel();stopSelection();if(url.value)URL.revokeObjectURL(url.value);clearResult()})
 </script>
 <style scoped>
 .editor{width:min(100%,980px);max-width:980px!important;background:#16161c;color:#fff;border:1px solid #ffffff20}.editor-header{display:flex;justify-content:space-between;align-items:start;gap:12px;padding:24px}.eyebrow{color:#ff9b6a;font-size:11px;font-weight:800;letter-spacing:.18em}.editor h2{font-size:30px;line-height:1.1;margin:10px 0}.editor h3{font-size:20px;line-height:1.2}.editor p{color:#bab9c0;line-height:1.6;margin:8px 0}.editor-content{display:grid;gap:14px;padding:0 24px 24px}.editor video{display:block;width:100%;max-height:52vh;background:black;border-radius:10px}.source,.timeline-head,.progress-label{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}.timeline{position:relative;height:32px;border:1px solid #45434b;background:repeating-linear-gradient(90deg,#292930 0 19px,#3a3940 19px 20px);border-radius:6px;overflow:hidden}.selected{position:absolute;top:0;bottom:0;background:#ff681e55;border:2px solid #ff681e}.cursor{position:absolute;top:0;bottom:0;width:2px;background:#fff}.controls{display:grid;grid-template-columns:1fr 1fr;gap:12px}.options{display:flex;gap:10px;align-items:center;flex-wrap:wrap}.options .q-select{min-width:200px;flex:1}.volume{display:flex;align-items:center;gap:16px}.volume .q-slider{flex:1}.note{font-size:12px}.result{background:#222229;padding:16px;border-radius:12px;display:grid;gap:12px}.progress{display:grid;gap:6px}@media(max-width:600px){.editor-header,.editor-content{padding:16px}.controls{grid-template-columns:1fr}.volume{flex-direction:column;align-items:stretch}}

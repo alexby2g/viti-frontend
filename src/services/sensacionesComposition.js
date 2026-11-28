@@ -1,4 +1,4 @@
-import {captionAt,titleAlpha,animatedLayer} from './sensacionesProject'
+import {captionAt,titleAlpha,animatedLayer,effectActive,keyPixels} from './sensacionesProject'
 // Shared canvas compositor. All inputs are local files; no remote fonts or assets.
 export function outputSize(width,height,quality,format){
   const limit=quality===1080?1080:720
@@ -31,6 +31,7 @@ export function drawComposition(ctx,video,options={},logo=null,fade=0,time=0,dur
     ctx.drawImage(video,(w-dw)/2,(h-dh)/2,dw,dh)
     ctx.filter='none'
   }
+  drawVideoEffects(ctx,options.effects,options.secondaryVideo,time)
   const base=Math.min(w,h)
   function textLine(value,y,size,x=w/2){
     if(!value?.trim())return
@@ -108,4 +109,59 @@ export function drawLayerSelection(ctx,layer,image){
   const box=layerBox(ctx,layer,image);if(!box)return
   ctx.save();ctx.translate(layer.x*ctx.canvas.width,layer.y*ctx.canvas.height);ctx.rotate(layer.rotation*Math.PI/180)
   ctx.strokeStyle='#ff985c';ctx.lineWidth=2;ctx.setLineDash([5,3]);ctx.strokeRect(-box.width/2-4,-box.height/2-4,box.width+8,box.height+8);ctx.restore()
+}
+
+// Scratch canvases are private to each monitor/export context.
+const surfaces=new WeakMap()
+function scratch(ctx,name,width,height){
+  let group=surfaces.get(ctx);if(!group){group={};surfaces.set(ctx,group)}
+  if(!group[name])group[name]=document.createElement('canvas')
+  const c=group[name];if(c.width!==width)c.width=width;if(c.height!==height)c.height=height
+  return c
+}
+export function secondaryTime(video,effect,time){
+  if(!video||!effectActive(effect,time)||!Number.isFinite(video.duration))return null
+  const t=time-effect.start
+  return t>=0&&t<video.duration?t:null
+}
+export function syncSecondary(video,effect,time,running,onError=()=>{}){
+  if(!video)return
+  const t=secondaryTime(video,effect,time)
+  if(t===null){if(!video.paused)video.pause();return}
+  if(!video.seeking&&Math.abs(video.currentTime-t)>(running?.25:.025)){
+    try{video.currentTime=t}catch(e){onError(e)}
+  }
+  if(running&&video.paused&&!video.seeking&&!video.ended){
+    video.play().catch(onError)
+  }else if(!running&&!video.paused)video.pause()
+}
+function maskPath(ctx,mask,x,y,w,h){
+  ctx.beginPath()
+  if(mask==='circle')ctx.ellipse(x+w/2,y+h/2,w/2,h/2,0,0,Math.PI*2)
+  else ctx.rect(x,y,w,h)
+  ctx.clip()
+}
+export function drawVideoEffects(ctx,effects,video,time){
+  if(!effects)return
+  const w=ctx.canvas.width,h=ctx.canvas.height,p=effects.pip,b=effects.blur
+  if(effectActive(b,time)){
+    const c=scratch(ctx,'blur',w,h),sc=c.getContext('2d')
+    sc.clearRect(0,0,w,h);sc.drawImage(ctx.canvas,0,0)
+    const bw=b.width*w,bh=b.height*h
+    ctx.save();maskPath(ctx,b.mask,b.x*w-bw/2,b.y*h-bh/2,bw,bh)
+    ctx.filter='blur('+Math.max(1,b.strength*Math.min(w,h)/720)+'px)';ctx.drawImage(c,0,0);ctx.restore()
+  }
+  const expected=secondaryTime(video,p,time)
+  if(expected===null||video.readyState<2||!video.videoWidth||!video.videoHeight||Math.abs(video.currentTime-expected)>.6)return
+  const scale=Math.min(w*p.size/video.videoWidth,h*p.size/video.videoHeight)
+  const dw=video.videoWidth*scale,dh=video.videoHeight*scale,x=p.x*w-dw/2,y=p.y*h-dh/2
+  let image=video
+  if(p.key!=='none'){
+    const factor=Math.min(1,640/Math.max(video.videoWidth,video.videoHeight))
+    const kw=Math.max(1,Math.round(video.videoWidth*factor)),kh=Math.max(1,Math.round(video.videoHeight*factor))
+    const c=scratch(ctx,'key',kw,kh),sc=c.getContext('2d',{willReadFrequently:true})
+    sc.clearRect(0,0,kw,kh);sc.drawImage(video,0,0,kw,kh)
+    const pixels=sc.getImageData(0,0,kw,kh);keyPixels(pixels.data,p.key,p.threshold,p.softness);sc.putImageData(pixels,0,0);image=c
+  }
+  ctx.save();maskPath(ctx,p.mask,x,y,dw,dh);ctx.globalAlpha=p.opacity;ctx.drawImage(image,x,y,dw,dh);ctx.restore()
 }
