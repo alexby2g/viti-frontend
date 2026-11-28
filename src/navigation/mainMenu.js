@@ -26,7 +26,9 @@ export function buildMainMenu({
 
   const items = [
     { type: 'section', label: 'Centro de trabajo' },
-    { label: 'Inicio', icon: 'space_dashboard', to: '/' },
+    { label: 'Inicio de gestión', icon: 'space_dashboard', to: '/panel' },
+    ...(isSuperAdmin ? [{ label: 'Sensaciones Studio', icon: 'movie', to: '/sensaciones/studio' }] : []),
+    { label: 'Portafolio público', icon: 'photo_library', to: '/' },
     { label: 'Solicitudes', icon: 'inbox', to: '/solicitudes' },
     ...(isSuperAdmin ? [{ label: 'Pagos', icon: 'receipt_long', to: '/pagos' }] : []),
     { label: 'Trabajos', icon: 'account_tree', to: '/trabajos' },
