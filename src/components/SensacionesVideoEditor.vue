@@ -41,6 +41,15 @@
             <q-btn flat round dense icon="arrow_downward" aria-label="Mover abajo" :disable="working||i===clips.length-1" @click="moveClip(i,1)"/>
             <q-btn flat round dense icon="delete_outline" aria-label="Quitar fragmento" :disable="working" @click="removeClip(i)"/>
           </div>
+          <div class="track-board" v-if="totalDuration>0">
+            <div class="timeline-head"><strong>Vista de pistas</strong><span>{{format(totalDuration)}}</span></div>
+            <div class="track"><span>Video</span><div class="track-lane video-lane"><div v-for="(block,i) in trackClips" :key="i" class="track-video" :style="{flex:block.length}" :title="'Fragmento '+(i+1)+' · '+format(block.length)">{{i+1}}</div></div></div>
+            <div class="track"><span>Audio original</span><div class="track-lane"><div v-if="!silent" class="track-audio" :style="{width:'100%'}">Audio · {{Math.round(volume*100)}}%</div></div></div>
+            <div class="track"><span>Música</span><div class="track-lane"><div v-if="musicFile" class="track-music" :style="{width:'100%'}">Música · {{Math.round(musicVolume*100)}}%</div></div></div>
+            <div class="track"><span>Textos</span><div class="track-lane"><div v-if="overlayTitle||logoFile" class="track-text" :style="{width:'100%'}">{{overlayTitle?'Título':''}}{{overlayTitle&&logoFile?' + ':''}}{{logoFile?'Marca':''}}</div></div></div>
+            <div class="track"><span>Subtítulos</span><div class="track-lane caption-lane"><div v-for="(cue,i) in trackCues" :key="i" class="track-caption" :style="{left:(cue.start/totalDuration*100)+'%',width:((cue.end-cue.start)/totalDuration*100)+'%'}" :title="cue.text">{{i+1}}</div><div v-if="!captions&&subtitle" class="track-caption" style="width:100%">Fijo</div></div></div>
+            <p class="note">Representación de las pistas de salida. Edita sus ajustes en los controles correspondientes.</p>
+          </div>
           <q-select dark outlined v-model="transition" :options="[{label:'Corte directo',value:'cut'},{label:'Fundido a negro entre fragmentos',value:'fade'}]" emit-value map-options label="Transición" :disable="working"/>
         </section>
         <section class="lab-panel">
@@ -61,6 +70,7 @@
           <q-file dark outlined :model-value="null" label="Importar subtítulos SRT (hasta 64 KiB)" accept=".srt" :max-file-size="65536" :disable="working" @update:model-value="loadCaptions" @rejected="error='Archivo SRT demasiado grande.'"/>
           <q-input dark outlined v-model="captions" type="textarea" maxlength="65536" label="Subtítulos SRT · tiempo de salida" hint="00:00:01,000 --> 00:00:03,000, seguido del texto en la siguiente línea." :disable="working"/>
           <div class="options"><q-btn flat color="deep-orange" label="Añadir ejemplo SRT" no-caps :disable="working||!!captions" @click="captions=sampleSrt"/><q-btn flat color="deep-orange" label="Comprobar subtítulos" no-caps :disable="working" @click="checkCaptions"/></div>
+          <p v-if="captionsChecked" class="caption-check">{{captionsChecked}}</p>
           <p class="note">Los tiempos se refieren al video final, después del montaje y la velocidad. Los subtítulos se incrustan en la imagen.</p>
           <q-file dark outlined v-model="logoFile" label="Logotipo PNG, JPG o WebP (hasta 1 MiB)" accept=".png,.jpg,.jpeg,.webp" :max-file-size="1048576" clearable :disable="working" @rejected="error='El logotipo debe ser una imagen de hasta 1 MiB.'"/>
           <div v-if="logoFile" class="volume"><span>Opacidad: {{Math.round(logoOpacity*100)}}%</span><q-slider dark v-model="logoOpacity" :min=".1" :max="1" :step=".05" color="deep-orange" :disable="working"/></div>
@@ -100,8 +110,12 @@ const speedOptions=speedValues.map(value=>({label:value+'×',value}))
 const sampleSrt='1\n00:00:00,000 --> 00:00:01,000\nMi primer subtítulo'
 const totalDuration=computed(()=>(clips.value.length?queuedDuration.value:end.value-start.value)/speed.value)
 async function loadCaptions(file){if(!file)return;try{const raw=await file.text();parseSrt(raw);captions.value=raw;error.value=''}catch(e){error.value=e.message}}
-function checkCaptions(){const cues=parseCues();if(cues)error.value=''}
+const captionsChecked=ref('')
+function checkCaptions(){const cues=parseCues();captionsChecked.value=cues?cues.length+' subtítulos válidos.':'';if(cues)error.value=''}
 function parseCues(){try{const cues=parseSrt(captions.value);if(cues.some(c=>c.end>totalDuration.value+.02))throw new Error('Hay subtítulos fuera de la duración final.');return cues}catch(e){error.value=e.message;return null}}
+const trackClips=computed(()=>(clips.value.length?clips.value:[{start:start.value,end:end.value}]).map(c=>({length:(c.end-c.start)/speed.value})))
+const trackCues=computed(()=>{try{return parseSrt(captions.value).filter(c=>c.end<=totalDuration.value+.02)}catch{return []}})
+watch([captions,totalDuration],()=>{captionsChecked.value=''})
 const projectRefs={speed,captions,height,silent,volume,transition,formatMode,fit,filter,brightness,contrast,saturation,overlayTitle,subtitle,titleAnimation,logoOpacity,musicVolume}
 function saveProject(){
   try{
@@ -185,4 +199,5 @@ onBeforeUnmount(()=>{cancel();stopSelection();if(url.value)URL.revokeObjectURL(u
 <style scoped>
 .editor{width:min(100%,980px);max-width:980px!important;background:#16161c;color:#fff;border:1px solid #ffffff20}.editor-header{display:flex;justify-content:space-between;align-items:start;gap:12px;padding:24px}.eyebrow{color:#ff9b6a;font-size:11px;font-weight:800;letter-spacing:.18em}.editor h2{font-size:30px;line-height:1.1;margin:10px 0}.editor h3{font-size:20px;line-height:1.2}.editor p{color:#bab9c0;line-height:1.6;margin:8px 0}.editor-content{display:grid;gap:14px;padding:0 24px 24px}.editor video{display:block;width:100%;max-height:52vh;background:black;border-radius:10px}.source,.timeline-head,.progress-label{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}.timeline{position:relative;height:32px;border:1px solid #45434b;background:repeating-linear-gradient(90deg,#292930 0 19px,#3a3940 19px 20px);border-radius:6px;overflow:hidden}.selected{position:absolute;top:0;bottom:0;background:#ff681e55;border:2px solid #ff681e}.cursor{position:absolute;top:0;bottom:0;width:2px;background:#fff}.controls{display:grid;grid-template-columns:1fr 1fr;gap:12px}.options{display:flex;gap:10px;align-items:center;flex-wrap:wrap}.options .q-select{min-width:200px;flex:1}.volume{display:flex;align-items:center;gap:16px}.volume .q-slider{flex:1}.note{font-size:12px}.result{background:#222229;padding:16px;border-radius:12px;display:grid;gap:12px}.progress{display:grid;gap:6px}@media(max-width:600px){.editor-header,.editor-content{padding:16px}.controls{grid-template-columns:1fr}.volume{flex-direction:column;align-items:stretch}}
 .lab-panel{background:#202027;padding:18px;border:1px solid #ffffff16;border-radius:12px;display:grid;gap:12px}.lab-panel h3{margin:0;color:#ffb38b}.clip-row{display:flex;align-items:center;gap:8px;background:#292931;padding:9px;border-radius:8px;flex-wrap:wrap}.clip-row strong{flex:1}.clip-row span{font-size:12px;color:#aaa}
+.track-board{display:grid;gap:8px;border:1px solid #ffffff15;border-radius:10px;background:#121217;padding:12px}.track{display:grid;grid-template-columns:105px minmax(0,1fr);gap:8px;align-items:center}.track>span{font-size:11px;color:#c4c4cb}.track-lane{position:relative;height:25px;background:#2a2a30;border-radius:4px;overflow:hidden}.video-lane{display:flex;gap:2px}.track-video,.track-audio,.track-music,.track-text,.track-caption{min-width:0;display:grid;place-items:center;overflow:hidden;white-space:nowrap;color:white;font-size:10px;border-radius:3px;height:100%}.track-video{background:#a74621}.track-audio{background:#296b60}.track-music{background:#435c95}.track-text{background:#7b4c8e}.track-caption{position:absolute;background:#8b6826}.caption-check{color:#8be8b8!important}
 </style>
