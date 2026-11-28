@@ -27,7 +27,7 @@ export function drawComposition(ctx,video,options={},logo=null,fade=0,time=0,dur
   if(vw&&vh){
     const scale=options.fit==='cover'?Math.max(w/vw,h/vh):Math.min(w/vw,h/vh)
     const dw=vw*scale,dh=vh*scale
-    ctx.filter='brightness('+bound(options.brightness,0.5,1.5,1)+') contrast('+bound(options.contrast,.5,1.5,1)+') saturate('+bound(options.saturation,0,2,1)+')'+(presets[options.filter]||'')
+    ctx.filter='brightness('+bound(options.brightness,0.5,1.5,1)+') contrast('+bound(options.contrast,.5,1.5,1)+') saturate('+bound(options.saturation,0,2,1)+') hue-rotate('+bound(options.hue,-180,180,0)+'deg)'+(presets[options.filter]||'')
     ctx.drawImage(video,(w-dw)/2,(h-dh)/2,dw,dh)
     ctx.filter='none'
   }
