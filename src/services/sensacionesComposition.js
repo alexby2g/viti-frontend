@@ -1,3 +1,4 @@
+import {captionAt,titleAlpha} from './sensacionesProject'
 // Shared canvas compositor. All inputs are local files; no remote fonts or assets.
 export function outputSize(width,height,quality,format){
   const limit=quality===1080?1080:720
@@ -18,7 +19,7 @@ export function normalizeSegments(segments,duration){
 }
 const bound=(n,min,max,fallback)=>Number.isFinite(Number(n))?Math.max(min,Math.min(max,Number(n))):fallback
 const presets={normal:'',cinema:' contrast(1.12) saturate(0.82)',warm:' sepia(0.22) saturate(1.15)',mono:' grayscale(1)',vivid:' saturate(1.35) contrast(1.05)'}
-export function drawComposition(ctx,video,options={},logo=null,fade=0){
+export function drawComposition(ctx,video,options={},logo=null,fade=0,time=0,duration=0){
   const w=ctx.canvas.width,h=ctx.canvas.height
   ctx.save()
   ctx.fillStyle='#000';ctx.fillRect(0,0,w,h)
@@ -43,7 +44,12 @@ export function drawComposition(ctx,video,options={},logo=null,fade=0){
       ctx.fillStyle='#fff';ctx.fillText(str,w/2,ty,w*.86)
     })
   }
-  textLine(options.title,h*.16,.05);textLine(options.subtitle,h*.84,.04)
+  ctx.save()
+  const alpha=titleAlpha(options.titleAnimation||'none',time,duration)
+  ctx.globalAlpha=alpha
+  textLine(options.title,h*.16+(options.titleAnimation==='slide'?(1-alpha)*h*.10:0),.05)
+  ctx.restore()
+  textLine(options.cues?.length?captionAt(options.cues,time):options.subtitle,h*.84,.04)
   if(logo){const scale=Math.min(w*.20/logo.width,h*.14/logo.height);const lw=logo.width*scale,lh=logo.height*scale;ctx.globalAlpha=bound(options.logoOpacity,0.1,1,.8);ctx.drawImage(logo,w-lw-base*.035,base*.035,lw,lh);ctx.globalAlpha=1}
   if(fade>0){ctx.fillStyle='rgba(0,0,0,'+bound(fade,0,1,0)+')';ctx.fillRect(0,0,w,h)}
   ctx.restore()
