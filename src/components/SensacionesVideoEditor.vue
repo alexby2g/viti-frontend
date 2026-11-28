@@ -18,7 +18,7 @@
           <div><q-input dark outlined type="number" :model-value="start" label="Inicio (segundos)" :min="0" :max="duration" step=".1" :disable="working" @update:model-value="v=>setStart(Number(v))"/><q-btn flat color="deep-orange" label="Usar posición actual" no-caps :disable="working" @click="setStart(current)"/></div>
           <div><q-input dark outlined type="number" :model-value="end" label="Final (segundos)" :min="0" :max="duration" step=".1" :disable="working" @update:model-value="v=>setEnd(Number(v))"/><q-btn flat color="deep-orange" label="Usar posición actual" no-caps :disable="working" @click="setEnd(current)"/></div>
         </div>
-        <div class="options"><q-btn outline color="deep-orange" icon="play_arrow" label="Previsualizar recorte" no-caps :disable="working||end-start<.5" @click="playSelection"/><q-btn flat label="Restablecer" no-caps :disable="working" @click="reset"/><q-select dark outlined v-model="height" :options="[{label:'HD · hasta 720p',value:720},{label:'Full HD · hasta 1080p',value:1080}]" emit-value map-options label="Resolución de salida" :disable="working"/><q-toggle dark v-model="silent" label="Quitar audio" :disable="working"/></div>
+        <div class="options"><q-btn outline color="deep-orange" icon="play_arrow" label="Previsualizar recorte" no-caps :disable="working||end-start<.5" @click="playSelection"/><q-btn flat label="Restablecer" no-caps :disable="working" @click="reset"/><q-select dark outlined v-model="height" :options="[{label:'HD · hasta 720p',value:720},{label:'Full HD · hasta 1080p',value:1080}]" emit-value map-options label="Resolución de salida" :disable="working"/><q-toggle dark v-model="silent" label="Silenciar audio original" :disable="working"/></div>
         <div v-if="!silent" class="volume"><span>Volumen de salida: {{Math.round(volume*100)}}%</span><q-slider dark v-model="volume" :min="0" :max="1" :step=".05" color="deep-orange" :disable="working"/></div>
         <section class="lab-panel">
           <div class="timeline-head"><h3>Montaje de fragmentos</h3><span>{{format(totalDuration)}} de salida</span></div>
@@ -57,7 +57,7 @@
           <h3>Música de fondo</h3>
           <q-file dark outlined v-model="musicFile" label="Audio propio MP3, WAV, M4A, OGG o WebM (hasta 20 MiB)" accept=".mp3,.wav,.m4a,.ogg,.webm,.aac" :max-file-size="20971520" clearable :disable="working" @rejected="error='Archivo de audio no admitido o demasiado grande.'"/>
           <div v-if="musicFile" class="volume"><span>Volumen de música: {{Math.round(musicVolume*100)}}%</span><q-slider dark v-model="musicVolume" :min="0" :max="1" :step=".05" color="deep-orange" :disable="working"/></div>
-          <p class="note">Usa música propia o con licencia. Si es más corta, se repetirá durante la edición. El control Quitar audio silencia el sonido original, no la música.</p>
+          <p class="note">Usa música propia o con licencia. Si es más corta, se repetirá durante la edición. El control Silenciar audio original silencia el sonido original, no la música.</p>
         </section>
         <p class="note">La vista previa de recorte reproduce el original; los efectos, montaje y audio mezclado se comprueban en el resultado exportado.</p>
         <p class="note">Exportación local en tiempo real, hasta 5 minutos en total. Mantén esta pestaña visible. El video se vuelve a codificar y el corte es aproximado, no a nivel de fotograma.</p>
@@ -126,7 +126,7 @@ async function loadRemote(){
 }
 async function generate(){
   if(working.value||!source.value)return
-  stopSelection();clearResult();error.value='';working.value=true;progress.value=0;stage.value='Exportando recorte';controller=new AbortController()
+  stopSelection();clearResult();error.value='';working.value=true;progress.value=0;stage.value='Exportando edición';controller=new AbortController()
   try{const output=await renderTrim({source:source.value,start:start.value,end:end.value,segments:clips.value.length?clips.value:undefined,options:{format:formatMode.value,fit:fit.value,filter:filter.value,brightness:brightness.value,contrast:contrast.value,saturation:saturation.value,title:overlayTitle.value,subtitle:subtitle.value,logoOpacity:logoOpacity.value,transition:transition.value},logoFile:logoFile.value,musicFile:musicFile.value,musicVolume:musicVolume.value,maxHeight:height.value,silent:silent.value,volume:volume.value,maxBytes:props.maxBytes,signal:controller.signal,onProgress:v=>progress.value=v});result.value=output;resultUrl.value=URL.createObjectURL(output)}
   catch(e){error.value=e.message||'No se pudo exportar el video.'}
   finally{working.value=false;controller=null}
