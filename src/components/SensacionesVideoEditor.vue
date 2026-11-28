@@ -21,6 +21,13 @@
         <div class="options"><q-btn outline color="deep-orange" icon="play_arrow" label="Previsualizar recorte" no-caps :disable="working||end-start<.5" @click="playSelection"/><q-btn flat label="Restablecer" no-caps :disable="working" @click="reset"/><q-select dark outlined v-model="height" :options="[{label:'HD · hasta 720p',value:720},{label:'Full HD · hasta 1080p',value:1080}]" emit-value map-options label="Resolución de salida" :disable="working"/><q-toggle dark v-model="silent" label="Silenciar audio original" :disable="working"/></div>
         <div v-if="!silent" class="volume"><span>Volumen de salida: {{Math.round(volume*100)}}%</span><q-slider dark v-model="volume" :min="0" :max="1" :step=".05" color="deep-orange" :disable="working"/></div>
         <section class="lab-panel">
+          <h3>Velocidad y proyecto</h3>
+          <q-select dark outlined v-model="speed" :options="speedOptions" emit-value map-options label="Velocidad de todo el montaje" :disable="working"/>
+          <p>Duración estimada de salida: {{format(totalDuration)}}. La velocidad también afecta al audio original.</p>
+          <div class="options"><q-btn outline color="deep-orange" icon="save" label="Guardar proyecto JSON" no-caps :disable="working" @click="saveProject"/><q-file dark outlined :model-value="null" label="Abrir proyecto JSON" accept=".json" :max-file-size="131072" :disable="working" @update:model-value="openProject" @rejected="error='Proyecto inválido o demasiado grande.'"/></div>
+          <p class="note">El proyecto conserva los ajustes, no los archivos multimedia. Para abrirlo, selecciona primero el mismo video. Vuelve a adjuntar la música y el logotipo si los utilizaste.</p>
+        </section>
+        <section class="lab-panel">
           <div class="timeline-head"><h3>Montaje de fragmentos</h3><span>{{format(totalDuration)}} de salida</span></div>
           <p>Selecciona zonas del mismo video y añádelas en el orden deseado. Si no añades ninguna, se exportará el recorte actual.</p>
           <div class="options">
@@ -49,7 +56,12 @@
         <section class="lab-panel">
           <h3>Textos y marca</h3>
           <q-input dark outlined v-model="overlayTitle" maxlength="180" label="Título sobre el video" :disable="working"/>
-          <q-input dark outlined v-model="subtitle" maxlength="180" label="Subtítulo fijo (visible durante toda la edición)" :disable="working"/>
+          <q-select dark outlined v-model="titleAnimation" :options="[{label:'Sin animación',value:'none'},{label:'Aparición y salida suave',value:'fade'},{label:'Desplazamiento y fundido',value:'slide'}]" emit-value map-options label="Animación del título" :disable="working"/>
+          <q-input dark outlined v-model="subtitle" maxlength="180" label="Subtítulo fijo (si no hay SRT)" :disable="working"/>
+          <q-file dark outlined :model-value="null" label="Importar subtítulos SRT (hasta 64 KiB)" accept=".srt" :max-file-size="65536" :disable="working" @update:model-value="loadCaptions" @rejected="error='Archivo SRT demasiado grande.'"/>
+          <q-input dark outlined v-model="captions" type="textarea" maxlength="65536" label="Subtítulos SRT · tiempo de salida" hint="00:00:01,000 --> 00:00:03,000, seguido del texto en la siguiente línea." :disable="working"/>
+          <div class="options"><q-btn flat color="deep-orange" label="Añadir ejemplo SRT" no-caps :disable="working||!!captions" @click="captions=sampleSrt"/><q-btn flat color="deep-orange" label="Comprobar subtítulos" no-caps :disable="working" @click="checkCaptions"/></div>
+          <p class="note">Los tiempos se refieren al video final, después del montaje y la velocidad. Los subtítulos se incrustan en la imagen.</p>
           <q-file dark outlined v-model="logoFile" label="Logotipo PNG, JPG o WebP (hasta 1 MiB)" accept=".png,.jpg,.jpeg,.webp" :max-file-size="1048576" clearable :disable="working" @rejected="error='El logotipo debe ser una imagen de hasta 1 MiB.'"/>
           <div v-if="logoFile" class="volume"><span>Opacidad: {{Math.round(logoOpacity*100)}}%</span><q-slider dark v-model="logoOpacity" :min=".1" :max="1" :step=".05" color="deep-orange" :disable="working"/></div>
         </section>
@@ -73,6 +85,7 @@
 import {ref,computed,onMounted,onBeforeUnmount,watch} from 'vue'
 import {mediaUrl} from '../services/sensacionesMedia'
 import {canTrim,renderTrim} from '../services/sensacionesTrim'
+import {speedValues,parseSrt,projectSettings} from '../services/sensacionesProject'
 const props=defineProps({item:Object,initialFile:Object,maxBytes:{type:Number,default:262144000}})
 const emit=defineEmits(['close','result'])
 const supported=canTrim()
@@ -82,7 +95,38 @@ const clips=ref([]),transition=ref('cut'),formatMode=ref('original'),fit=ref('co
 const overlayTitle=ref(''),subtitle=ref(''),logoFile=ref(null),logoOpacity=ref(.8),musicFile=ref(null),musicVolume=ref(.25)
 const colorControls=[{label:'Brillo',value:brightness,min:.5,max:1.5},{label:'Contraste',value:contrast,min:.5,max:1.5},{label:'Saturación',value:saturation,min:0,max:2}]
 const queuedDuration=computed(()=>clips.value.reduce((sum,clip)=>sum+clip.end-clip.start,0))
-const totalDuration=computed(()=>clips.value.length?queuedDuration.value:end.value-start.value)
+const speed=ref(1),titleAnimation=ref('none'),captions=ref('')
+const speedOptions=speedValues.map(value=>({label:value+'×',value}))
+const sampleSrt='1\n00:00:00,000 --> 00:00:01,000\nMi primer subtítulo'
+const totalDuration=computed(()=>(clips.value.length?queuedDuration.value:end.value-start.value)/speed.value)
+async function loadCaptions(file){if(!file)return;try{const raw=await file.text();parseSrt(raw);captions.value=raw;error.value=''}catch(e){error.value=e.message}}
+function checkCaptions(){const cues=parseCues();if(cues)error.value=''}
+function parseCues(){try{const cues=parseSrt(captions.value);if(cues.some(c=>c.end>totalDuration.value+.02))throw new Error('Hay subtítulos fuera de la duración final.');return cues}catch(e){error.value=e.message;return null}}
+const projectRefs={speed,captions,height,silent,volume,transition,formatMode,fit,filter,brightness,contrast,saturation,overlayTitle,subtitle,titleAnimation,logoOpacity,musicVolume}
+function saveProject(){
+  try{
+    const settings={selection:{start:start.value,end:end.value},clips:clips.value,...Object.fromEntries(Object.entries(projectRefs).map(([k,v])=>[k,v.value]))}
+    const project={format:'sensaciones-video-lab-v1',source:{name:source.value.name,size:source.value.size,duration:duration.value},settings,attachments:{music:musicFile.value?.name||null,logo:logoFile.value?.name||null}}
+    projectSettings(project)
+    const objectUrl=URL.createObjectURL(new Blob([JSON.stringify(project,null,2)],{type:'application/json'})),a=document.createElement('a')
+    a.href=objectUrl;a.download='sensaciones-proyecto.json';a.click();setTimeout(()=>URL.revokeObjectURL(objectUrl),1000);error.value=''
+  }catch(e){error.value=e.message||'No se pudo guardar el proyecto.'}
+}
+async function openProject(file){
+  if(!file||working.value)return
+  working.value=true
+  try{
+    const raw=JSON.parse(await file.text()),s=projectSettings(raw)
+    if(!source.value||raw.source.name!==source.value.name||raw.source.size!==source.value.size||Math.abs(raw.source.duration-duration.value)>.1)throw new Error('Selecciona el mismo archivo original antes de abrir este proyecto.')
+    if(!window.confirm('¿Restaurar los ajustes del proyecto? Se sustituirán los ajustes actuales y deberás volver a seleccionar el audio y el logotipo.'))return
+    stopSelection();start.value=Math.min(duration.value,s.selection.start);end.value=Math.min(duration.value,s.selection.end);clips.value=s.clips.map(c=>({start:c.start,end:Math.min(duration.value,c.end)}))
+    for(const [k,v] of Object.entries(projectRefs))v.value=s[k]
+    musicFile.value=null;logoFile.value=null;clearResult()
+    if(preview.value)preview.value.currentTime=start.value
+    error.value='';if(raw.attachments?.music||raw.attachments?.logo)error.value='Proyecto restaurado. Vuelve a seleccionar los archivos de música y logotipo que usaste.'
+  }catch(e){error.value=e.message||'No se pudo abrir el proyecto.'}
+  finally{working.value=false}
+}
 function addClip(){if(clips.value.length<12&&end.value-start.value>=.5&&queuedDuration.value+end.value-start.value<=300)clips.value=[...clips.value,{start:start.value,end:end.value}]}
 function splitClip(){if(clips.value.length<=10&&current.value-start.value>=.5&&end.value-current.value>=.5&&queuedDuration.value+end.value-start.value<=300)clips.value=[...clips.value,{start:start.value,end:current.value},{start:current.value,end:end.value}]}
 function moveClip(i,delta){const next=[...clips.value];if(i+delta<0||i+delta>=next.length)return;[next[i],next[i+delta]]=[next[i+delta],next[i]];clips.value=next}
@@ -100,7 +144,7 @@ function setEnd(n){if(!Number.isFinite(n))return;stopSelection();end.value=Math.
 function changeRange(r){stopSelection();if(r.max-r.min<.5)return;start.value=r.min;end.value=r.max;clearResult()}
 function reset(){stopSelection();start.value=0;end.value=duration.value;if(preview.value)preview.value.currentTime=0;clearResult()}
 function updateTime(){if(!preview.value)return;current.value=preview.value.currentTime;if(selectionPlaying&&current.value>=end.value){stopSelection();preview.value.currentTime=end.value}}
-async function playSelection(){if(!preview.value)return;preview.value.currentTime=start.value;selectionPlaying=true;try{await preview.value.play()}catch{selectionPlaying=false;error.value='No se pudo reproducir la selección.'}}
+async function playSelection(){if(!preview.value)return;preview.value.currentTime=start.value;preview.value.playbackRate=speed.value;selectionPlaying=true;try{await preview.value.play()}catch{selectionPlaying=false;error.value='No se pudo reproducir la selección.'}}
 function cancel(){controller?.abort()}
 async function loadRemote(){
   if(working.value)return
@@ -126,15 +170,16 @@ async function loadRemote(){
 }
 async function generate(){
   if(working.value||!source.value)return
+  const cues=parseCues();if(!cues)return
   stopSelection();clearResult();error.value='';working.value=true;progress.value=0;stage.value='Exportando edición';controller=new AbortController()
-  try{const output=await renderTrim({source:source.value,start:start.value,end:end.value,segments:clips.value.length?clips.value:undefined,options:{format:formatMode.value,fit:fit.value,filter:filter.value,brightness:brightness.value,contrast:contrast.value,saturation:saturation.value,title:overlayTitle.value,subtitle:subtitle.value,logoOpacity:logoOpacity.value,transition:transition.value},logoFile:logoFile.value,musicFile:musicFile.value,musicVolume:musicVolume.value,maxHeight:height.value,silent:silent.value,volume:volume.value,maxBytes:props.maxBytes,signal:controller.signal,onProgress:v=>progress.value=v});result.value=output;resultUrl.value=URL.createObjectURL(output)}
+  try{const output=await renderTrim({source:source.value,start:start.value,end:end.value,segments:clips.value.length?clips.value:undefined,speed:speed.value,options:{cues,titleAnimation:titleAnimation.value,format:formatMode.value,fit:fit.value,filter:filter.value,brightness:brightness.value,contrast:contrast.value,saturation:saturation.value,title:overlayTitle.value,subtitle:subtitle.value,logoOpacity:logoOpacity.value,transition:transition.value},logoFile:logoFile.value,musicFile:musicFile.value,musicVolume:musicVolume.value,maxHeight:height.value,silent:silent.value,volume:volume.value,maxBytes:props.maxBytes,signal:controller.signal,onProgress:v=>progress.value=v});result.value=output;resultUrl.value=URL.createObjectURL(output)}
   catch(e){error.value=e.message||'No se pudo exportar el video.'}
   finally{working.value=false;controller=null}
 }
 function download(){if(!result.value)return;const a=document.createElement('a');a.href=resultUrl.value;a.download=result.value.name;a.click()}
 function useResult(){if(result.value)emit('result',result.value)}
 onMounted(()=>{if(props.initialFile)selectLocal(props.initialFile)})
-watch([height,silent,volume,clips,transition,formatMode,fit,filter,brightness,contrast,saturation,overlayTitle,subtitle,logoFile,logoOpacity,musicFile,musicVolume],clearResult)
+watch([speed,titleAnimation,captions,height,silent,volume,clips,transition,formatMode,fit,filter,brightness,contrast,saturation,overlayTitle,subtitle,logoFile,logoOpacity,musicFile,musicVolume],clearResult)
 onBeforeUnmount(()=>{cancel();stopSelection();if(url.value)URL.revokeObjectURL(url.value);clearResult()})
 </script>
 <style scoped>
