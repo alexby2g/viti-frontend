@@ -42,7 +42,7 @@ const canChangeProfilePhoto = computed(() => isClient.value || isSuperAdmin.valu
 const unreadLabel = computed(() => notifications.unreadCount > 99 ? '99+' : String(notifications.unreadCount || ''))
 const businessOptions = computed(() => tenant.businesses.map(b => ({ label: b.nombre_comercial, value: b.id })))
 
-const menu = computed(() => buildMainMenu({
+const originalMenu = computed(() => buildMainMenu({
   isClient: isClient.value,
   isSuperAdmin: isSuperAdmin.value,
   hasClientProfile: hasClientProfile.value,
@@ -51,6 +51,22 @@ const menu = computed(() => buildMainMenu({
   unreadCount: notifications.unreadCount,
   productName: 'Sensaciones',
 }))
+
+// Solo el superadministrador puede acceder a Studio; los demás roles conservan su menú.
+const menu = computed(() => {
+  if (!isSuperAdmin.value || isClient.value) return originalMenu.value
+  const legacy = originalMenu.value.flatMap(item => item.type === 'section' ? [] : item.children || [item])
+    .filter(item => !['/sensaciones/studio','/'].includes(item.to))
+  return [
+    {type:'section',label:'Sensaciones Studio'},
+    {label:'Biblioteca multimedia',icon:'movie',to:'/sensaciones/studio'},
+    {label:'Álbumes y proyectos',icon:'collections',to:'/sensaciones/studio/colecciones'},
+    {label:'Marca y servicios',icon:'palette',to:'/sensaciones/studio/marca'},
+    {label:'Portafolio público',icon:'photo_library',to:'/'},
+    {type:'section',label:'Otros espacios'},
+    {label:'Gestión anterior · Viti',icon:'inventory_2',children:legacy,legacy:true},
+  ]
+})
 
 const quickItems = computed(() => menu.value.flatMap(item => item.children
   ? item.children.filter(child => child.to).map(child => ({ ...child, group: item.label }))
@@ -149,7 +165,7 @@ onBeforeUnmount(() => {
     <q-header bordered class="viti-header">
       <q-toolbar class="viti-toolbar">
         <q-btn flat round dense icon="menu" @click="drawer = !drawer" />
-        <div class="q-ml-md text-weight-bold gt-xs">{{ isClient ? (tenant.active?.nombre_comercial || 'Mi espacio Sensaciones') : 'Gestión Sensaciones' }}</div>
+        <div class="q-ml-md text-weight-bold gt-xs">{{ isClient ? (tenant.active?.nombre_comercial || 'Mi espacio Sensaciones') : 'Gestión anterior · Viti' }}</div>
         <q-space />
         <q-btn flat round dense icon="refresh" @click="refreshApp"><q-tooltip>Actualizar Sensaciones</q-tooltip></q-btn>
         <q-btn flat round icon="search" @click="openQuickSearch"><q-tooltip>Buscar en Sensaciones · Ctrl K</q-tooltip></q-btn>
@@ -189,7 +205,8 @@ onBeforeUnmount(() => {
       <div class="column fit no-wrap">
         <div class="q-pa-lg"><AppBrand /></div>
         <div v-if="!isClient" class="q-px-md q-pb-md">
-          <q-btn unelevated color="primary" icon="list_alt" label="Ver solicitudes" no-caps class="full-width drawer-primary-action" to="/solicitudes" @click="closeMobileDrawer" />
+          <q-btn v-if="isSuperAdmin" unelevated color="deep-orange" icon="arrow_back" label="Volver a Studio" no-caps class="full-width drawer-primary-action" to="/sensaciones/studio" @click="closeMobileDrawer" />
+          <q-btn v-else unelevated color="primary" icon="list_alt" label="Ver solicitudes" no-caps class="full-width drawer-primary-action" to="/solicitudes" @click="closeMobileDrawer" />
         </div>
         <div v-else class="q-px-md q-pb-md">
           <div class="client-badge">
@@ -209,7 +226,7 @@ onBeforeUnmount(() => {
                 <q-item-section>{{ item.label }}</q-item-section>
                 <q-item-section v-if="item.badge" side><q-badge rounded color="negative" :label="item.badge > 99 ? '99+' : item.badge" /></q-item-section>
               </q-item>
-              <q-expansion-item v-else :icon="item.icon" :label="item.label" group="menu">
+              <q-expansion-item v-else :icon="item.icon" :label="item.label" :default-opened="!!item.legacy" group="menu">
                 <q-item v-for="sub in item.children" :key="sub.to || sub.action" clickable v-ripple :to="sub.to" class="q-ml-sm" @click="handleItem(sub)">
                   <q-item-section avatar><q-icon :name="sub.icon" /></q-item-section>
                   <q-item-section>{{ sub.label }}</q-item-section>
@@ -225,7 +242,7 @@ onBeforeUnmount(() => {
           <q-item-section avatar>
             <q-avatar color="accent" text-color="white">
               <img v-if="profilePhoto" :src="profilePhoto" alt="Foto de perfil" />
-              <span v-else>{{ initials || 'VT' }}</span>
+              <span v-else>{{ initials || 'SD' }}</span>
             </q-avatar>
           </q-item-section>
           <q-item-section>
