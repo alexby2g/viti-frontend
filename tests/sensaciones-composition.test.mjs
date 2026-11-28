@@ -4,10 +4,10 @@ import { readFile } from 'node:fs/promises'
 // Load the pure ESM helper even if the root package is CommonJS.
 const projectSource=await readFile(new URL('../src/services/sensacionesProject.js',import.meta.url),'utf8')
 const projectUrl='data:text/javascript;base64,'+Buffer.from(projectSource).toString('base64')
-const {parseSrt,captionAt,titleAlpha,projectSettings,cleanLayers,layerTransform,animatedLayer,snapPosition,cleanEffects,effectActive,keyPixels,normalizeMontage,moveMontage,resizeMontageClip}=await import(projectUrl)
+const {parseSrt,captionAt,titleAlpha,projectSettings,cleanLayers,layerTransform,animatedLayer,snapPosition,cleanEffects,effectActive,keyPixels,normalizeMontage,moveMontage,resizeMontageClip,montageProject,restoreMontageProject}=await import(projectUrl)
 let source=await readFile(new URL('../src/services/sensacionesComposition.js',import.meta.url),'utf8')
 source=source.replace("'./sensacionesProject'",JSON.stringify(projectUrl))
-const {outputSize,normalizeSegments,drawComposition,drawLayers,hitLayer,layerActive,secondaryTime}=await import('data:text/javascript;base64,'+Buffer.from(source).toString('base64'))
+const {outputSize,normalizeSegments,drawComposition,drawLayers,hitLayer,layerActive,secondaryTime,cameraGeometry}=await import('data:text/javascript;base64,'+Buffer.from(source).toString('base64'))
 test('formats are bounded, even and preserve orientation',()=>{
   assert.deepEqual(outputSize(1920,1080,720,'wide'),[1280,720])
   assert.deepEqual(outputSize(1920,1080,720,'vertical'),[406,720])
@@ -172,4 +172,21 @@ test('direct trim handles cannot reverse a clip or extend beyond source',()=>{
   assert.equal(resizeMontageClip(c,'end',-2).end,2.5)
   assert.equal(resizeMontageClip(c,'end',99).end,10)
   assert.equal(c.start,2);assert.equal(c.end,6)
+})
+
+test('camera geometry zoom and pan preserve frame bounds and neutral defaults',()=>{
+  assert.deepEqual(cameraGeometry(1280,720,1280,720),[0,0,1280,720])
+  assert.deepEqual(cameraGeometry(1280,720,1280,720,{cameraZoom:2,cameraX:1,cameraY:-1}),[0,-720,2560,1440])
+})
+test('montage project restores multiple source ranges, duplicate clips and output settings',()=>{
+  const a={file:{name:'a.mp4',size:1000,type:'video/mp4'},duration:5,start:0,end:5}
+  const b={file:{name:'b.webm',size:2000,type:'video/webm'},duration:8,start:0,end:8}
+  const original=[{...b,start:1,end:4},{...a,start:2,end:3},{...b,start:4,end:6}]
+  const raw=montageProject(original,{quality:1080,formatMode:'vertical',transition:'fade',silent:true})
+  const restored=restoreMontageProject(JSON.parse(JSON.stringify(raw)),[a,b])
+  assert.deepEqual(restored.clips.map(c=>[c.file.name,c.start,c.end]),[['b.webm',1,4],['a.mp4',2,3],['b.webm',4,6]])
+  assert.equal(restored.settings.quality,1080)
+  assert.equal(restored.settings.silent,true)
+  assert.throws(()=>restoreMontageProject(raw,[a]))
+  assert.throws(()=>restoreMontageProject({...raw,clips:[{...raw.clips[0],end:99}]},[a,b]))
 })
