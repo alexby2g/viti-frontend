@@ -64,7 +64,7 @@
   </main>
 </template>
 <script setup>
-import {ref,computed,onMounted} from 'vue'
+import {ref,computed,onMounted,watch} from 'vue'
 import {useRouter} from 'vue-router'
 import {useAuthStore} from '../stores/auth'
 import axios from 'axios'
@@ -74,6 +74,7 @@ import {capturePoster} from '../services/sensacionesPoster'
 const router=useRouter(),auth=useAuthStore()
 const overview=ref(null),title=ref(''),description=ref(''),file=ref(null),items=ref([]),error=ref(''),notice=ref(''),busy=ref(false),loading=ref(false),page=ref(1),last=ref(1),progress=ref(0)
 const posterFile=ref(null),posterDialog=ref(false),replacementPoster=ref(null),originalVideo=ref(null),posterTarget=ref(null),posterError=ref('')
+watch(file,()=>{posterFile.value=null})
 const search=ref(''),kind=ref(''),status=ref(''),editing=ref(false),editId=ref(null),editTitle=ref(''),editDescription=ref(''),preview=ref(null)
 const kinds=[{label:'Todos',value:''},{label:'Fotografías',value:'photo'},{label:'Videos',value:'video'}]
 const statuses=[{label:'Todos',value:''},{label:'Publicados',value:'published'},{label:'Borradores',value:'draft'}]
@@ -109,7 +110,7 @@ async function upload(){
     }
     if(selected.size>3145728){
       const {data}=await api.post('/sensaciones/studio/uploads',{title:title.value,description:description.value,mime:selected.type,bytes:selected.size})
-      await axios.put(data.url,selected,{headers:data.headers,withCredentials:false,withXSRFToken:false,timeout:0,onUploadProgress:e=>{progress.value=e.total?e.loaded/e.total:0}})
+      try{await axios.put(data.url,selected,{headers:data.headers,withCredentials:false,withXSRFToken:false,timeout:0,onUploadProgress:e=>{progress.value=e.total?e.loaded/e.total:0}})}catch{throw new Error('R2 rechazó la carga directa o el navegador bloqueó la conexión (CORS). No se publicó el video.')}
       id=(await api.post('/sensaciones/studio/uploads/'+data.id+'/finish')).data.id
     }else{
       const form=new FormData();form.append('title',title.value);form.append('description',description.value);form.append('file',selected)
