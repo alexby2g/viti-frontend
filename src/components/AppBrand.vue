@@ -1,7 +1,7 @@
 <template>
   <div class="viti-product-brand row items-center no-wrap">
     <div class="viti-mark" aria-hidden="true">
-      <img src="/sensaciones-mark.svg" alt="" />
+      <img src="/sensaciones-favicon.svg" alt="" />
     </div>
     <div class="q-ml-sm brand-copy">
       <div class="product-line">SENSACIONES</div>

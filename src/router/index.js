@@ -7,8 +7,12 @@ import { useTenantStore } from '../stores/tenant'
 export default defineRouter(({ store }) => {
   const offlinePreview = import.meta.env.VITE_SENSACIONES_OFFLINE_PREVIEW === '1'
   const publicRoutes = [
-    { path:'/sensaciones/portafolio', name:'sensaciones-collections', component:()=>import('../pages/SensacionesCollectionsPage.vue'), meta:{publicLanding:true} },
-    { path:'/', alias:'/sensaciones', name:'sensaciones-landing', component:()=>import('../pages/SensacionesLandingPage.vue'), meta:{publicLanding:true} },
+    { path:'/sensaciones/portafolio', name:'sensaciones-collections', component:()=>import('../pages/SensacionesCollectionsPage.vue'), meta:{publicLanding:true,sensacionesPublic:true} },
+    { path:'/sensaciones/antes-despues', name:'sensaciones-comparisons', component:()=>import('../pages/SensacionesCollectionsPage.vue'), meta:{publicLanding:true,sensacionesPublic:true,collectionMode:'comparison'} },
+    { path:'/sensaciones/fotografias', name:'sensaciones-photos', component:()=>import('../pages/SensacionesLandingPage.vue'), meta:{publicLanding:true,sensacionesPublic:true,portfolioMode:'photo'} },
+    { path:'/sensaciones/servicios', name:'sensaciones-services', component:()=>import('../pages/SensacionesLandingPage.vue'), meta:{publicLanding:true,sensacionesPublic:true,portfolioMode:'services'} },
+    { path:'/sensaciones/comunidad', name:'sensaciones-community', component:()=>import('../pages/SensacionesLandingPage.vue'), meta:{publicLanding:true,sensacionesPublic:true,portfolioMode:'community'} },
+    { path:'/', alias:'/sensaciones', name:'sensaciones-landing', component:()=>import('../pages/SensacionesLandingPage.vue'), meta:{publicLanding:true,sensacionesPublic:true} },
     { path:'/viti', name:'viti-landing', redirect:'/' },
     { path:'/viti/planes', name:'viti-plans', redirect:{path:'/',hash:'#servicios'} },
     { path:'/planes', redirect:'/viti/planes', meta:{publicLanding:true} },
@@ -70,7 +74,7 @@ export default defineRouter(({ store }) => {
   }
 
   router.beforeEach(async (to, from) => {
-    if (offlinePreview && !['sensaciones-landing','sensaciones-collections'].includes(to.name)) return { name:'sensaciones-landing' }
+    if (offlinePreview && !to.meta.sensacionesPublic) return { name:'sensaciones-landing' }
     if (to.meta.publicLanding || to.name === 'viti-landing' || to.name === 'viti-plans') return true
 
     const auth = useAuthStore(store)
