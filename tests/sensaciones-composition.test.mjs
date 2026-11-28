@@ -4,7 +4,7 @@ import { readFile } from 'node:fs/promises'
 // Load the pure ESM helper even if the root package is CommonJS.
 const projectSource=await readFile(new URL('../src/services/sensacionesProject.js',import.meta.url),'utf8')
 const projectUrl='data:text/javascript;base64,'+Buffer.from(projectSource).toString('base64')
-const {parseSrt,captionAt,titleAlpha,projectSettings,cleanLayers}=await import(projectUrl)
+const {parseSrt,captionAt,titleAlpha,projectSettings,cleanLayers,layerTransform,animatedLayer,snapPosition}=await import(projectUrl)
 let source=await readFile(new URL('../src/services/sensacionesComposition.js',import.meta.url),'utf8')
 source=source.replace("'./sensacionesProject'",JSON.stringify(projectUrl))
 const {outputSize,normalizeSegments,drawComposition,drawLayers,hitLayer,layerActive}=await import('data:text/javascript;base64,'+Buffer.from(source).toString('base64'))
@@ -103,4 +103,26 @@ test('old projects default to original title and caption positions',()=>{
   assert.deepEqual(s.layers,[]);assert.equal(s.titleY,.16);assert.equal(s.captionY,.84)
   p.settings.captionY=.4;p.settings.titleX=.75
   assert.equal(projectSettings(p).captionY,.4);assert.equal(projectSettings(p).titleX,.75)
+})
+
+test('keyframes interpolate position, scale, rotation and opacity',()=>{
+  const [layer]=cleanLayers([{id:'moving',type:'text',text:'Hola',start:0,end:4,keyframes:[{time:0,x:.1,y:.2,size:.1,rotation:0,opacity:1},{time:4,x:.9,y:.6,size:.3,rotation:90,opacity:0}]}])
+  const mid=layerTransform(layer,2)
+  assert.equal(mid.x,.5);assert.ok(Math.abs(mid.y-.4)<1e-9);assert.equal(mid.size,.2);assert.equal(mid.rotation,45);assert.equal(mid.opacity,.5)
+  assert.equal(layerTransform(layer,5).x,.9)
+})
+test('entrance and exit animation respect time and preserve old layers',()=>{
+  const [layer]=cleanLayers([{id:'a',type:'text',start:1,end:5,opacity:1,size:.2,enter:'fade',exit:'zoom',animationSeconds:1}])
+  assert.equal(animatedLayer(layer,1).opacity,0)
+  assert.equal(animatedLayer(layer,2).opacity,1)
+  assert.ok(Math.abs(animatedLayer(layer,4.5).size-.115)<1e-9)
+  const [old]=cleanLayers([{id:'old',type:'text',start:0,end:2,x:.8}])
+  assert.equal(animatedLayer(old,1).x,.8);assert.equal(old.enter,'none')
+})
+test('keyframes reject duplicates and invalid times',()=>{
+  const l={id:'a',type:'text',start:0,end:4}
+  assert.throws(()=>cleanLayers([{...l,keyframes:[{time:1},{time:1}]}]))
+  assert.throws(()=>cleanLayers([{...l,keyframes:[{time:301}]}]))
+  assert.deepEqual(snapPosition(.493),{value:.5,guide:.5})
+  assert.deepEqual(snapPosition(.493,false),{value:.493,guide:null})
 })
