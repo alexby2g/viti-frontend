@@ -4,10 +4,10 @@ import { readFile } from 'node:fs/promises'
 // Load the pure ESM helper even if the root package is CommonJS.
 const projectSource=await readFile(new URL('../src/services/sensacionesProject.js',import.meta.url),'utf8')
 const projectUrl='data:text/javascript;base64,'+Buffer.from(projectSource).toString('base64')
-const {parseSrt,captionAt,titleAlpha,projectSettings}=await import(projectUrl)
+const {parseSrt,captionAt,titleAlpha,projectSettings,cleanLayers}=await import(projectUrl)
 let source=await readFile(new URL('../src/services/sensacionesComposition.js',import.meta.url),'utf8')
 source=source.replace("'./sensacionesProject'",JSON.stringify(projectUrl))
-const {outputSize,normalizeSegments,drawComposition}=await import('data:text/javascript;base64,'+Buffer.from(source).toString('base64'))
+const {outputSize,normalizeSegments,drawComposition,drawLayers,hitLayer,layerActive}=await import('data:text/javascript;base64,'+Buffer.from(source).toString('base64'))
 test('formats are bounded, even and preserve orientation',()=>{
   assert.deepEqual(outputSize(1920,1080,720,'wide'),[1280,720])
   assert.deepEqual(outputSize(1920,1080,720,'vertical'),[406,720])
@@ -65,4 +65,42 @@ test('saved projects keep hue and old projects default to neutral hue',()=>{
   assert.equal(projectSettings(p).hue,-70)
   p.settings.hue=999
   assert.equal(projectSettings(p).hue,180)
+})
+
+test('free layers preserve normalized coordinates and reject unsafe images',()=>{
+  const l={id:'layer-1',type:'text',name:'Title',text:'Sensaciones',x:.8,y:.2,size:.07,rotation:30,opacity:.5,start:1,end:3,color:'#ff681e',font:'serif'}
+  const [clean]=cleanLayers([l])
+  assert.equal(clean.x,.8);assert.equal(clean.y,.2);assert.equal(clean.rotation,30);assert.equal(clean.color,'#ff681e')
+  assert.throws(()=>cleanLayers([l,l]))
+  assert.throws(()=>cleanLayers([{...l,type:'image',data:'https://example.com/sticker.png'}]))
+  assert.throws(()=>cleanLayers([{...l,type:'image',data:'data:image/svg+xml;base64,AAAA'}]))
+  assert.throws(()=>cleanLayers([{...l,end:0}]))
+  assert.equal(layerActive(clean,1),true);assert.equal(layerActive(clean,3),false)
+})
+test('rotated layer hit test selects topmost visible object',()=>{
+  const ctx={canvas:{width:800,height:400}}
+  const layers=cleanLayers([0,1].map(i=>({id:'layer-'+i,type:'image',data:'data:image/png;base64,AAAA',x:.7,y:.3,size:.5,rotation:90,opacity:1,start:i,end:3})))
+  const image={width:200,height:100},images=new Map(layers.map(l=>[l.id,image]))
+  assert.equal(hitLayer(ctx,layers,images,.5,560,120),'layer-0')
+  assert.equal(hitLayer(ctx,layers,images,1.5,560,120),'layer-1')
+  assert.equal(hitLayer(ctx,layers,images,1.5,560,210),'layer-1')
+  assert.equal(hitLayer(ctx,layers,images,1.5,650,120),null)
+  assert.equal(hitLayer(ctx,layers,images,3,560,120),null)
+})
+test('image layers are composited at the requested time and geometry',()=>{
+  const calls=[]
+  const ctx={canvas:{width:800,height:400},save(){},restore(){},translate(...v){calls.push(['translate',...v])},rotate(v){calls.push(['rotate',v])},drawImage(...v){calls.push(['image',...v])}}
+  const layer=cleanLayers([{id:'img',type:'image',data:'data:image/png;base64,AAAA',x:.7,y:.3,size:.5,rotation:90,opacity:.5,start:1,end:3}])[0]
+  const image={width:200,height:100},images=new Map([['img',image]])
+  drawLayers(ctx,[layer],images,0);assert.equal(calls.length,0)
+  drawLayers(ctx,[layer],images,2)
+  assert.deepEqual(calls,[['translate',560,120],['rotate',Math.PI/2],['image',image,-100,-50,200,100]])
+  assert.equal(ctx.globalAlpha,.5)
+})
+test('old projects default to original title and caption positions',()=>{
+  const p={format:'sensaciones-video-lab-v1',source:{name:'demo.mp4',size:1024,duration:6},settings:{selection:{start:0,end:4},clips:[],captions:''}}
+  const s=projectSettings(p)
+  assert.deepEqual(s.layers,[]);assert.equal(s.titleY,.16);assert.equal(s.captionY,.84)
+  p.settings.captionY=.4;p.settings.titleX=.75
+  assert.equal(projectSettings(p).captionY,.4);assert.equal(projectSettings(p).titleX,.75)
 })

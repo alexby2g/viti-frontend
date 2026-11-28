@@ -49,6 +49,9 @@
           <q-input dark outlined v-model="overlayTitle" maxlength="180" label="Título sobre el video" :disable="working"/>
           <q-select dark outlined v-model="titleAnimation" :options="[{label:'Sin animación',value:'none'},{label:'Aparición y salida suave',value:'fade'},{label:'Desplazamiento y fundido',value:'slide'}]" emit-value map-options label="Animación del título" :disable="working"/>
           <q-input dark outlined v-model="subtitle" maxlength="180" label="Subtítulo fijo (si no hay SRT)" :disable="working"/>
+          <div class="options"><q-btn outline color="deep-orange" label="Mover título" no-caps :disable="working||!overlayTitle" @click="selectAnchor('title')"/><q-btn outline color="deep-orange" label="Mover subtítulos" no-caps :disable="working||(!subtitle&&!captions)" @click="selectAnchor('caption')"/></div>
+          <p class="note">Activa un elemento y arrástralo por el monitor, o ajusta su posición con los controles.</p>
+          <div v-for="field in anchorFields" :key="field.key" class="volume"><span>{{field.label}}: {{Math.round(field.value.value*100)}}%</span><q-slider dark :model-value="field.value.value" @update:model-value="v=>field.value.value=v" :min="field.min" :max="field.max" :step=".01" color="deep-orange" :disable="working"/></div>
           <q-file dark outlined :model-value="null" label="Importar subtítulos SRT (hasta 64 KiB)" accept=".srt" :max-file-size="65536" :disable="working" @update:model-value="loadCaptions" @rejected="error='Archivo SRT demasiado grande.'"/>
           <q-input dark outlined v-model="captions" type="textarea" maxlength="65536" label="Subtítulos SRT · tiempo de salida" hint="00:00:01,000 --> 00:00:03,000, seguido del texto en la siguiente línea." :disable="working"/>
           <div class="options"><q-btn flat color="deep-orange" label="Añadir ejemplo SRT" no-caps :disable="working||!!captions" @click="captions=sampleSrt"/><q-btn flat color="deep-orange" label="Comprobar subtítulos" no-caps :disable="working" @click="checkCaptions"/></div>
@@ -58,6 +61,20 @@
           <div v-if="logoFile" class="volume"><span>Opacidad: {{Math.round(logoOpacity*100)}}%</span><q-slider dark v-model="logoOpacity" :min=".1" :max="1" :step=".05" color="deep-orange" :disable="working"/></div>
         </section>
 </div>
+        <div v-if="duration>0" v-show="activeTool==='layers'" class="tool-panel">
+          <h3>Capas libres</h3><p class="note">Selecciona una capa y arrástrala sobre el video. Los tiempos corresponden al montaje final.</p>
+          <div class="options"><q-btn outline color="deep-orange" icon="title" label="Texto libre" no-caps :disable="working||layers.length>=12" @click="addTextLayer('Tu texto')"/><q-btn outline color="deep-orange" icon="emoji_emotions" label="★" :disable="working||layers.length>=12" @click="addTextLayer('★')"/><q-btn outline color="deep-orange" label="♥" :disable="working||layers.length>=12" @click="addTextLayer('♥')"/></div>
+          <q-file dark outlined :model-value="null" label="Sticker, PNG, JPG o WebP (1 MiB)" accept=".png,.jpg,.jpeg,.webp" :max-file-size="1048576" :disable="working||layers.length>=12||imageCount>=8" @update:model-value="addImageLayer" @rejected="error='Imagen no admitida o superior a 1 MiB.'"/>
+          <div class="layer-list"><button v-for="(layer,i) in [...layers].reverse()" :key="layer.id" :disabled="working" :class="{chosen:selectedLayerId===layer.id}" @click="selectLayer(layer.id)"><q-icon :name="layer.type==='image'?'image':'title'"/><span>{{layer.name}}</span><small>{{layers.length-i}}</small></button></div>
+          <template v-if="selectedLayer">
+            <q-input dark outlined v-model="selectedLayer.name" maxlength="80" label="Nombre de capa" :disable="working"/>
+            <template v-if="selectedLayer.type==='text'"><q-input dark outlined type="textarea" v-model="selectedLayer.text" maxlength="180" label="Texto" :disable="working"/><q-select dark outlined v-model="selectedLayer.font" :options="['sans-serif','serif','monospace']" label="Fuente" :disable="working"/><label class="color-pick">Color <input type="color" v-model="selectedLayer.color" :disabled="working"/></label><q-toggle dark v-model="selectedLayer.bold" label="Negrita" :disable="working"/><q-toggle dark v-model="selectedLayer.background" label="Fondo oscuro" :disable="working"/><q-toggle dark v-model="selectedLayer.outline" label="Contorno" :disable="working"/></template>
+            <div v-for="field in layerFields" :key="field.key" class="volume"><span>{{field.label}}: {{Math.round(selectedLayer[field.key]*field.display)}}{{field.unit}}</span><q-slider dark v-model="selectedLayer[field.key]" :min="field.min" :max="field.max" :step="field.step" color="deep-orange" :disable="working"/></div>
+            <div class="controls"><q-input dark outlined type="number" :model-value="selectedLayer.start" label="Inicio (s)" :min="0" :max="300" step=".1" :disable="working" @update:model-value="v=>setLayerTime('start',v)"/><q-input dark outlined type="number" :model-value="selectedLayer.end" label="Final (s)" :min="0" :max="300" step=".1" :disable="working" @update:model-value="v=>setLayerTime('end',v)"/></div>
+            <q-btn flat color="deep-orange" icon="visibility" label="Ver capa en su tiempo" no-caps :disable="working||selectedLayer.start>=totalDuration" @click="seekLayer(selectedLayer)"/><p v-if="selectedLayer.end>totalDuration+.02" class="note">La capa se recorta automáticamente al final del montaje.</p>
+            <div class="options"><q-btn flat dense color="deep-orange" icon="arrow_upward" label="Adelante" no-caps :disable="working" @click="moveLayer(1)"/><q-btn flat dense color="deep-orange" icon="arrow_downward" label="Atrás" no-caps :disable="working" @click="moveLayer(-1)"/><q-btn flat dense color="deep-orange" icon="content_copy" label="Duplicar" no-caps :disable="working||layers.length>=12||(selectedLayer.type==='image'&&imageCount>=8)" @click="duplicateLayer"/><q-btn flat dense color="negative" icon="delete_outline" label="Quitar capa" no-caps :disable="working" @click="removeLayer"/></div>
+          </template>
+        </div>
         <div v-if="duration>0" v-show="activeTool==='audio'" class="tool-panel"><h3>Audio original</h3><q-toggle dark v-model="silent" label="Silenciar audio original" :disable="working"/>        <div v-if="!silent" class="volume"><span>Volumen de salida: {{Math.round(volume*100)}}%</span><q-slider dark v-model="volume" :min="0" :max="1" :step=".05" color="deep-orange" :disable="working"/></div>
         <section class="lab-panel">
           <h3>Música de fondo</h3>
@@ -70,8 +87,8 @@
           <h3>Velocidad y proyecto</h3>
           <q-select dark outlined v-model="speed" :options="speedOptions" emit-value map-options label="Velocidad de todo el montaje" :disable="working"/>
           <p>Duración estimada de salida: {{format(totalDuration)}}. La velocidad también afecta al audio original.</p>
-          <div class="options"><q-btn outline color="deep-orange" icon="save" label="Guardar proyecto JSON" no-caps :disable="working" @click="saveProject"/><q-file dark outlined :model-value="null" label="Abrir proyecto JSON" accept=".json" :max-file-size="131072" :disable="working" @update:model-value="openProject" @rejected="error='Proyecto inválido o demasiado grande.'"/></div>
-          <p class="note">El proyecto conserva los ajustes, no los archivos multimedia. Para abrirlo, selecciona primero el mismo video. Vuelve a adjuntar la música y el logotipo si los utilizaste.</p>
+          <div class="options"><q-btn outline color="deep-orange" icon="save" label="Guardar proyecto JSON" no-caps :disable="working" @click="saveProject"/><q-file dark outlined :model-value="null" label="Abrir proyecto JSON" accept=".json" :max-file-size="projectFileLimit" :disable="working" @update:model-value="openProject" @rejected="error='Proyecto inválido o demasiado grande.'"/></div>
+          <p class="note">El proyecto conserva los ajustes y las imágenes de capas, no el video ni el audio. Para abrirlo, selecciona primero el mismo video. Vuelve a adjuntar la música y el logotipo si los utilizaste.</p>
         </section>
 <section class="lab-panel"><h3>Exportación</h3><q-select dark outlined v-model="height" :options="[{label:'HD · hasta 720p',value:720},{label:'Full HD · hasta 1080p',value:1080}]" emit-value map-options label="Resolución de salida" :disable="working"/><p class="note">Hasta cinco minutos. La exportación recodifica el video en tiempo real; mantén la pestaña visible. El original permanece intacto.</p><p v-if="!supported">Usa Chrome, Edge o Brave de escritorio actualizado.</p></section></div>
         <p v-if="!duration&&activeTool!=='media'" class="note">Carga primero un video desde Archivos.</p>
@@ -80,7 +97,7 @@
         <div class="monitor-head"><strong>Monitor de edición</strong><q-btn-toggle dense unelevated no-caps color="grey-9" toggle-color="deep-orange" v-model="showOriginal" :options="[{label:'Original',value:true},{label:'Editado',value:false}]"/></div>
         <div class="monitor-stage">
           <video v-if="url" ref="preview" :src="url" class="source-video" playsinline preload="auto" @loadedmetadata="metadata" @loadeddata="renderMonitor" @seeked="renderMonitor" @timeupdate="updateTime" @play="playing=true" @pause="playing=false" @ended="playing=false" @error="error='No se pudo abrir el video. Prueba otro archivo.'"/>
-          <canvas v-show="duration>0" ref="monitorCanvas" aria-label="Vista previa del video editado"/>
+          <canvas v-show="duration>0" ref="monitorCanvas" :class="{draggable:!showOriginal&&!working&&(activeTool==='layers'||!!anchorMode)}" aria-label="Vista previa del video editado" @pointerdown="pointerDown" @pointermove="pointerMove" @pointerup="pointerEnd" @pointercancel="pointerEnd" @lostpointercapture="pointerEnd"/>
           <div v-if="!duration" class="empty-monitor"><q-icon name="movie_creation" size="64px"/><p>Importa un video para comenzar</p><q-btn outline color="deep-orange" label="Elegir archivo" no-caps @click="activeTool='media'"/></div>
         </div>
         <div v-if="duration" class="monitor-controls"><q-btn flat round :icon="playing?'pause':'play_arrow'" :aria-label="playing?'Pausar':'Reproducir'" :disable="working" @click="togglePlayback"/><span>{{format(current)}} / {{format(duration)}}</span><q-slider dark :model-value="current" :min="0" :max="duration" :step=".01" color="deep-orange" :disable="working" @update:model-value="seekSource"/><q-btn flat round icon="fullscreen" aria-label="Ampliar monitor" @click="fullscreenMonitor"/></div>
@@ -99,6 +116,7 @@
             <div class="track"><span>Audio original</span><div class="track-lane"><div v-if="!silent" class="track-audio" :style="{width:'100%'}">Audio · {{Math.round(volume*100)}}%</div></div></div>
             <div class="track"><span>Música</span><div class="track-lane"><div v-if="musicFile" class="track-music" :style="{width:'100%'}">Música · {{Math.round(musicVolume*100)}}%</div></div></div>
             <div class="track"><span>Textos</span><div class="track-lane"><div v-if="overlayTitle||logoFile" class="track-text" :style="{width:'100%'}">{{overlayTitle?'Título':''}}{{overlayTitle&&logoFile?' + ':''}}{{logoFile?'Marca':''}}</div></div></div>
+            <div v-for="(layer,i) in layers" :key="layer.id" class="track"><span :title="layer.name">Capa {{i+1}}</span><div class="track-lane"><button v-if="layer.start<totalDuration" class="track-overlay" :class="{selected:selectedLayerId===layer.id}" :style="{left:(layer.start/totalDuration*100)+'%',width:((Math.min(layer.end,totalDuration)-layer.start)/totalDuration*100)+'%'}" :title="layer.name" :disabled="working" @click="selectLayer(layer.id);seekLayer(layer)">{{layer.name}}</button></div></div>
             <div class="track"><span>Subtítulos</span><div class="track-lane caption-lane"><div v-for="(cue,i) in trackCues" :key="i" class="track-caption" :style="{left:(cue.start/totalDuration*100)+'%',width:((cue.end-cue.start)/totalDuration*100)+'%'}" :title="cue.text">{{i+1}}</div><div v-if="!captions&&subtitle" class="track-caption" style="width:100%">Fijo</div></div></div>
             <p class="note">Representación de las pistas de salida. Edita sus ajustes en los controles correspondientes.</p>
           </div>
@@ -111,19 +129,59 @@
 </template>
 <script setup>
 import {ref,computed,onMounted,onBeforeUnmount,watch,nextTick} from 'vue'
-import {drawComposition,outputSize} from '../services/sensacionesComposition'
+import {drawComposition,outputSize,hitLayer,drawLayerSelection,layerActive} from '../services/sensacionesComposition'
 import {mediaUrl} from '../services/sensacionesMedia'
 import {canTrim,renderTrim} from '../services/sensacionesTrim'
-import {speedValues,parseSrt,projectSettings} from '../services/sensacionesProject'
+import {speedValues,parseSrt,projectSettings,cleanLayers,projectFileLimit} from '../services/sensacionesProject'
 const props=defineProps({item:Object,initialFile:Object,maxBytes:{type:Number,default:262144000}})
 const emit=defineEmits(['close','result'])
 const supported=canTrim()
 const localFile=ref(null),source=ref(null),url=ref(''),preview=ref(null),duration=ref(0),start=ref(0),end=ref(0),current=ref(0),height=ref(720),silent=ref(false),volume=ref(1)
 const working=ref(false),progress=ref(0),stage=ref(''),error=ref(''),result=ref(null),resultUrl=ref('')
 const inspector=ref(null),activeTool=ref('media'),showOriginal=ref(false),monitorCanvas=ref(null),playing=ref(false),hue=ref(0)
-const tools=[{id:'media',label:'Archivos',icon:'folder_open'},{id:'trim',label:'Recortar',icon:'content_cut'},{id:'color',label:'Color y formato',icon:'palette'},{id:'text',label:'Textos y marca',icon:'title'},{id:'audio',label:'Audio',icon:'graphic_eq'},{id:'project',label:'Proyecto',icon:'settings'}]
+const tools=[{id:'media',label:'Archivos',icon:'folder_open'},{id:'trim',label:'Recortar',icon:'content_cut'},{id:'color',label:'Color y formato',icon:'palette'},{id:'text',label:'Textos y marca',icon:'title'},{id:'layers',label:'Stickers y capas',icon:'layers'},{id:'audio',label:'Audio',icon:'graphic_eq'},{id:'project',label:'Proyecto',icon:'settings'}]
 const clips=ref([]),transition=ref('cut'),formatMode=ref('original'),fit=ref('contain'),filter=ref('normal'),brightness=ref(1),contrast=ref(1),saturation=ref(1)
 const overlayTitle=ref(''),subtitle=ref(''),logoFile=ref(null),logoOpacity=ref(.8),musicFile=ref(null),musicVolume=ref(.25)
+const layers=ref([]),selectedLayerId=ref(null),anchorMode=ref(null)
+const layerImages=new Map()
+const selectedLayer=computed(()=>layers.value.find(l=>l.id===selectedLayerId.value))
+const imageCount=computed(()=>layers.value.filter(l=>l.type==='image').length)
+const titleX=ref(.5),titleY=ref(.16),titleSize=ref(.05),captionX=ref(.5),captionY=ref(.84),captionSize=ref(.04)
+const anchorFields=[{label:'Título X',value:titleX,min:0,max:1},{label:'Título Y',value:titleY,min:0,max:1},{label:'Tamaño título',value:titleSize,min:.02,max:.3},{label:'Subtítulos X',value:captionX,min:0,max:1},{label:'Subtítulos Y',value:captionY,min:0,max:1},{label:'Tamaño subtítulos',value:captionSize,min:.02,max:.3}]
+const layerFields=[{key:'x',label:'Posición X',min:0,max:1,step:.01,display:100,unit:'%'},{key:'y',label:'Posición Y',min:0,max:1,step:.01,display:100,unit:'%'},{key:'size',label:'Tamaño',min:.02,max:1,step:.01,display:100,unit:'%'},{key:'rotation',label:'Rotación',min:-180,max:180,step:1,display:1,unit:'°'},{key:'opacity',label:'Opacidad',min:0,max:1,step:.01,display:100,unit:'%'}]
+const layerId=()=>crypto.randomUUID()
+function selectLayer(id){selectedLayerId.value=id;anchorMode.value=null;activeTool.value='layers';showOriginal.value=false;renderMonitor()}
+function seekLayer(layer){if(!layer||layer.start>=totalDuration.value)return;const sequence=clips.value.length?clips.value:[{start:start.value,end:end.value}];let t=Math.min(layer.start+.05,(layer.start+Math.min(layer.end,totalDuration.value))/2)*speed.value;for(const clip of sequence){const length=clip.end-clip.start;if(t<length){stopSelection();seekSource(clip.start+t);return}t-=length}}
+function selectAnchor(mode){anchorMode.value=mode;selectedLayerId.value=null;showOriginal.value=false;renderMonitor()}
+function baseLayer(type,name){return {id:layerId(),type,name,x:.5,y:.5,size:type==='image'?.25:.08,rotation:0,opacity:1,start:0,end:Math.max(.01,Math.min(300,totalDuration.value))}}
+function addTextLayer(text){if(working.value||layers.value.length>=12)return;const layer={...baseLayer('text','Texto libre'),text,color:'#ffffff',font:'sans-serif',background:false,bold:true,outline:true};layers.value.push(layer);selectLayer(layer.id)}
+function imageData(file){return new Promise((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(reader.result);reader.onerror=()=>reject(new Error('No se pudo leer la imagen.'));reader.readAsDataURL(file)})}
+async function decodeLayer(data){
+  const [header,payload]=data.split(','),type=header.slice(5,-7)
+  const bytes=Uint8Array.from(atob(payload),c=>c.charCodeAt(0))
+  const bitmap=await createImageBitmap(new Blob([bytes],{type}))
+  if(!bitmap.width||!bitmap.height||bitmap.width*bitmap.height>4000000){bitmap.close();throw new Error('Imagen de capa demasiado grande: máximo 4 megapíxeles.')}
+  return bitmap
+}
+async function addImageLayer(file){
+  if(!file||working.value||layers.value.length>=12||imageCount.value>=8)return
+  working.value=true;stage.value='Preparando imagen';progress.value=0
+  let bitmap
+  try{
+    if(file.size>1048576||!['image/png','image/jpeg','image/webp'].includes(file.type))throw new Error('Selecciona PNG, JPG o WebP de hasta 1 MiB.')
+    const layer=cleanLayers([{...baseLayer('image',file.name.slice(0,80)),data:await imageData(file)}])[0]
+    bitmap=await decodeLayer(layer.data)
+    if(disposed){bitmap.close();return}
+    layerImages.set(layer.id,bitmap);layers.value.push(layer);selectLayer(layer.id);error.value=''
+  }catch(e){error.value=e.message||'No se pudo abrir la imagen.'}
+  finally{working.value=false}
+}
+function moveLayer(delta){if(working.value)return;const i=layers.value.findIndex(l=>l.id===selectedLayerId.value),j=i+delta;if(i<0||j<0||j>=layers.value.length)return;const next=[...layers.value];[next[i],next[j]]=[next[j],next[i]];layers.value=next}
+function removeLayer(){if(working.value||!selectedLayer.value)return;const id=selectedLayerId.value,bitmap=layerImages.get(id);layers.value=layers.value.filter(l=>l.id!==id);layerImages.delete(id);if(bitmap&&![...layerImages.values()].includes(bitmap))bitmap.close();selectedLayerId.value=null}
+function duplicateLayer(){if(working.value||!selectedLayer.value||layers.value.length>=12||(selectedLayer.value.type==='image'&&imageCount.value>=8))return;const layer={...selectedLayer.value,id:layerId(),name:(selectedLayer.value.name+' copia').slice(0,80),x:Math.min(1,selectedLayer.value.x+.04),y:Math.min(1,selectedLayer.value.y+.04)};if(layer.type==='image')layerImages.set(layer.id,layerImages.get(selectedLayerId.value));layers.value.push(layer);selectLayer(layer.id)}
+function setLayerTime(key,value){if(value===''||value===null||!selectedLayer.value)return;const n=Number(value);if(!Number.isFinite(n))return;const l=selectedLayer.value;l[key]=key==='start'?Math.max(0,Math.min(l.end-.01,n)):Math.min(300,Math.max(l.start+.01,n))}
+function clearLayers(){for(const bitmap of new Set(layerImages.values()))bitmap?.close();layerImages.clear();layers.value=[];selectedLayerId.value=null;anchorMode.value=null}
+function layerOptions(){return {titleX:titleX.value,titleY:titleY.value,titleSize:titleSize.value,captionX:captionX.value,captionY:captionY.value,captionSize:captionSize.value,layers:layers.value,layerImages}}
 const colorControls=[{label:'Brillo',value:brightness,min:.5,max:1.5},{label:'Contraste',value:contrast,min:.5,max:1.5},{label:'Saturación',value:saturation,min:0,max:2}]
 const queuedDuration=computed(()=>clips.value.reduce((sum,clip)=>sum+clip.end-clip.start,0))
 const speed=ref(1),titleAnimation=ref('none'),captions=ref('')
@@ -137,10 +195,10 @@ function parseCues(){try{const cues=parseSrt(captions.value);if(cues.some(c=>c.e
 const trackClips=computed(()=>(clips.value.length?clips.value:[{start:start.value,end:end.value}]).map(c=>({length:(c.end-c.start)/speed.value})))
 const trackCues=computed(()=>{try{return parseSrt(captions.value).filter(c=>c.end<=totalDuration.value+.02)}catch{return []}})
 watch([captions,totalDuration],()=>{captionsChecked.value=''})
-const projectRefs={speed,captions,height,silent,volume,transition,formatMode,fit,filter,brightness,contrast,saturation,hue,overlayTitle,subtitle,titleAnimation,logoOpacity,musicVolume}
+const projectRefs={speed,captions,height,silent,volume,transition,formatMode,fit,filter,brightness,contrast,saturation,hue,overlayTitle,subtitle,titleAnimation,logoOpacity,musicVolume,titleX,titleY,titleSize,captionX,captionY,captionSize}
 function saveProject(){
   try{
-    const settings={selection:{start:start.value,end:end.value},clips:clips.value,...Object.fromEntries(Object.entries(projectRefs).map(([k,v])=>[k,v.value]))}
+    const settings={selection:{start:start.value,end:end.value},clips:clips.value,layers:layers.value,...Object.fromEntries(Object.entries(projectRefs).map(([k,v])=>[k,v.value]))}
     const project={format:'sensaciones-video-lab-v1',source:{name:source.value.name,size:source.value.size,duration:duration.value},settings,attachments:{music:musicFile.value?.name||null,logo:logoFile.value?.name||null}}
     projectSettings(project)
     const objectUrl=URL.createObjectURL(new Blob([JSON.stringify(project,null,2)],{type:'application/json'})),a=document.createElement('a')
@@ -149,18 +207,23 @@ function saveProject(){
 }
 async function openProject(file){
   if(!file||working.value)return
-  working.value=true
+  working.value=true;stage.value='Abriendo proyecto';progress.value=0
+  const restored=new Map();let adopted=false
   try{
+    if(file.size>projectFileLimit)throw new Error('Proyecto demasiado grande.')
     const raw=JSON.parse(await file.text()),s=projectSettings(raw)
     if(!source.value||raw.source.name!==source.value.name||raw.source.size!==source.value.size||Math.abs(raw.source.duration-duration.value)>.1)throw new Error('Selecciona el mismo archivo original antes de abrir este proyecto.')
     if(!window.confirm('¿Restaurar los ajustes del proyecto? Se sustituirán los ajustes actuales y deberás volver a seleccionar el audio y el logotipo.'))return
+    for(const layer of s.layers)if(layer.type==='image')restored.set(layer.id,await decodeLayer(layer.data))
+    if(disposed)return
+    clearLayers();for(const [id,bitmap] of restored)layerImages.set(id,bitmap);layers.value=s.layers;adopted=true
     stopSelection();start.value=Math.min(duration.value,s.selection.start);end.value=Math.min(duration.value,s.selection.end);clips.value=s.clips.map(c=>({start:c.start,end:Math.min(duration.value,c.end)}))
     for(const [k,v] of Object.entries(projectRefs))v.value=s[k]
     musicFile.value=null;logoFile.value=null;clearResult()
     if(preview.value)preview.value.currentTime=start.value
     error.value='';if(raw.attachments?.music||raw.attachments?.logo)error.value='Proyecto restaurado. Vuelve a seleccionar los archivos de música y logotipo que usaste.'
   }catch(e){error.value=e.message||'No se pudo abrir el proyecto.'}
-  finally{working.value=false}
+  finally{if(!adopted)for(const bitmap of restored.values())bitmap.close();working.value=false}
 }
 function addClip(){if(clips.value.length<12&&end.value-start.value>=.5&&queuedDuration.value+end.value-start.value<=300)clips.value=[...clips.value,{start:start.value,end:end.value}]}
 function splitClip(){if(clips.value.length<=10&&current.value-start.value>=.5&&end.value-current.value>=.5&&queuedDuration.value+end.value-start.value<=300)clips.value=[...clips.value,{start:start.value,end:current.value},{start:current.value,end:end.value}]}
@@ -207,7 +270,7 @@ async function generate(){
   if(working.value||!source.value)return
   const cues=parseCues();if(!cues)return
   stopSelection();clearResult();error.value='';working.value=true;progress.value=0;stage.value='Exportando edición';controller=new AbortController()
-  try{const output=await renderTrim({source:source.value,start:start.value,end:end.value,segments:clips.value.length?clips.value:undefined,speed:speed.value,options:{cues,titleAnimation:titleAnimation.value,format:formatMode.value,fit:fit.value,filter:filter.value,brightness:brightness.value,contrast:contrast.value,saturation:saturation.value,hue:hue.value,title:overlayTitle.value,subtitle:subtitle.value,logoOpacity:logoOpacity.value,transition:transition.value},logoFile:logoFile.value,musicFile:musicFile.value,musicVolume:musicVolume.value,maxHeight:height.value,silent:silent.value,volume:volume.value,maxBytes:props.maxBytes,signal:controller.signal,onProgress:v=>progress.value=v});result.value=output;resultUrl.value=URL.createObjectURL(output)}
+  try{const output=await renderTrim({source:source.value,start:start.value,end:end.value,segments:clips.value.length?clips.value:undefined,speed:speed.value,options:{...layerOptions(),layers:cleanLayers(layers.value),cues,titleAnimation:titleAnimation.value,format:formatMode.value,fit:fit.value,filter:filter.value,brightness:brightness.value,contrast:contrast.value,saturation:saturation.value,hue:hue.value,title:overlayTitle.value,subtitle:subtitle.value,logoOpacity:logoOpacity.value,transition:transition.value},logoFile:logoFile.value,musicFile:musicFile.value,musicVolume:musicVolume.value,maxHeight:height.value,silent:silent.value,volume:volume.value,maxBytes:props.maxBytes,signal:controller.signal,onProgress:v=>progress.value=v});result.value=output;resultUrl.value=URL.createObjectURL(output)}
   catch(e){error.value=e.message||'No se pudo exportar el video.'}
   finally{working.value=false;controller=null}
 }
@@ -215,7 +278,7 @@ function download(){if(!result.value)return;const a=document.createElement('a');
 function useResult(){if(result.value)emit('result',result.value)}
 onMounted(()=>{if(props.initialFile)selectLocal(props.initialFile)})
 watch([speed,titleAnimation,captions,height,silent,volume,clips,transition,formatMode,fit,filter,brightness,contrast,saturation,hue,overlayTitle,subtitle,logoFile,logoOpacity,musicFile,musicVolume],clearResult)
-let monitorFrame=0,monitorLogo=null,logoRevision=0,disposed=false
+let monitorTime=0,drag=null,monitorFrame=0,monitorLogo=null,logoRevision=0,disposed=false
 function syncAudio(){const v=preview.value;if(v){v.muted=silent.value;v.volume=volume.value;v.playbackRate=speed.value;v.preservesPitch=true}}
 function seekSource(value){if(!preview.value||!Number.isFinite(value))return;selectionPlaying=false;preview.value.currentTime=Math.max(0,Math.min(duration.value,value));current.value=preview.value.currentTime}
 async function togglePlayback(){const v=preview.value;if(!v)return;if(!v.paused){stopSelection();return}selectionPlaying=false;syncAudio();try{await v.play()}catch{error.value='No se pudo iniciar la reproducción.'}}
@@ -242,14 +305,37 @@ function renderMonitor(){
     }
     offset+=clip.end-clip.start
   }
-  drawComposition(ctx,v,{fit:fit.value,filter:filter.value,brightness:brightness.value,contrast:contrast.value,saturation:saturation.value,hue:hue.value,title:overlayTitle.value,subtitle:subtitle.value,cues:trackCues.value,titleAnimation:titleAnimation.value,logoOpacity:logoOpacity.value},monitorLogo,fade,Math.min(totalDuration.value,at),totalDuration.value)
+  monitorTime=Math.min(totalDuration.value,at)
+  drawComposition(ctx,v,{...layerOptions(),fit:fit.value,filter:filter.value,brightness:brightness.value,contrast:contrast.value,saturation:saturation.value,hue:hue.value,title:overlayTitle.value,subtitle:subtitle.value,cues:trackCues.value,titleAnimation:titleAnimation.value,logoOpacity:logoOpacity.value},monitorLogo,fade,monitorTime,totalDuration.value)
+  if(!working.value&&activeTool.value==='layers'&&selectedLayer.value&&layerActive(selectedLayer.value,monitorTime))drawLayerSelection(ctx,selectedLayer.value,layerImages.get(selectedLayerId.value))
+  if(!working.value&&activeTool.value==='text'&&anchorMode.value){const x=(anchorMode.value==='title'?titleX.value:captionX.value)*w,y=(anchorMode.value==='title'?titleY.value:captionY.value)*h;ctx.save();ctx.strokeStyle='#ff985c';ctx.lineWidth=2;ctx.strokeRect(x-12,y-12,24,24);ctx.restore()}
 }
+function pointerPosition(event){const rect=monitorCanvas.value.getBoundingClientRect();return {x:Math.min(1,Math.max(0,(event.clientX-rect.left)/rect.width)),y:Math.min(1,Math.max(0,(event.clientY-rect.top)/rect.height))}}
+function pointerDown(event){
+  if(working.value||showOriginal.value||event.button!==0)return
+  const canvas=monitorCanvas.value,p=pointerPosition(event)
+  if(activeTool.value==='text'&&anchorMode.value){drag={pointer:event.pointerId,anchor:anchorMode.value,dx:0,dy:0};stopSelection();canvas.setPointerCapture(event.pointerId);pointerMove(event);return}
+  if(activeTool.value!=='layers')return
+  const id=hitLayer(canvas.getContext('2d'),layers.value,layerImages,monitorTime,p.x*canvas.width,p.y*canvas.height)
+  if(!id){selectedLayerId.value=null;renderMonitor();return}
+  selectLayer(id);stopSelection();const l=selectedLayer.value;drag={pointer:event.pointerId,id,dx:p.x-l.x,dy:p.y-l.y};canvas.setPointerCapture(event.pointerId)
+}
+function pointerMove(event){
+  if(!drag||drag.pointer!==event.pointerId||working.value)return
+  const p=pointerPosition(event),x=Math.max(0,Math.min(1,p.x-drag.dx)),y=Math.max(0,Math.min(1,p.y-drag.dy))
+  if(drag.anchor){if(drag.anchor==='title'){titleX.value=x;titleY.value=y}else{captionX.value=x;captionY.value=y}}
+  else{const l=layers.value.find(l=>l.id===drag.id);if(l){l.x=x;l.y=y}}
+  renderMonitor()
+}
+function pointerEnd(event){if(drag?.pointer===event.pointerId)drag=null}
+watch([layers,titleX,titleY,titleSize,captionX,captionY,captionSize],()=>{clearResult();nextTick(renderMonitor)},{deep:true})
+watch([selectedLayerId,activeTool,anchorMode,working],()=>nextTick(renderMonitor))
 function monitorLoop(){if(disposed)return;if(playing.value)renderMonitor();monitorFrame=requestAnimationFrame(monitorLoop)}
 watch([showOriginal,height,formatMode,fit,filter,brightness,contrast,saturation,hue,overlayTitle,subtitle,trackCues,titleAnimation,logoOpacity,transition,speed,clips,start,end],()=>nextTick(renderMonitor))
 watch([speed,silent,volume],syncAudio)
 watch(logoFile,async file=>{const id=++logoRevision;monitorLogo?.close();monitorLogo=null;if(file){try{const bitmap=await createImageBitmap(file);if(disposed||id!==logoRevision){bitmap.close();return}if(bitmap.width*bitmap.height>16000000){bitmap.close();error.value='Logotipo demasiado grande.';return}monitorLogo=bitmap}catch{error.value='No se pudo abrir el logotipo.'}}renderMonitor()})
 onMounted(()=>{monitorFrame=requestAnimationFrame(monitorLoop)})
-onBeforeUnmount(()=>{disposed=true;++logoRevision;cancelAnimationFrame(monitorFrame);monitorLogo?.close();cancel();stopSelection();if(url.value)URL.revokeObjectURL(url.value);clearResult()})
+onBeforeUnmount(()=>{disposed=true;++logoRevision;cancelAnimationFrame(monitorFrame);monitorLogo?.close();clearLayers();cancel();stopSelection();if(url.value)URL.revokeObjectURL(url.value);clearResult()})
 </script>
 <style scoped>
 .editor{width:min(100%,980px);max-width:980px!important;background:#16161c;color:#fff;border:1px solid #ffffff20}.editor-header{display:flex;justify-content:space-between;align-items:start;gap:12px;padding:24px}.eyebrow{color:#ff9b6a;font-size:11px;font-weight:800;letter-spacing:.18em}.editor h2{font-size:30px;line-height:1.1;margin:10px 0}.editor h3{font-size:20px;line-height:1.2}.editor p{color:#bab9c0;line-height:1.6;margin:8px 0}.editor-content{display:grid;gap:14px;padding:0 24px 24px}.editor video{display:block;width:100%;max-height:52vh;background:black;border-radius:10px}.source,.timeline-head,.progress-label{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}.timeline{position:relative;height:32px;border:1px solid #45434b;background:repeating-linear-gradient(90deg,#292930 0 19px,#3a3940 19px 20px);border-radius:6px;overflow:hidden}.selected{position:absolute;top:0;bottom:0;background:#ff681e55;border:2px solid #ff681e}.cursor{position:absolute;top:0;bottom:0;width:2px;background:#fff}.controls{display:grid;grid-template-columns:1fr 1fr;gap:12px}.options{display:flex;gap:10px;align-items:center;flex-wrap:wrap}.options .q-select{min-width:200px;flex:1}.volume{display:flex;align-items:center;gap:16px}.volume .q-slider{flex:1}.note{font-size:12px}.result{background:#222229;padding:16px;border-radius:12px;display:grid;gap:12px}.progress{display:grid;gap:6px}@media(max-width:600px){.editor-header,.editor-content{padding:16px}.controls{grid-template-columns:1fr}.volume{flex-direction:column;align-items:stretch}}
@@ -258,4 +344,5 @@ onBeforeUnmount(()=>{disposed=true;++logoRevision;cancelAnimationFrame(monitorFr
 
 .pro-workspace{width:100vw!important;max-width:100vw!important;height:100dvh!important;max-height:100dvh!important;border:0;border-radius:0!important;display:flex;flex-direction:column;overflow:hidden!important;background:#101014}.pro-workspace .editor-header{padding:10px 20px;align-items:center;background:#19191f;border-bottom:1px solid #ffffff12;flex-shrink:0}.editor-brand h2{font-size:21px;margin:3px 0}.head-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.head-time{font-size:12px;color:#aaa}.tool-tabs{flex-shrink:0;display:flex;gap:4px;padding:7px 12px;border-bottom:1px solid #ffffff12;background:#19191f;overflow-x:auto}.tool-tabs button{background:transparent;color:#babac2;border:0;padding:9px 13px;border-radius:7px;display:flex;align-items:center;gap:7px;white-space:nowrap;cursor:pointer;font:inherit;font-size:13px}.tool-tabs button.active{background:#ff681e23;color:#ffac80}.editor-error{flex-shrink:0}.work-grid{flex:1;min-height:0;display:grid;grid-template-columns:minmax(270px,320px) minmax(0,1fr);overflow:hidden}.inspector{min-height:0;overflow-y:auto;background:#1b1b21;border-right:1px solid #ffffff16;padding:14px;scrollbar-color:#555 #1b1b21}.tool-panel{display:grid;gap:12px}.tool-panel>h3{margin:0 0 4px;color:#ffb38b}.inspector .lab-panel{padding:0;border:0;background:none;gap:12px}.inspector .controls{grid-template-columns:1fr}.inspector .volume{flex-direction:column;align-items:stretch;gap:0}.inspector .options{gap:6px}.inspector .options .q-btn{font-size:12px}.monitor{min-width:0;min-height:0;display:flex;flex-direction:column;padding:12px 18px;gap:7px;overflow:hidden}.monitor-head,.monitor-footer,.dock-top{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}.monitor-footer{color:#aaa;font-size:11px}.monitor-stage{position:relative;min-height:0;flex:1;display:flex;align-items:center;justify-content:center;background:#050506;border:1px solid #ffffff12;border-radius:8px;overflow:hidden}.monitor-stage canvas{display:block;max-width:100%;max-height:100%;width:auto;height:auto;object-fit:contain}.monitor-stage:fullscreen{background:#000}.pro-workspace .source-video{position:absolute;width:1px;height:1px;opacity:0;pointer-events:none;max-height:none}.empty-monitor{text-align:center;color:#ff985c}.monitor-controls{display:flex;align-items:center;gap:10px;font-size:12px}.monitor-controls .q-slider{flex:1;min-width:0}.monitor-note{font-size:11px;margin:0!important}.timeline-dock{flex-shrink:0;max-height:34vh;display:flex;flex-direction:column;min-height:0;border-top:1px solid #ffffff20;background:#19191f;padding:8px 16px}.dock-scroll{overflow:auto;min-height:0;padding:4px 0;scrollbar-color:#555 #19191f}.timeline-dock .track-board{margin-top:3px;padding:7px;gap:4px}.timeline-dock .track-lane{height:20px}.timeline-dock .timeline{height:19px}.timeline-dock .track-board .note{display:none}.timeline-dock .timeline-head{font-size:12px}.export-tray{position:absolute;z-index:5;right:16px;top:105px;width:min(480px,calc(100% - 32px));max-height:70vh;overflow:auto;background:#23232a;border:1px solid #ffffff25;border-radius:12px;padding:14px;box-shadow:0 12px 40px #0008}.export-tray video{max-height:34vh}.export-tray .result{padding:0}.export-tray h3{margin:0}.head-actions .q-btn{font-size:12px}@media(max-width:760px){.pro-workspace .editor-header{padding:8px}.head-time{display:none}.editor-brand h2{font-size:16px}.head-actions{gap:3px}.head-actions .q-btn{font-size:11px}.work-grid{grid-template-columns:1fr;grid-template-rows:minmax(140px,1fr) minmax(110px,.8fr)}.monitor{grid-row:1;padding:6px 10px}.inspector{grid-row:2;border-right:0;border-top:1px solid #ffffff16;padding:10px}.timeline-dock{max-height:27vh;padding:6px 10px}.monitor-note{display:none}.tool-tabs button{padding:7px 9px;font-size:11px}.dock-top .q-btn{font-size:10px}}
 .timeline-dock .timeline{cursor:pointer}.track-video{border:0;cursor:pointer}.track-video:hover{background:#d3612e}.track-video:focus-visible,.tool-tabs button:focus-visible{outline:2px solid #ffb38b;outline-offset:-2px}
+.track-overlay{position:absolute;height:100%;background:#8453a0;color:white;border:0;border-radius:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer;font-size:10px}.track-overlay.selected{outline:2px solid #ff985c;outline-offset:-2px}.layer-list{display:grid;gap:5px}.layer-list button{display:flex;gap:8px;align-items:center;padding:10px;border:1px solid #ffffff16;border-radius:6px;background:#25252c;color:#eee;cursor:pointer;text-align:left}.layer-list button span{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.layer-list button.chosen{border-color:#ff681e;background:#ff681e20}.color-pick{display:flex;align-items:center;justify-content:space-between;color:#ddd}.monitor-stage canvas.draggable{touch-action:none;cursor:move}
 </style>

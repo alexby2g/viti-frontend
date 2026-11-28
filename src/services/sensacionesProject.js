@@ -44,5 +44,33 @@ export function projectSettings(raw){
   const total=clips.length?clips.reduce((n,c)=>n+c.end-c.start,0):selection.end-selection.start
   if(clips.length&&total>300)throw new Error('Secuencia demasiado larga.')
   const captions=cleanText(s.captions,65536);parseSrt(captions)
-  return {selection,clips,speed,captions,height:choice(s.height,[720,1080],720),silent:s.silent===true,volume:clamp(s.volume,0,1,1),transition:choice(s.transition,['cut','fade'],'cut'),formatMode:choice(s.formatMode,['original','wide','vertical','square'],'original'),fit:choice(s.fit,['contain','cover'],'contain'),filter:choice(s.filter,['normal','cinema','warm','mono','vivid'],'normal'),brightness:clamp(s.brightness,.5,1.5,1),contrast:clamp(s.contrast,.5,1.5,1),saturation:clamp(s.saturation,0,2,1),hue:clamp(s.hue,-180,180,0),overlayTitle:cleanText(s.overlayTitle),subtitle:cleanText(s.subtitle),titleAnimation:choice(s.titleAnimation,['none','fade','slide'],'none'),logoOpacity:clamp(s.logoOpacity,.1,1,.8),musicVolume:clamp(s.musicVolume,0,1,.25)}
+  return {selection,clips,speed,captions,height:choice(s.height,[720,1080],720),silent:s.silent===true,volume:clamp(s.volume,0,1,1),transition:choice(s.transition,['cut','fade'],'cut'),formatMode:choice(s.formatMode,['original','wide','vertical','square'],'original'),fit:choice(s.fit,['contain','cover'],'contain'),filter:choice(s.filter,['normal','cinema','warm','mono','vivid'],'normal'),brightness:clamp(s.brightness,.5,1.5,1),contrast:clamp(s.contrast,.5,1.5,1),saturation:clamp(s.saturation,0,2,1),hue:clamp(s.hue,-180,180,0),overlayTitle:cleanText(s.overlayTitle),subtitle:cleanText(s.subtitle),titleAnimation:choice(s.titleAnimation,['none','fade','slide'],'none'),logoOpacity:clamp(s.logoOpacity,.1,1,.8),musicVolume:clamp(s.musicVolume,0,1,.25),titleX:clamp(s.titleX,0,1,.5),titleY:clamp(s.titleY,0,1,.16),titleSize:clamp(s.titleSize,.02,.3,.05),captionX:clamp(s.captionX,0,1,.5),captionY:clamp(s.captionY,0,1,.84),captionSize:clamp(s.captionSize,.02,.3,.04),layers:cleanLayers(s.layers)}
+}
+
+export const layerLimit=12
+export const imageLayerLimit=8
+export const projectFileLimit=12*1024*1024
+export function cleanLayers(input){
+  if(input==null)return []
+  if(!Array.isArray(input)||input.length>layerLimit)throw new Error('Máximo 12 capas.')
+  const ids=new Set();let images=0
+  return input.map(l=>{
+    if(!l||typeof l.id!=='string'||!/^[-a-zA-Z0-9]{1,80}$/.test(l.id)||ids.has(l.id)||!['text','image'].includes(l.type))throw new Error('Capa inválida.')
+    ids.add(l.id)
+    const start=clamp(l.start,0,300,0),end=clamp(l.end,0,300,300)
+    if(end<=start)throw new Error('El final de una capa debe ser posterior al inicio.')
+    const result={id:l.id,type:l.type,name:cleanText(l.name,80)||'Capa',x:clamp(l.x,0,1,.5),y:clamp(l.y,0,1,.5),size:clamp(l.size,.02,1,l.type==='image'?.25:.07),rotation:clamp(l.rotation,-180,180,0),opacity:clamp(l.opacity,0,1,1),start,end}
+    if(l.type==='image'){
+      if(++images>imageLayerLimit||typeof l.data!=='string'||l.data.length>1398200||!/^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/]+={0,2}$/.test(l.data))throw new Error('Imagen de capa inválida o demasiado grande.')
+      result.data=l.data
+    }else{
+      result.text=cleanText(l.text)
+      result.color=typeof l.color==='string'&&/^#[0-9a-fA-F]{6}$/.test(l.color)?l.color:'#ffffff'
+      result.font=choice(l.font,['sans-serif','serif','monospace'],'sans-serif')
+      result.background=l.background===true
+      result.bold=l.bold!==false
+      result.outline=l.outline===true
+    }
+    return result
+  })
 }
