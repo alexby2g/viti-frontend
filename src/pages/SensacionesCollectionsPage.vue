@@ -1,14 +1,15 @@
 <template>
 <main class="collections"><router-link to="/sensaciones">← Inicio</router-link><h1>Proyectos y álbumes</h1><p>Una mirada a nuestras producciones y procesos creativos.</p><q-banner v-if="error" class="bg-negative text-white">{{error}}</q-banner><q-spinner v-if="loading" color="deep-orange" size="40px"/><p v-else-if="!items.length&&!error">Todavía no hay colecciones publicadas.</p>
-<article v-for="c in items" :key="c.id"><div class="head"><img v-if="c.cover" :src="c.cover" :alt="'Portada: '+c.title" loading="lazy"/><div><span>{{labels[c.kind]}}</span><h2>{{c.title}}</h2><p>{{c.description}}</p></div></div>
-<div v-if="c.kind==='comparison' && c.items.length===2" class="compare"><div class="frame"><img :src="c.items[0].url" alt="Original"/><img class="after" :src="c.items[1].url" alt="Editado" :style="{clipPath:'inset(0 0 0 '+(positions[c.id]??50)+'%)'}"/><div class="line" :style="{left:(positions[c.id]??50)+'%'}"></div></div><label>Original / editado <input type="range" min="0" max="100" :value="positions[c.id]??50" @input="positions[c.id]=Number($event.target.value)" /></label></div>
-<div v-else-if="c.kind!=='comparison'" class="grid"><div v-for="m in c.items" :key="m.id"><video v-if="m.kind==='video'" :src="m.url" controls playsinline preload="none"/><button v-else class="photo" @click="active=m"><img :src="m.url" :alt="m.title" loading="lazy"/></button><p>{{m.title}}</p></div></div></article>
+<article v-for="c in items" :key="c.id"><div class="head"><img v-if="c.cover" :src="mediaUrl(c.cover)" :alt="'Portada: '+c.title" loading="lazy"/><div><span>{{labels[c.kind]}}</span><h2>{{c.title}}</h2><p>{{c.description}}</p></div></div>
+<div v-if="c.kind==='comparison' && c.items.length===2" class="compare"><div class="frame"><img :src="mediaUrl(c.items[0].url)" alt="Original"/><img class="after" :src="mediaUrl(c.items[1].url)" alt="Editado" :style="{clipPath:'inset(0 0 0 '+(positions[c.id]??50)+'%)'}"/><div class="line" :style="{left:(positions[c.id]??50)+'%'}"></div></div><label>Original / editado <input type="range" min="0" max="100" :value="positions[c.id]??50" @input="positions[c.id]=Number($event.target.value)" /></label></div>
+<div v-else-if="c.kind!=='comparison'" class="grid"><div v-for="m in c.items" :key="m.id"><video v-if="m.kind==='video'" :src="mediaUrl(m.url)" controls playsinline preload="none"/><button v-else class="photo" @click="active=m"><img :src="mediaUrl(m.url)" :alt="m.title" loading="lazy"/></button><p>{{m.title}}</p></div></div></article>
 <q-pagination v-if="last>1" v-model="page" :max="last" color="deep-orange" @update:model-value="load"/>
-<q-dialog :model-value="!!active" @update:model-value="v=>{if(!v)active=null}" maximized><div class="viewer"><q-btn flat color="white" label="Cerrar" @click="active=null"/><img v-if="active" :src="active.url" :alt="active.title"/></div></q-dialog>
+<q-dialog :model-value="!!active" @update:model-value="v=>{if(!v)active=null}" maximized><div class="viewer"><q-btn flat color="white" label="Cerrar" @click="active=null"/><img v-if="active" :src="mediaUrl(active.url)" :alt="active.title"/></div></q-dialog>
 </main></template>
 <script setup>
 import {ref,onMounted} from 'vue'
 import {api} from '../boot/axios'
+import {mediaUrl} from '../services/sensacionesMedia'
 const labels={album:'Álbum fotográfico',project:'Proyecto multimedia',comparison:'Antes y después'}
 const items=ref([]),positions=ref({}),page=ref(1),last=ref(1),active=ref(null),error=ref(''),loading=ref(false)
 async function load(){loading.value=true;error.value='';try{const {data}=await api.get('/sensaciones/collections',{params:{page:page.value}});items.value=data.data;last.value=data.last_page}catch{error.value='No se pudieron cargar las colecciones.'}finally{loading.value=false}}
