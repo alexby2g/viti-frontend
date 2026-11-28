@@ -25,7 +25,7 @@ watch(search,()=>{ clearTimeout(window.__vitiClientSearch); window.__vitiClientS
 
 <template>
   <q-page class="viti-page clients-page">
-    <PageHeader eyebrow="Clientes" title="Personas y negocios con los que trabaja VITI" subtitle="Aquí ves el vínculo comercial. Las operaciones internas de cada negocio permanecen fuera de VITI." />
+    <PageHeader eyebrow="Clientes" title="Clientes de la gestión anterior" subtitle="Consulta los clientes y negocios conservados del sistema anterior. Sus datos y operaciones siguen intactos." />
 
     <section class="clients-toolbar q-mb-lg">
       <q-input v-model="search" outlined dense clearable placeholder="Buscar por nombre, teléfono, correo o negocio"><template #prepend><q-icon name="search"/></template></q-input>
@@ -51,7 +51,7 @@ watch(search,()=>{ clearTimeout(window.__vitiClientSearch); window.__vitiClientS
     <section v-else-if="!loading" class="clients-empty">
       <q-icon name="groups" size="56px"/>
       <h2>{{search ? 'No encontramos clientes' : 'Todavía no hay clientes'}}</h2>
-      <p>{{search ? 'Prueba con otro término de búsqueda.' : 'Los clientes se crearán a partir de las solicitudes y del flujo comercial de VITI.'}}</p>
+      <p>{{search ? 'Prueba con otro término de búsqueda.' : 'Los clientes se crearán a partir de las solicitudes y del flujo comercial de la gestión anterior.'}}</p>
       <q-btn v-if="!search" outline color="orange" no-caps icon="inbox" label="Ir a solicitudes" to="/solicitudes"/>
     </section>
   </q-page>
