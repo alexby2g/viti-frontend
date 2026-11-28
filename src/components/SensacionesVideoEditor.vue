@@ -4,14 +4,14 @@
       <div class="editor-brand"><div class="eyebrow">SENSACIONES / VIDEO LAB</div><h2>Editor de video</h2></div>
       <div class="head-actions"><span v-if="duration" class="head-time">{{format(totalDuration)}} de salida</span><q-btn flat color="grey-4" icon="save" label="Proyecto" no-caps :disable="!duration||working" @click="activeTool='project'"/><q-btn unelevated color="deep-orange" icon="movie" label="Exportar" no-caps :disable="working||!supported||!duration||totalDuration<.5||totalDuration>300" @click="generate"/><q-btn flat round icon="close" aria-label="Cerrar editor" :disable="working" @click="$emit('close')"/></div>
     </header>
-    <nav class="tool-tabs" aria-label="Herramientas de edición"><button v-for="tool in tools" :key="tool.id" :class="{active:activeTool===tool.id}" :aria-pressed="activeTool===tool.id" @click="activeTool=tool.id"><q-icon :name="tool.icon" size="20px"/>{{tool.label}}</button></nav>
+    <nav class="tool-tabs" aria-label="Herramientas de edición"><button v-for="tool in tools" :key="tool.id" :class="{active:activeTool===tool.id}" :aria-pressed="activeTool===tool.id" @click="activeTool=tool.id"><q-icon :name="tool.icon" size="20px"/>{{tool.label}}</button><button :disabled="working" @click="openMontage"><q-icon name="video_library" size="20px"/>Montaje múltiple</button></nav>
     <q-banner v-if="error" dense class="bg-negative text-white editor-error">{{error}}<template #action><q-btn flat round dense icon="close" aria-label="Cerrar aviso" @click="error=''"/></template></q-banner>
     <div class="work-grid">
       <aside ref="inspector" class="inspector">
         <div v-show="activeTool==='media'" class="tool-panel"><h3>Archivos multimedia</h3>      <div v-if="item" class="source"><strong>{{item.title}}</strong><q-btn outline color="deep-orange" icon="download" label="Cargar video de la biblioteca" no-caps :disable="working" @click="loadRemote"/></div>
       <q-file dark outlined :model-value="localFile" label="Seleccionar video original (MP4 o WebM)" accept=".mp4,.webm" :max-file-size="262144000" :disable="working" @update:model-value="selectLocal" @rejected="error='Archivo no admitido o mayor de 250 MiB.'"/>
       <p v-if="item&&!source">Puedes utilizar la copia de la biblioteca o elegir el archivo original de tu computadora.</p>
-<p class="note">Selecciona un MP4 o WebM para empezar. Tus originales no se modificarán.</p></div>
+<q-btn outline color="deep-orange" icon="video_library" label="Unir varios videos" no-caps :disable="working" @click="openMontage"/><p class="note">Selecciona un MP4 o WebM para empezar. Tus originales no se modificarán.</p></div>
         <div v-if="duration>0" v-show="activeTool==='trim'" class="tool-panel"><h3>Recortar y dividir</h3>        <div class="controls">
           <div><q-input dark outlined type="number" :model-value="start" label="Inicio (segundos)" :min="0" :max="duration" step=".1" :disable="working" @update:model-value="v=>setStart(Number(v))"/><q-btn flat color="deep-orange" label="Usar posición actual" no-caps :disable="working" @click="setStart(current)"/></div>
           <div><q-input dark outlined type="number" :model-value="end" label="Final (segundos)" :min="0" :max="duration" step=".1" :disable="working" @update:model-value="v=>setEnd(Number(v))"/><q-btn flat color="deep-orange" label="Usar posición actual" no-caps :disable="working" @click="setEnd(current)"/></div>
@@ -172,17 +172,22 @@
     <div v-if="working||result" class="export-tray">      <div v-if="working" class="progress"><q-linear-progress :value="progress" color="deep-orange" :indeterminate="stage==='Descargando original'"/><div class="progress-label"><span>{{stage}} · {{Math.round(progress*100)}}%</span><q-btn flat color="deep-orange" label="Cancelar" no-caps @click="cancel"/></div></div>
       <div v-if="result" class="result"><div class="timeline-head"><h3>Resultado de la edición</h3><q-btn flat round dense icon="close" aria-label="Cerrar resultado" @click="clearResult"/></div><video :src="resultUrl" controls playsinline preload="metadata"/><p>{{result.type}} · {{(result.size/1048576).toFixed(2)}} MiB. Revisa la reproducción y el audio antes de guardar.</p><div class="options"><q-btn outline color="deep-orange" icon="download" label="Descargar copia" no-caps :disable="working" @click="download"/><q-btn unelevated color="deep-orange" icon="save" label="Usar como nuevo borrador" no-caps :disable="working" @click="useResult"/></div><p class="note">El resultado se enviará al formulario de nueva publicación. No se subirá hasta que pulses Guardar borrador.</p></div>
 </div>
+    <q-dialog v-model="montageOpen" maximized persistent><SensacionesMontage v-if="montageOpen" :initial-file="source" :max-bytes="maxBytes" @close="montageOpen=false" @edit="editMontage" @result="saveMontageResult"/></q-dialog>
   </q-card>
 </template>
 <script setup>
 import {ref,computed,onMounted,onBeforeUnmount,watch,nextTick} from 'vue'
+import SensacionesMontage from './SensacionesMontage.vue'
 import {drawComposition,outputSize,hitLayer,drawLayerSelection,layerActive,syncSecondary} from '../services/sensacionesComposition'
 import {mediaUrl} from '../services/sensacionesMedia'
 import {canTrim,renderTrim} from '../services/sensacionesTrim'
 import {speedValues,parseSrt,projectSettings,cleanLayers,projectFileLimit,layerTransform,animatedLayer,snapPosition,cleanEffects} from '../services/sensacionesProject'
 const props=defineProps({item:Object,initialFile:Object,maxBytes:{type:Number,default:262144000}})
 const emit=defineEmits(['close','result'])
-const supported=canTrim()
+const supported=canTrim(),montageOpen=ref(false)
+function openMontage(){if(working.value)return;stopSelection();secondaryNode?.pause();montageOpen.value=true}
+function editMontage(file){if(!file||working.value)return;if(source.value&&!window.confirm('¿Usar el montaje generado como nuevo video de origen? Se reemplazarán el origen y los recortes actuales; los demás ajustes se conservarán.'))return;montageOpen.value=false;selectLocal(file)}
+function saveMontageResult(file){if(!file||working.value)return;emit('result',file)}
 const localFile=ref(null),source=ref(null),url=ref(''),preview=ref(null),duration=ref(0),start=ref(0),end=ref(0),current=ref(0),height=ref(720),silent=ref(false),volume=ref(1)
 const working=ref(false),progress=ref(0),stage=ref(''),error=ref(''),result=ref(null),resultUrl=ref('')
 const inspector=ref(null),activeTool=ref('media'),showOriginal=ref(false),monitorCanvas=ref(null),playing=ref(false),hue=ref(0)
