@@ -1,5 +1,5 @@
 // Browser-local editing. The original is never modified.
-import {outputSize,normalizeSegments,drawComposition} from './sensacionesComposition'
+import {outputSize,normalizeSegments,drawComposition,syncSecondary,secondaryTime} from './sensacionesComposition'
 import {speedValues} from './sensacionesProject'
 const choices=['video/mp4;codecs=avc1.42001f,mp4a.40.2','video/mp4','video/webm;codecs=vp8,opus','video/webm']
 export function canTrim(){
@@ -16,14 +16,14 @@ function waitEvent(node,event,action,signal){
     try{action()}catch(e){finish(e)}
   })
 }
-export async function renderTrim({source,start,end,segments,speed=1,options={},musicFile=null,musicVolume=.25,logoFile=null,maxHeight=720,silent=false,volume=1,maxBytes=262144000,signal,onProgress=()=>{}}){
+export async function renderTrim({source,start,end,segments,speed=1,options={},secondaryFile=null,musicFile=null,musicVolume=.25,logoFile=null,maxHeight=720,silent=false,volume=1,maxBytes=262144000,signal,onProgress=()=>{}}){
   if(!canTrim())throw new Error('Usa Chrome, Edge o Brave de escritorio actualizado.')
   if(!source)throw new Error('Selecciona un archivo de video.')
   if(!speedValues.includes(speed))throw new Error('Velocidad no compatible.')
   const video=document.createElement('video'),canvas=document.createElement('canvas')
   const url=URL.createObjectURL(source)
   video.preload='auto';video.playsInline=true;video.muted=silent&&!musicFile
-  let audio,stream,recorder,raf,interval,visibility,abort,logo,music,musicUrl
+  let audio,stream,recorder,raf,interval,visibility,abort,logo,music,musicUrl,secondary,secondaryUrl
   try{
     // Create audio context during the initiating click, before awaiting metadata.
     if(!silent||musicFile){
@@ -48,6 +48,13 @@ export async function renderTrim({source,start,end,segments,speed=1,options={},m
     if(options.cues?.some(c=>c.end>outputDuration+.02))throw new Error('Hay subtítulos fuera de la duración final.')
     video.playbackRate=speed;video.preservesPitch=true
     await seek(clips[0].start)
+    if(options.effects?.pip?.enabled){
+      if(!secondaryFile)throw new Error('Adjunta el segundo video antes de exportar.')
+      secondary=document.createElement('video');secondary.muted=true;secondary.playsInline=true;secondary.preload='auto';secondaryUrl=URL.createObjectURL(secondaryFile)
+      await waitEvent(secondary,'loadeddata',()=>{secondary.src=secondaryUrl},signal)
+      if(!secondary.videoWidth||!Number.isFinite(secondary.duration))throw new Error('Segundo video no compatible.')
+      options={...options,secondaryVideo:secondary}
+    }
     if(logoFile){logo=await createImageBitmap(logoFile);if(!logo.width||!logo.height||logo.width*logo.height>16000000)throw new Error('Logotipo demasiado grande.')}
     if(music)await waitEvent(music,'loadeddata',()=>{music.src=musicUrl},signal)
     ;[canvas.width,canvas.height]=outputSize(video.videoWidth,video.videoHeight,maxHeight,options.format)
@@ -63,7 +70,7 @@ export async function renderTrim({source,start,end,segments,speed=1,options={},m
       let failure=null,finished=false,index=0,elapsed=0,seeking=false,lastTime=clips[0].start,lastAdvance=performance.now()
       const stop=(error=null)=>{
         if(finished)return
-        finished=true;failure=error;video.pause();music?.pause();cancelAnimationFrame(raf);clearInterval(interval)
+        finished=true;failure=error;video.pause();music?.pause();secondary?.pause();cancelAnimationFrame(raf);clearInterval(interval)
         if(recorder.state!=='inactive')recorder.stop();else reject(error||new Error('No se pudo exportar.'))
       }
       abort=()=>stop(new Error('Edición cancelada.'))
@@ -79,17 +86,19 @@ export async function renderTrim({source,start,end,segments,speed=1,options={},m
       }
       const draw=()=>{if(finished)return
         if(!seeking){const clip=clips[index],length=clip.end-clip.start,edge=Math.min(.5,length/3),fade=options.transition==='fade'?1-Math.max(0,Math.min(1,(video.currentTime-clip.start)/edge,(clip.end-video.currentTime)/edge)):0
-          drawComposition(ctx,video,options,logo,fade,(elapsed+Math.max(0,video.currentTime-clip.start))/speed,outputDuration)}
+          const time=(elapsed+Math.max(0,video.currentTime-clip.start))/speed
+          try{syncSecondary(secondary,options.effects?.pip,time,true,()=>stop(new Error('No se pudo reproducir el segundo video.')));drawComposition(ctx,video,options,logo,fade,time,outputDuration)}catch(e){stop(e);return}}
         raf=requestAnimationFrame(draw)
       }
       async function advance(){
-        seeking=true;video.pause();music?.pause()
+        seeking=true;video.pause();music?.pause();secondary?.pause()
         try{
           await waitEvent(recorder,'pause',()=>recorder.pause(),signal)
           elapsed+=clips[index].end-clips[index].start;index++
           await seek(clips[index].start)
           if(finished)return
-          drawComposition(ctx,video,options,logo,options.transition==='fade'?1:0)
+          const target=secondaryTime(secondary,options.effects?.pip,elapsed/speed)
+          if(target!==null&&Math.abs(secondary.currentTime-target)>.025)await waitEvent(secondary,'seeked',()=>{secondary.currentTime=target},signal)
           lastTime=video.currentTime;lastAdvance=performance.now()
           drawComposition(ctx,video,options,logo,options.transition==='fade'?1:0,elapsed/speed,outputDuration)
           await waitEvent(recorder,'resume',()=>recorder.resume(),signal)
@@ -112,7 +121,7 @@ export async function renderTrim({source,start,end,segments,speed=1,options={},m
       Promise.all([video.play(),music?.play()]).catch(()=>stop(new Error('No se pudo iniciar la reproducción o la música.')))
     })
   }finally{
-    video.pause();music?.pause();logo?.close();if(musicUrl)URL.revokeObjectURL(musicUrl);cancelAnimationFrame(raf);clearInterval(interval)
+    video.pause();music?.pause();if(secondary){secondary.pause();secondary.removeAttribute('src');secondary.load()}if(secondaryUrl)URL.revokeObjectURL(secondaryUrl);logo?.close();if(musicUrl)URL.revokeObjectURL(musicUrl);cancelAnimationFrame(raf);clearInterval(interval)
     if(visibility)document.removeEventListener('visibilitychange',visibility)
     if(abort)signal?.removeEventListener('abort',abort)
     if(recorder&&recorder.state!=='inactive')recorder.stop()
