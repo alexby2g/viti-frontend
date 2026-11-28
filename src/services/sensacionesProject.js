@@ -155,3 +155,19 @@ export function resizeMontageClip(clip,key,value){
   if(!['start','end'].includes(key)||!Number.isFinite(value))return clip
   return {...clip,[key]:key==='start'?Math.max(0,Math.min(clip.end-.5,value)):Math.min(clip.duration,Math.max(clip.start+.5,value))}
 }
+
+export function montageProject(clips,settings={}){
+  const valid=normalizeMontage(clips)
+  return {format:'sensaciones-montage-v1',clips:valid.map(c=>({name:c.file.name,size:c.file.size,type:c.file.type,duration:c.duration,start:c.start,end:c.end})),settings:{quality:choice(settings.quality,[720,1080],720),formatMode:choice(settings.formatMode,['wide','vertical','square','original'],'wide'),transition:choice(settings.transition,['cut','fade'],'cut'),silent:settings.silent===true}}
+}
+export function restoreMontageProject(raw,available){
+  if(raw?.format!=='sensaciones-montage-v1'||!Array.isArray(raw.clips)||!raw.clips.length||raw.clips.length>12)throw new Error('Proyecto de montaje inválido.')
+  const clips=raw.clips.map(c=>{
+    if(!c||typeof c.name!=='string'||!Number.isFinite(c.duration))throw new Error('Referencia de archivo inválida.')
+    const match=available.find(a=>a.file.name===c.name&&a.file.size===c.size&&a.file.type===c.type&&Math.abs(a.duration-c.duration)<.1)
+    if(!match)throw new Error('Importa primero el archivo original: '+c.name.slice(0,150))
+    return {...match,start:c.start,end:c.end}
+  })
+  normalizeMontage(clips)
+  return {clips,settings:montageProject(clips,raw.settings||{}).settings}
+}
