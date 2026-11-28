@@ -9,7 +9,7 @@
 <div class="colors"><label v-for="c in colors" :key="c.key">{{c.label}} <input type="color" v-model="form[c.key]"/> {{form[c.key]}}</label></div>
 <q-select dark outlined v-model="form.logo_id" :options="photos" emit-value map-options clearable label="Logotipo (imagen publicada)"/>
 <q-select dark outlined v-model="form.intro_id" :options="videos" emit-value map-options clearable label="Video de presentación (publicado)"/>
-<p>Sube y publica tus archivos primero desde Studio.</p>
+<p>Sube y publica tus archivos primero desde Studio.</p><q-toggle dark v-model="form.watermark" label="Aplicar marca de agua a fotografías públicas"/><p>Requiere GD habilitado en el servidor. Límite provisional: fotos de 6 megapíxeles y logotipo de 1 megapíxel. Los originales no se modifican.</p>
 <q-input dark outlined v-model="form.whatsapp" label="WhatsApp internacional, solo números (ej. 591…)" maxlength="15"/>
 <q-input dark outlined v-model="form.seo_title" label="Título SEO" maxlength="70" required/>
 <q-input dark outlined v-model="form.seo_description" label="Descripción SEO" maxlength="160" type="textarea" required/>
