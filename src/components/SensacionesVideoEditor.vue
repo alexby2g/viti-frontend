@@ -89,7 +89,7 @@
           </template>
         </div>
         <div v-if="duration>0" v-show="activeTool==='effects'" class="tool-panel">
-          <h3>Composición de video</h3>
+          <h3>Composición de video</h3><q-btn-toggle dense unelevated no-caps color="grey-9" toggle-color="deep-orange" v-model="movingEffect" :options="[{label:'Mover video 2',value:'pip'},{label:'Mover desenfoque',value:'blur'}]" :disable="working"/><p class="note">Elige el elemento y arrástralo en el monitor.</p>
           <section class="lab-panel"><h3>Video sobre video (PiP)</h3>
             <q-file dark outlined :model-value="secondaryFile" label="Segundo video MP4 / WebM" accept=".mp4,.webm" :max-file-size="262144000" clearable :disable="working" @update:model-value="loadSecondary" @rejected="error='Segundo video no admitido o mayor de 250 MiB.'"/>
             <p v-if="secondaryName&&!secondaryReady" class="note">Archivo requerido o cargando: {{secondaryName}}.</p>
@@ -142,7 +142,7 @@
         <div class="monitor-head"><strong>Monitor de edición</strong><q-btn-toggle dense unelevated no-caps color="grey-9" toggle-color="deep-orange" v-model="showOriginal" :options="[{label:'Original',value:true},{label:'Editado',value:false}]"/></div>
         <div class="monitor-stage">
           <video v-if="url" ref="preview" :src="url" class="source-video" playsinline preload="auto" @loadedmetadata="metadata" @loadeddata="renderMonitor" @seeked="renderMonitor" @timeupdate="updateTime" @play="playing=true" @pause="playing=false" @ended="playing=false" @error="error='No se pudo abrir el video. Prueba otro archivo.'"/>
-          <canvas v-show="duration>0" ref="monitorCanvas" :class="{draggable:!showOriginal&&!working&&(activeTool==='layers'||!!anchorMode)}" aria-label="Vista previa del video editado" @pointerdown="pointerDown" @pointermove="pointerMove" @pointerup="pointerEnd" @pointercancel="pointerEnd" @lostpointercapture="pointerEnd"/>
+          <canvas v-show="duration>0" ref="monitorCanvas" :class="{draggable:!showOriginal&&!working&&(activeTool==='layers'||activeTool==='effects'||!!anchorMode)}" aria-label="Vista previa del video editado" @pointerdown="pointerDown" @pointermove="pointerMove" @pointerup="pointerEnd" @pointercancel="pointerEnd" @lostpointercapture="pointerEnd"/>
           <div v-if="!duration" class="empty-monitor"><q-icon name="movie_creation" size="64px"/><p>Importa un video para comenzar</p><q-btn outline color="deep-orange" label="Elegir archivo" no-caps @click="activeTool='media'"/></div>
         </div>
         <div v-if="duration" class="monitor-controls"><q-btn flat round :icon="playing?'pause':'play_arrow'" :aria-label="playing?'Pausar':'Reproducir'" :disable="working" @click="togglePlayback"/><span>{{format(current)}} / {{format(duration)}}</span><q-slider dark :model-value="current" :min="0" :max="duration" :step=".01" color="deep-orange" :disable="working" @update:model-value="seekSource"/><q-btn flat round icon="fullscreen" aria-label="Ampliar monitor" @click="fullscreenMonitor"/></div>
@@ -189,7 +189,7 @@ const inspector=ref(null),activeTool=ref('media'),showOriginal=ref(false),monito
 const tools=[{id:'media',label:'Archivos',icon:'folder_open'},{id:'trim',label:'Recortar',icon:'content_cut'},{id:'color',label:'Color y formato',icon:'palette'},{id:'text',label:'Textos y marca',icon:'title'},{id:'layers',label:'Stickers y capas',icon:'layers'},{id:'effects',label:'Composición',icon:'auto_fix_high'},{id:'audio',label:'Audio',icon:'graphic_eq'},{id:'project',label:'Proyecto',icon:'settings'}]
 const clips=ref([]),transition=ref('cut'),formatMode=ref('original'),fit=ref('contain'),filter=ref('normal'),brightness=ref(1),contrast=ref(1),saturation=ref(1)
 const overlayTitle=ref(''),subtitle=ref(''),logoFile=ref(null),logoOpacity=ref(.8),musicFile=ref(null),musicVolume=ref(.25)
-const effects=ref(cleanEffects()),secondaryFile=ref(null),secondaryReady=ref(false),secondaryDuration=ref(0),secondaryName=ref('')
+const movingEffect=ref('pip'),effects=ref(cleanEffects()),secondaryFile=ref(null),secondaryReady=ref(false),secondaryDuration=ref(0),secondaryName=ref('')
 let secondaryNode=null,secondaryUrl='',secondaryRevision=0
 const maskOptions=[{label:'Rectangular',value:'rectangle'},{label:'Circular / ovalada',value:'circle'}]
 const keyOptions=[{label:'Sin recorte de color',value:'none'},{label:'Eliminar verde',value:'green'},{label:'Eliminar azul',value:'blue'}]
@@ -449,6 +449,7 @@ function renderMonitor(){
   syncSecondary(secondaryNode,effects.value.pip,monitorTime,playing.value&&!working.value,()=>{error.value='No se pudo reproducir el segundo video.'})
   drawComposition(ctx,v,{...layerOptions(),fit:fit.value,filter:filter.value,brightness:brightness.value,contrast:contrast.value,saturation:saturation.value,hue:hue.value,title:overlayTitle.value,subtitle:subtitle.value,cues:trackCues.value,titleAnimation:titleAnimation.value,logoOpacity:logoOpacity.value},monitorLogo,fade,monitorTime,totalDuration.value)
   if(!working.value&&activeTool.value==='layers'&&selectedLayer.value&&layerActive(selectedLayer.value,monitorTime))drawLayerSelection(ctx,animatedLayer(selectedLayer.value,monitorTime),layerImages.get(selectedLayerId.value))
+  if(activeTool.value==='effects'&&!working.value){const e=effects.value[movingEffect.value];if(e.enabled){ctx.save();ctx.strokeStyle='#ff985c';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(e.x*w-10,e.y*h);ctx.lineTo(e.x*w+10,e.y*h);ctx.moveTo(e.x*w,e.y*h-10);ctx.lineTo(e.x*w,e.y*h+10);ctx.stroke();ctx.restore()}}
   if(drag&&snapEnabled.value&&!working.value){ctx.save();ctx.strokeStyle='#40d6e6';ctx.lineWidth=1.5;ctx.setLineDash([5,4]);ctx.beginPath();if(guides.value.x!==null){ctx.moveTo(guides.value.x*w,0);ctx.lineTo(guides.value.x*w,h)}if(guides.value.y!==null){ctx.moveTo(0,guides.value.y*h);ctx.lineTo(w,guides.value.y*h)}ctx.stroke();ctx.restore()}
   if(!working.value&&activeTool.value==='text'&&anchorMode.value){const x=(anchorMode.value==='title'?titleX.value:captionX.value)*w,y=(anchorMode.value==='title'?titleY.value:captionY.value)*h;ctx.save();ctx.strokeStyle='#ff985c';ctx.lineWidth=2;ctx.strokeRect(x-12,y-12,24,24);ctx.restore()}
 }
@@ -457,6 +458,7 @@ function pointerDown(event){
   if(working.value||showOriginal.value||event.button!==0)return
   const canvas=monitorCanvas.value,p=pointerPosition(event)
   if(activeTool.value==='text'&&anchorMode.value){drag={pointer:event.pointerId,anchor:anchorMode.value,dx:0,dy:0};stopSelection();canvas.setPointerCapture(event.pointerId);pointerMove(event);return}
+  if(activeTool.value==='effects'){const type=movingEffect.value,e=effects.value[type];if(!e.enabled)return;stopSelection();drag={pointer:event.pointerId,effect:type,dx:p.x-e.x,dy:p.y-e.y};canvas.setPointerCapture(event.pointerId);return}
   if(activeTool.value!=='layers')return
   const id=hitLayer(canvas.getContext('2d'),layers.value,layerImages,monitorTime,p.x*canvas.width,p.y*canvas.height)
   if(!id){selectedLayerId.value=null;renderMonitor();return}
@@ -465,13 +467,15 @@ function pointerDown(event){
 function pointerMove(event){
   if(!drag||drag.pointer!==event.pointerId||working.value)return
   const p=pointerPosition(event),sx=snapPosition(Math.max(0,Math.min(1,p.x-drag.dx)),snapEnabled.value),sy=snapPosition(Math.max(0,Math.min(1,p.y-drag.dy)),snapEnabled.value),x=sx.value,y=sy.value;guides.value={x:sx.guide,y:sy.guide}
-  if(drag.anchor){if(drag.anchor==='title'){titleX.value=x;titleY.value=y}else{captionX.value=x;captionY.value=y}}
+  if(drag.effect){const e=effects.value[drag.effect];e.x=x;e.y=y}
+  else if(drag.anchor){if(drag.anchor==='title'){titleX.value=x;titleY.value=y}else{captionX.value=x;captionY.value=y}}
   else{const l=layers.value.find(l=>l.id===drag.id);if(l){const target=drag.keyTime===null?l:l.keyframes?.find(k=>k.time===drag.keyTime);if(target){target.x=x;target.y=y}}}
   renderMonitor()
 }
 function pointerEnd(event){if(drag?.pointer===event.pointerId){drag=null;guides.value={x:null,y:null};renderMonitor()}}
 watch([layers,titleX,titleY,titleSize,captionX,captionY,captionSize],()=>{clearResult();nextTick(renderMonitor)},{deep:true})
 watch([selectedLayerId,activeTool,anchorMode,working,activeKeyTime],()=>nextTick(renderMonitor))
+watch(movingEffect,()=>nextTick(renderMonitor))
 watch(effects,()=>{clearResult();nextTick(renderMonitor)},{deep:true})
 watch(playing,value=>{if(!value){secondaryNode?.pause();nextTick(renderMonitor)}})
 function monitorLoop(){if(disposed)return;if(playing.value)renderMonitor();monitorFrame=requestAnimationFrame(monitorLoop)}
