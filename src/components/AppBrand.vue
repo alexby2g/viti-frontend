@@ -1,11 +1,3 @@
-<script setup>
-import { useBrandingStore } from '../stores/branding'
-import packageMeta from '../../package.json'
-
-const branding = useBrandingStore()
-const vitiVersion = packageMeta.version
-</script>
-
 <template>
   <div class="viti-product-brand row items-center no-wrap">
     <div class="viti-mark" aria-hidden="true">
