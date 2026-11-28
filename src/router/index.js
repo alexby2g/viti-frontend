@@ -16,7 +16,7 @@ export default defineRouter(({ store }) => {
   ]
   const router = createRouter({
     history: createWebHistory(),
-    routes:[...publicRoutes, { path:'/sensaciones/studio/colecciones', name:'sensaciones-collections-studio', component:()=>import('../pages/SensacionesCollectionsStudioPage.vue'), meta:{requiresAuth:true,superAdminOnly:true,adminOnly:true} }, { path:'/sensaciones/studio', name:'sensaciones-studio', component:()=>import('../pages/SensacionesStudioPage.vue'), meta:{requiresAuth:true,superAdminOnly:true,adminOnly:true} }, ...routes],
+    routes:[...publicRoutes, { path:'/sensaciones/studio/marca', name:'sensaciones-settings', component:()=>import('../pages/SensacionesSettingsPage.vue'), meta:{requiresAuth:true,superAdminOnly:true,adminOnly:true} }, { path:'/sensaciones/studio/colecciones', name:'sensaciones-collections-studio', component:()=>import('../pages/SensacionesCollectionsStudioPage.vue'), meta:{requiresAuth:true,superAdminOnly:true,adminOnly:true} }, { path:'/sensaciones/studio', name:'sensaciones-studio', component:()=>import('../pages/SensacionesStudioPage.vue'), meta:{requiresAuth:true,superAdminOnly:true,adminOnly:true} }, ...routes],
     scrollBehavior(to, from, savedPosition) {
       if (to.hash) return { el:to.hash, behavior:'smooth' }
       const alwaysTop = to.meta.publicLanding || ['public-application','client-register','login','viti-demo'].includes(to.name)
