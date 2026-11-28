@@ -49,7 +49,7 @@ const menu = computed(() => buildMainMenu({
   hasBusiness: tenant.businesses.length > 0,
   isManager: isManager.value,
   unreadCount: notifications.unreadCount,
-  productName: branding.product_name,
+  productName: 'Sensaciones',
 }))
 
 const quickItems = computed(() => menu.value.flatMap(item => item.children
@@ -149,10 +149,10 @@ onBeforeUnmount(() => {
     <q-header bordered class="viti-header">
       <q-toolbar class="viti-toolbar">
         <q-btn flat round dense icon="menu" @click="drawer = !drawer" />
-        <div class="q-ml-md text-weight-bold gt-xs">{{ isClient ? (tenant.active?.nombre_comercial || `Mi espacio ${branding.product_name}`) : `Panel ${branding.product_name}` }}</div>
+        <div class="q-ml-md text-weight-bold gt-xs">{{ isClient ? (tenant.active?.nombre_comercial || 'Mi espacio Sensaciones') : 'Gestión Sensaciones' }}</div>
         <q-space />
-        <q-btn flat round dense icon="refresh" @click="refreshApp"><q-tooltip>Actualizar {{ branding.product_name }}</q-tooltip></q-btn>
-        <q-btn flat round icon="search" @click="openQuickSearch"><q-tooltip>Buscar en {{ branding.product_name }} · Ctrl K</q-tooltip></q-btn>
+        <q-btn flat round dense icon="refresh" @click="refreshApp"><q-tooltip>Actualizar Sensaciones</q-tooltip></q-btn>
+        <q-btn flat round icon="search" @click="openQuickSearch"><q-tooltip>Buscar en Sensaciones · Ctrl K</q-tooltip></q-btn>
         <q-btn flat round :icon="notifications.unreadCount ? 'notifications_active' : 'notifications_none'">
           <q-badge v-if="notifications.unreadCount" floating rounded color="negative" :label="unreadLabel" />
           <q-tooltip>Notificaciones internas</q-tooltip>
@@ -195,7 +195,7 @@ onBeforeUnmount(() => {
           <div class="client-badge">
             <div class="text-caption">Negocio activo</div>
             <q-select v-if="tenant.businesses.length > 1" dark borderless dense :model-value="tenant.activeId" :options="businessOptions" emit-value map-options @update:model-value="switchBusiness" />
-            <div v-else class="text-weight-bold ellipsis">{{ tenant.active?.nombre_comercial || `Mi espacio ${branding.product_name}` }}</div>
+            <div v-else class="text-weight-bold ellipsis">{{ tenant.active?.nombre_comercial || `Mi espacio ${'Sensaciones'}` }}</div>
             <div v-if="tenant.active?.rol" class="text-caption q-mt-xs">{{ tenant.active.rol }}</div>
           </div>
         </div>
